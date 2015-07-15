@@ -1,0 +1,21 @@
+FEM:
+G. Lin, G.E. Karniadakis, A Discontinuous Galerkin Method for Two-Temperature Plasmas, 2005
+
+HLLC scheme:
+K.F. Gurski, An HLLC-Type Approximate Riemann Solver for Ideal MHD, 2004
+E.F. Toro, M. Spruce, W. Speares, Restoration of the contact surface in the HLL-Riemann solver, 1994
+
+HLLD scheme:
+T. Miyoshi, K. Kusano, A multi-state HLL approximate Riemann solver for ideal MHD,2005
+A. Mignone, A Simple and Accurate Riemann Solver for Isothermal MHD, 2007
+
+Upwind scheme:
+K.G. Powell, P.L. Roe, T.J. Linde, T.I. Gombosi, D.L. De Zeeuwy, A Solution-Adaptive Upwind Scheme for Ideal MHD, 1999
+
+Introdiction of div B source temrs:
+K.G. Powell, An Approximate Riemann Solver for MHD, 1997
+
+Roe averaged matrix:
+P. Cargo, G. Gallice, Roe Matrices for Ideal MHD and Systematic Construction of Roe Matrices for Systems of Conservation Laws, 1997
+P.L. Roe, Approximate Riemann Solvers, Parameter Vectors, and Difference Schemes, 1981
+M. Brio, C.C. Wu, An Upwind Differencing Scheme for the Equations of Ideal MHD, 1988
