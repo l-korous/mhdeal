@@ -89,7 +89,8 @@ using namespace dealii;
 
 #define DIM 3
 #define DG_ORDER 1
-#define INIT_REF_NUM 4
+#define INIT_REF_NUM 5
+#define COMPONENT_COUNT 2
 
 #pragma endregion
 
@@ -180,7 +181,7 @@ FEProblem::FEProblem()
 
   // Spaces
   fes.push_back(new dealii::FE_DGQ<DIM>(DG_ORDER));
-  multiplicities.push_back(1);
+  multiplicities.push_back(COMPONENT_COUNT);
 
   feCollection.push_back(dealii::FESystem<DIM, DIM>(fes, multiplicities));
 
@@ -190,6 +191,56 @@ FEProblem::FEProblem()
   qCollectionFace.push_back(dealii::QGauss<DIM - 1>(3 * DG_ORDER));
 }
 
+class Postprocessor : public DataPostprocessor < DIM >
+{
+public:
+  Postprocessor();
+  virtual void compute_derived_quantities_vector(const std::vector<Vector<double> > &uh, const std::vector<std::vector<Tensor<1, DIM> > > &duh, const std::vector<std::vector<Tensor<2, DIM> > > &dduh, const std::vector<Point<DIM> > &normals, const std::vector<Point<DIM> >                  &evaluation_points, const dealii::types::material_id mat_id, std::vector<Vector<double> >                    &computed_quantities) const;
+  virtual std::vector<std::string> get_names() const;
+  virtual std::vector < DataComponentInterpretation::DataComponentInterpretation > get_data_component_interpretation() const;
+  virtual UpdateFlags get_needed_update_flags() const;
+};
+
+Postprocessor::Postprocessor() : DataPostprocessor<DIM>()
+{}
+
+void Postprocessor::compute_derived_quantities_vector(const std::vector<Vector<double> > &uh, const std::vector<std::vector<Tensor<1, DIM> > > &duh, const std::vector<std::vector<Tensor<2, DIM> > > &dduh, const std::vector<Point<DIM> > &normals, const std::vector<Point<DIM> > &evaluation_points, const dealii::types::material_id mat_id, std::vector<Vector<double> > &computed_quantities) const
+{
+  const unsigned int n_quadrature_points = uh.size();
+
+  for (unsigned int q = 0; q < n_quadrature_points; ++q)
+  {
+    // Velocities
+    for (unsigned int d = 0; d < COMPONENT_COUNT; ++d)
+      computed_quantities[q](d) = uh[q](d);
+  }
+}
+
+std::vector<std::string> Postprocessor::get_names() const
+{
+  std::vector<std::string> names;
+  for (unsigned int d = 0; d < COMPONENT_COUNT; ++d)
+  {
+    std::stringstream ss;
+    ss << "solution_";
+    ss << std::to_string(d);
+    names.push_back(ss.str());
+  }
+  return names;
+}
+
+std::vector<DataComponentInterpretation::DataComponentInterpretation> Postprocessor::get_data_component_interpretation() const
+{
+  std::vector<DataComponentInterpretation::DataComponentInterpretation> interpretation;
+  for (unsigned int d = 0; d < COMPONENT_COUNT; ++d)
+    interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+  return interpretation;
+}
+
+UpdateFlags Postprocessor::get_needed_update_flags() const
+{
+  return update_values | update_gradients | update_quadrature_points;
+}
 
 void FEProblem::setup_system()
 {
@@ -200,7 +251,7 @@ void FEProblem::setup_system()
   DynamicSparsityPattern dsp(dof_handler.n_dofs());
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp);
   sparsity_pattern.copy_from(dsp);
-  
+
   system_matrix.reinit(sparsity_pattern);
   right_hand_side.reinit(dof_handler.n_dofs());
   solution.reinit(dof_handler.n_dofs());
@@ -209,7 +260,7 @@ void FEProblem::setup_system()
 void FEProblem::assemble_system()
 {
   MeshWorker::IntegrationInfoBox<DIM> info_box;
-  
+
   info_box.initialize_gauss_quadrature(3 * DG_ORDER, 3 * DG_ORDER, 3 * DG_ORDER);
 
   // These are the types of values we need for integrating our system. They
@@ -274,6 +325,14 @@ void FEProblem::integrate_cell_term(DoFInfo &dinfo,
   FullMatrix<double> &local_matrix = dinfo.matrix(0).matrix;
   const std::vector<double> &JxW = fe_v.get_JxW_values();
 
+  const unsigned int dofs_per_cell = info.finite_element().dofs_per_cell;
+  std::vector<int> components(dofs_per_cell);
+
+  for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  {
+    components[i] = info.finite_element().system_to_component_index(i).first;
+  }
+
   // With these objects, we continue local integration like always. First,
   // we loop over the quadrature points and compute the advection vector in
   // the current point.
@@ -288,9 +347,14 @@ void FEProblem::integrate_cell_term(DoFInfo &dinfo,
     // in the cell term.  What's left is integrating the matrix entries.
     for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
       for (unsigned int j = 0; j < fe_v.dofs_per_cell; ++j)
-        local_matrix(i, j) -= beta*fe_v.shape_grad(i, point)*
-        fe_v.shape_value(j, point) *
-        JxW[point];
+      {
+        if (components[i] == components[j])
+        {
+          local_matrix(i, j) -= beta*fe_v.shape_grad(i, point)*
+            fe_v.shape_value(j, point) *
+            JxW[point];
+        }
+      }
   }
 }
 
@@ -312,6 +376,14 @@ void FEProblem::integrate_boundary_term(DoFInfo &dinfo,
   static BoundaryValues boundary_function;
   boundary_function.value_list(fe_v.get_quadrature_points(), g);
 
+  const unsigned int dofs_per_cell = info.finite_element().dofs_per_cell;
+  std::vector<int> components(dofs_per_cell);
+
+  for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  {
+    components[i] = info.finite_element().system_to_component_index(i).first;
+  }
+
   for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
   {
     Point<DIM> beta;
@@ -323,10 +395,15 @@ void FEProblem::integrate_boundary_term(DoFInfo &dinfo,
     if (beta_n > 0)
       for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
         for (unsigned int j = 0; j < fe_v.dofs_per_cell; ++j)
-          local_matrix(i, j) += beta_n *
-          fe_v.shape_value(j, point) *
-          fe_v.shape_value(i, point) *
-          JxW[point];
+        {
+          if (components[i] == components[j])
+          {
+            local_matrix(i, j) += beta_n *
+              fe_v.shape_value(j, point) *
+              fe_v.shape_value(i, point) *
+              JxW[point];
+          }
+        }
     else
       for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
         local_vector(i) -= beta_n *
@@ -370,6 +447,21 @@ void FEProblem::integrate_face_term(DoFInfo &dinfo1,
   const std::vector<double> &JxW = fe_v.get_JxW_values();
   const std::vector<Point<DIM> > &normals = fe_v.get_normal_vectors();
 
+  const unsigned int dofs_per_cell1 = info1.finite_element().dofs_per_cell;
+  const unsigned int dofs_per_cell2 = info2.finite_element().dofs_per_cell;
+
+  std::vector<int> components1(dofs_per_cell1);
+  std::vector<int> components2(dofs_per_cell2);
+
+  for (unsigned int i = 0; i < dofs_per_cell1; ++i)
+  {
+    components1[i] = info1.finite_element().system_to_component_index(i).first;
+  }
+  for (unsigned int i = 0; i < dofs_per_cell2; ++i)
+  {
+    components2[i] = info2.finite_element().system_to_component_index(i).first;
+  }
+
   for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
   {
     Point<DIM> beta;
@@ -383,38 +475,58 @@ void FEProblem::integrate_face_term(DoFInfo &dinfo1,
       // This term we've already seen:
       for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
         for (unsigned int j = 0; j < fe_v.dofs_per_cell; ++j)
-          u1_v1_matrix(i, j) += beta_n *
-          fe_v.shape_value(j, point) *
-          fe_v.shape_value(i, point) *
-          JxW[point];
+        {
+          if (components1[i] == components1[j])
+          {
+            u1_v1_matrix(i, j) += beta_n *
+              fe_v.shape_value(j, point) *
+              fe_v.shape_value(i, point) *
+              JxW[point];
+          }
+        }
 
       // We additionally assemble the term $(\beta\cdot n u,\hat
       // v)_{\partial \kappa_+}$,
       for (unsigned int k = 0; k < fe_v_neighbor.dofs_per_cell; ++k)
         for (unsigned int j = 0; j < fe_v.dofs_per_cell; ++j)
-          u1_v2_matrix(k, j) -= beta_n *
-          fe_v.shape_value(j, point) *
-          fe_v_neighbor.shape_value(k, point) *
-          JxW[point];
+        {
+          if (components1[j] == components2[k])
+          {
+            u1_v2_matrix(k, j) -= beta_n *
+              fe_v.shape_value(j, point) *
+              fe_v_neighbor.shape_value(k, point) *
+              JxW[point];
+          }
+        }
     }
     else
     {
       // This one we've already seen, too:
       for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
         for (unsigned int l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
-          u2_v1_matrix(i, l) += beta_n *
-          fe_v_neighbor.shape_value(l, point) *
-          fe_v.shape_value(i, point) *
-          JxW[point];
+        {
+          if (components1[i] == components2[l])
+          {
+            u2_v1_matrix(i, l) += beta_n *
+              fe_v_neighbor.shape_value(l, point) *
+              fe_v.shape_value(i, point) *
+              JxW[point];
+          }
+        }
 
       // And this is another new one: $(\beta\cdot n \hat u,\hat
       // v)_{\partial \kappa_-}$:
       for (unsigned int k = 0; k < fe_v_neighbor.dofs_per_cell; ++k)
         for (unsigned int l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
-          u2_v2_matrix(k, l) -= beta_n *
-          fe_v_neighbor.shape_value(l, point) *
-          fe_v_neighbor.shape_value(k, point) *
-          JxW[point];
+        {
+          if (components2[k] == components2[l])
+          {
+            u2_v2_matrix(k, l) -= beta_n *
+              fe_v_neighbor.shape_value(l, point) *
+              fe_v_neighbor.shape_value(k, point) *
+              JxW[point];
+          }
+        }
     }
   }
 }
@@ -450,10 +562,11 @@ void FEProblem::solve(Vector<double> &solution)
 
 void FEProblem::output_results() const
 {
+  Postprocessor postprocessor;
   DataOut<DIM, hp::DoFHandler<DIM> > data_out;
-  data_out.attach_dof_handler(this->dof_handler);
-  const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
-  data_out.add_data_vector(this->solution, "sln");
+  data_out.attach_dof_handler(dof_handler);
+  const DataOut<DIM, hp::DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, hp::DoFHandler<DIM> >::type_dof_data;
+  data_out.add_data_vector(solution, postprocessor);
   data_out.build_patches();
   std::string filename = "solution.vtk";
   std::ofstream output(filename.c_str());
