@@ -19,15 +19,17 @@ SET(TARGET "dealii-mhd")
 # page of the documentation.
 SET(TARGET_SRC
   main.cpp
+  postProcessor.cpp
+  mhdSolver.cpp
+  equationImplementation.cpp
+  common.h
   )
 
 # Usually, you will not need to modify anything beyond this point...
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
-
 FIND_PACKAGE(deal.II 8.3 QUIET
-  HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR}
-  )
+  HINTS ${deal.II_DIR} ${DEAL_II_DIR} ../ ../../ $ENV{DEAL_II_DIR} NO_SYSTEM_PATH NO_DEFAULT_PATH)
 IF(NOT ${deal.II_FOUND})
   MESSAGE(FATAL_ERROR "\n"
     "*** Could not locate a (sufficiently recent) version of deal.II. ***\n\n"
