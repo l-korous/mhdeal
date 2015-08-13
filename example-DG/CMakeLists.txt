@@ -22,6 +22,17 @@ SET(TARGET_SRC
   postProcessor.cpp
   mhdSolver.cpp
   equationImplementation.cpp
+  boundaryConditions.cpp
+  numericalFlux.cpp
+  initialSln.cpp
+  
+  definitions.h
+  postProcessor.h
+  mhdSolver.h
+  equationImplementation.h
+  boundaryConditions.h
+  numericalFlux.h
+  initialSln.h
   common.h
   )
 

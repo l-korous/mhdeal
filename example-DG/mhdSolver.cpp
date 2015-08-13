@@ -2,26 +2,21 @@
 
 typedef EquationImplementation Eq;
 
+Vector<d> MHDSolver::slnPrev;
+
 MHDSolver::MHDSolver()
   :
-  dofHandler(triangulation)
+  feSystem(dealii::FE_DGQ<DIM>(DG_ORDER), COMPONENT_COUNT),
+  dofHandler(triangulation),
+  mapping(),
+  quad(2 * DG_ORDER),
+  quadFace(2 * DG_ORDER)
 {
-  std::vector<const dealii::FiniteElement<DIM> *> fes;
-  std::vector<ui> multiplicities;
-
-  fes.push_back(new dealii::FE_DGQ<DIM>(DG_ORDER));
-  multiplicities.push_back(COMPONENT_COUNT);
-  feCollection.push_back(dealii::FESystem<DIM, DIM>(fes, multiplicities));
-
-  mappingCollection.push_back(dealii::MappingQ<DIM>(1, true));
-
-  qCollection.push_back(dealii::QGauss<DIM>(3 * DG_ORDER));
-  qCollectionFace.push_back(dealii::QGauss<DIM - 1>(3 * DG_ORDER));
 }
 
 void MHDSolver::setup_system()
 {
-  dofHandler.distribute_dofs(feCollection);
+  dofHandler.distribute_dofs(feSystem);
 
   dealii::DoFRenumbering::component_wise(dofHandler);
 
@@ -32,6 +27,7 @@ void MHDSolver::setup_system()
   systemMatrix.reinit(sparsityPattern);
   rightHandSide.reinit(dofHandler.n_dofs());
   solution.reinit(dofHandler.n_dofs());
+  slnPrev.reinit(dofHandler.n_dofs());
 }
 
 void MHDSolver::assemble_system()
@@ -41,12 +37,19 @@ void MHDSolver::assemble_system()
   // \todo This is wrong probably.
   info_box.initialize_gauss_quadrature(3 * DG_ORDER, 3 * DG_ORDER, 3 * DG_ORDER);
 
+  AnyData solution_data;
+  solution_data.add(&solution, "solution");
+  info_box.cell_selector.add("solution", true, false, false);
+  info_box.boundary_selector.add("solution", true, false, false);
+  info_box.face_selector.add("solution", true, false, false);
+
+
   info_box.initialize_update_flags();
   UpdateFlags update_flags = update_quadrature_points | update_values | update_gradients;
   info_box.add_update_flags(update_flags, true, true, true, true);
 
   // \todo What about multiple FEs in feCollection?
-  info_box.initialize(this->feCollection[0], this->mappingCollection[0]);
+  info_box.initialize(feSystem, mapping, );
 
   // \todo This has to be done properly for hpDoFHandler (varying number of DOFs per cell)
   MeshWorker::DoFInfo<DIM> dof_info(dofHandler);
@@ -69,6 +72,14 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   const ui dofs_per_cell = info.finite_element().dofs_per_cell;
 
+  std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+  //for (ui i = 0; i < COMPONENT_COUNT; i++)
+  //  for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
+  //  prev_values = 
+  //info.values;
+  dinfo.reinit(dinfo.cell);
+  fe_v.get_function_values(MHDSolver::slnPrev, prev_values);
+
   // Components
   std::vector<int> components(dofs_per_cell);
   for (ui i = 0; i < dofs_per_cell; ++i)
@@ -81,15 +92,12 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
       {
         local_matrix(i, j) += JxW[point] * Eq::matrixVolValue(components[j], components[i],
           fe_v.shape_value(j, point), fe_v.shape_value(i, point),
-          vec(), fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
+          prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
           vecDimVec(), fe_v.quadrature_point(point));
       }
   }
 }
 
-// Now the same for the boundary terms. Note that now we use FEValuesBase,
-// the base class for both FEFaceValues and FESubfaceValues, in order to get
-// access to normal vectors.
 void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
   CellInfo &info)
 {
@@ -127,9 +135,6 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
   }
 }
 
-// Finally, the interior face terms. The difference here is that we receive
-// two info objects, one for each cell adjacent to the face and we assemble
-// four matrices, one for each cell and two for coupling back and forth.
 void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   DoFInfo &dinfo2,
   CellInfo &info1,
@@ -233,23 +238,25 @@ void MHDSolver::solve(Vector<d> &solution)
   PreconditionBlockSSOR<SparseMatrix<d> > preconditioner;
 
   // then assign the matrix to it and set the right block size:
-  preconditioner.initialize(systemMatrix, feCollection.max_dofs_per_cell());
+  preconditioner.initialize(systemMatrix, feSystem.dofs_per_cell);
 
   // After these preparations we are ready to start the linear solver.
-  solver.solve(systemMatrix, solution, rightHandSide,
-    preconditioner);
+  solver.solve(systemMatrix, solution, rightHandSide, preconditioner);
 }
 
-void MHDSolver::outputResults() const
+void MHDSolver::outputResults(ui timeStep, d currentTime) const
 {
   Postprocessor postprocessor;
-  DataOut<DIM, hp::DoFHandler<DIM> > data_out;
+  DataOut<DIM, DoFHandler<DIM> > data_out;
   data_out.attach_dof_handler(dofHandler);
-  const DataOut<DIM, hp::DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, hp::DoFHandler<DIM> >::type_dof_data;
-  data_out.add_data_vector(solution, postprocessor);
-  data_out.build_patches();
-  std::string filename = "solution.vtk";
-  std::ofstream output(filename.c_str());
+  const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
+  data_out.add_data_vector(slnPrev, postprocessor);
+  data_out.build_patches(mapping);
+  std::stringstream ss;
+  ss << "solution-";
+  ss << timeStep;
+  ss << ".vtk";
+  std::ofstream output(ss.str());
   data_out.write_vtk(output);
 }
 
@@ -269,8 +276,21 @@ void MHDSolver::run()
     << dofHandler.n_dofs()
     << std::endl;
 
-  assemble_system();
-  solve(solution);
+  // Initial sln.
+  VectorFunctionFromScalarFunctionObject<DIM> initialSln(InitialSln::value, 0, COMPONENT_COUNT);
+  VectorTools::interpolate(this->dofHandler, initialSln, this->slnPrev);
 
-  outputResults();
+  d currentTime = 0.;
+  for (ui timeStep = 0; currentTime < T_FINAL; timeStep++, currentTime += DELTA_T)
+  {
+    Timer timer;
+    timer.start();
+    assemble_system();
+    solve(solution);
+    this->slnPrev = solution;
+    outputResults(timeStep, currentTime);
+    timer.stop();
+    std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s.";
+  }
+
 }

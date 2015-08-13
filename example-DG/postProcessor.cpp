@@ -3,7 +3,12 @@
 Postprocessor::Postprocessor() : DataPostprocessor<DIM>()
 {}
 
-void Postprocessor::compute_derived_quantities_vector(const std::vector<Vector<double> > &uh, const std::vector<std::vector<Tensor<1, DIM> > > &duh, const std::vector<std::vector<Tensor<2, DIM> > > &dduh, const std::vector<Point<DIM> > &normals, const std::vector<Point<DIM> > &evaluation_points, const dealii::types::material_id mat_id, std::vector<Vector<double> > &computed_quantities) const
+void Postprocessor::compute_derived_quantities_vector(const std::vector<Vector<d> > &uh,
+  const std::vector<vecDimVec> &duh,
+  const std::vector<std::vector<Tensor<2, DIM> > > &dduh,
+  const std::vector<Point<DIM> > &normals,
+  const std::vector<Point<DIM> > &evaluation_points, 
+  std::vector<Vector<d> > &computed_quantities) const
 {
   const ui n_quadrature_points = uh.size();
 
