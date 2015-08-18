@@ -1,3 +1,8 @@
+#ifndef MHD_SOLVER_H
+#define MHD_SOLVER_H
+
+#include "definitions.h"
+
 class MHDSolver
 {
 public:
@@ -34,3 +39,5 @@ private:
   static void assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info);
   static void assembleInternalEdge(DoFInfo &dinfo1, DoFInfo &dinfo2, CellInfo &info1, CellInfo &info2);
 };
+
+#endif // MHD_SOLVER_H

@@ -1,3 +1,8 @@
+#ifndef POST_PROCESSOR_H
+#define POST_PROCESSOR_H
+
+#include "definitions.h"
+
 class Postprocessor : public DataPostprocessor < DIM >
 {
 public:
@@ -13,3 +18,5 @@ public:
   virtual std::vector < DataComponentInterpretation::DataComponentInterpretation > get_data_component_interpretation() const;
   virtual UpdateFlags get_needed_update_flags() const;
 };
+
+#endif // POST_PROCESSOR_H

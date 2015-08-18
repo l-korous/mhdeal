@@ -1,3 +1,7 @@
+#ifndef DEFINITIONS_H
+#define DEFINITIONS_H
+
+
 // These are problem definitions.
 
 #define DIM 2
@@ -7,3 +11,6 @@
 
 #define T_FINAL 1.0
 #define DELTA_T 0.1
+
+
+#endif // DEFINITIONS_H

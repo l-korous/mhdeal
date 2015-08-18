@@ -1,3 +1,8 @@
+#ifndef EQUATION_IMPLEMENTATION_H
+#define EQUATION_IMPLEMENTATION_H
+
+#include "definitions.h"
+
 class EquationImplementation
 {
 public:
@@ -30,3 +35,5 @@ public:
     d v_valN, vec Un_valN, dimVec v_gradN,
     vecDimVec Un_gradN, bool v_N, Point<DIM> quadPoint, Point<DIM> normal);
 };
+
+#endif // EQUATION_IMPLEMENTATION_H

@@ -1,3 +1,6 @@
+#ifndef COMMON_H
+#define COMMON_H
+
 #include <fstream>
 #include <vector>
 #include <iostream>
@@ -65,3 +68,5 @@ typedef dealii::Vector<d> vec;
 #include "numericalFlux.h"
 #include "boundaryConditions.h"
 #include "initialSln.h"
+
+#endif // COMMON_H
