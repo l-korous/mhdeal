@@ -8,7 +8,7 @@ DirichletBoundaryCondition bc;
 
 MHDSolver::MHDSolver()
     :
-    feSystem(dealii::FE_DGQ<COMPONENT_COUNT, DIM>(DG_ORDER), COMPONENT_COUNT),
+    feSystem(dealii::FE_DGQ<DIM>(DG_ORDER), COMPONENT_COUNT),
     dofHandler(triangulation),
     mapping(),
     quad(2 * DG_ORDER),
@@ -35,7 +35,7 @@ void MHDSolver::setup_system()
 
 void MHDSolver::assemble_system()
 {
-    MeshWorker::IntegrationInfoBox<COMPONENT_COUNT, DIM> info_box;
+    MeshWorker::IntegrationInfoBox<DIM> info_box;
 
     // \todo This is wrong probably.
     info_box.initialize_gauss_quadrature(3 * DG_ORDER, 3 * DG_ORDER, 3 * DG_ORDER);
@@ -54,13 +54,13 @@ void MHDSolver::assemble_system()
     info_box.initialize(feSystem, mapping, solution_data, rightHandSide);
 
     // \todo This has to be done properly for hpDoFHandler (varying number of DOFs per cell)
-    MeshWorker::DoFInfo<COMPONENT_COUNT, DIM> dof_info(dofHandler);
+    MeshWorker::DoFInfo<DIM> dof_info(dofHandler);
 
     MeshWorker::Assembler::SystemSimple < SparseMatrix<d>, Vector<d> > assembler;
     assembler.initialize(systemMatrix, rightHandSide);
 
     // \todo This comes from tutorial, it may need some adjustment.
-    MeshWorker::loop<COMPONENT_COUNT, DIM, MeshWorker::DoFInfo<COMPONENT_COUNT, DIM>, MeshWorker::IntegrationInfoBox<COMPONENT_COUNT, DIM> >
+    MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
         (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
         &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
 }
@@ -68,7 +68,7 @@ void MHDSolver::assemble_system()
 void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
     CellInfo &info)
 {
-    const FEValuesBase<COMPONENT_COUNT, DIM> &fe_v = info.fe_values();
+    const FEValuesBase<DIM> &fe_v = info.fe_values();
     FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
     Vector<d> &local_vector = dinfo.vector(0).block(0);
     const std::vector<d> &JxW = fe_v.get_JxW_values();
@@ -107,7 +107,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
     CellInfo &info)
 {
-    const FEValuesBase<COMPONENT_COUNT, DIM> &fe_v = info.fe_values();
+    const FEValuesBase<DIM> &fe_v = info.fe_values();
     FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
     Vector<d> &local_vector = dinfo.vector(0).block(0);
 
@@ -153,11 +153,11 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
 {
     // For quadrature points, weights, etc., we use the FEValuesBase object of
     // the first argument.
-    const FEValuesBase<COMPONENT_COUNT, DIM> &fe_v = info1.fe_values();
+    const FEValuesBase<DIM> &fe_v = info1.fe_values();
 
     // For additional shape functions, we have to ask the neighbors
     // FEValuesBase.
-    const FEValuesBase<COMPONENT_COUNT, DIM> &fe_v_neighbor = info2.fe_values();
+    const FEValuesBase<DIM> &fe_v_neighbor = info2.fe_values();
 
     // Then we get references to the four local matrices. The letters u and v
     // refer to trial and test functions, respectively. The %numbers indicate
@@ -282,9 +282,9 @@ void MHDSolver::solve(Vector<d> &solution)
 void MHDSolver::outputResults(ui timeStep, d currentTime) const
 {
     Postprocessor postprocessor;
-    DataOut<COMPONENT_COUNT, DoFHandler<COMPONENT_COUNT, DIM> > data_out;
+    DataOut<DIM, DoFHandler<DIM> > data_out;
     data_out.attach_dof_handler(dofHandler);
-    const DataOut<COMPONENT_COUNT, DoFHandler<COMPONENT_COUNT, DIM> >::DataVectorType data_vector_type = DataOut<COMPONENT_COUNT, DoFHandler<COMPONENT_COUNT, DIM> >::type_dof_data;
+    const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
     data_out.add_data_vector(slnPrev, postprocessor);
     data_out.build_patches(mapping);
     std::stringstream ss;

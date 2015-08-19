@@ -1,3 +1,6 @@
+#ifndef EQUATIONS_H
+#define EQUATIONS_H
+
 #include "boundaryConditions.h"
 #include "numericalFlux.h"
 
@@ -33,3 +36,5 @@ public:
     d v_valN, vec Un_valN, dimVec v_gradN,
     vecDimVec Un_gradN, bool v_N, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux);
 };
+
+#endif
