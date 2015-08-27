@@ -10,6 +10,12 @@ void Postprocessor::compute_derived_quantities_scalar(const std::vector<d>      
     const std::vector<Point<DIM> >    &evaluation_points0,
     std::vector<Vector<double> >      &computed_quantities) const
 {
+    const ui n_quadrature_points = uh0.size();
+
+    for (ui q = 0; q < n_quadrature_points; ++q)
+    {
+       computed_quantities[q](0) = uh0[q];
+    }
 }
 
 void Postprocessor::compute_derived_quantities_vector(const std::vector<Vector<d> > &uh,

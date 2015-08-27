@@ -266,6 +266,7 @@ void MHDSolver::solve(Vector<d> &solution)
         matrix_out.close();
         rhs_out.close();
     }
+    /*
     SolverControl           solver_control(1000, 1e-12);
     SolverRichardson<>      solver(solver_control);
 
@@ -277,6 +278,13 @@ void MHDSolver::solve(Vector<d> &solution)
 
     // After these preparations we are ready to start the linear solver.
     solver.solve(systemMatrix, solution, rightHandSide, preconditioner);
+    */
+
+    dealii::SparseDirectUMFPACK solver;
+
+    solver.initialize(systemMatrix);
+
+    solver.vmult(solution, rightHandSide);
 }
 
 void MHDSolver::outputResults(ui timeStep, d currentTime) const

@@ -1,9 +1,8 @@
-#include "common.h"
+    #include "common.h"
 
-d calculate_flux(double x, double y, double vx, double vy)
+d calculate_flux(double x, double y, double nx, double ny)
 {
-    double norm = std::max<double>(1e-12, std::sqrt(std::pow(x, 2.) + std::pow(y, 2.)));
-    return -y / norm*vx + x / norm*vy;
+    return FLUX;
 }
 
 d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
@@ -16,7 +15,7 @@ d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
   // Time derivative.
   if (comp_i == comp_j)
   {
-      result += u_val * v_val;
+      result += u_val * v_val / DELTA_T;
       flux = calculate_flux(quadPoint(0), quadPoint(1), v_grad[0], v_grad[1]);
       result -= u_val * flux;
   }
@@ -31,9 +30,6 @@ d EquationImplementation::matrixBoundaryEdgeValue(ui comp_i, ui comp_j,
 {
   d result = 0.;
 
-  d a_dot_n = calculate_flux(quadPoint(0), quadPoint(1), normal(0), normal(1));
-  result = a_dot_n * v_val;
-
   return result;
 }
 
@@ -45,13 +41,6 @@ d EquationImplementation::matrixInternalEdgeValue(ui comp_i, ui comp_j,
 {
   d result = 0.;
 
-  d jump_v = v_N ? -v_val : v_val;
-
-  vec numFlux(COMPONENT_COUNT);
-
-  num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
-
-  result = numFlux[comp_i] * jump_v;
 
   return result;
 }
@@ -65,7 +54,7 @@ d EquationImplementation::rhsVolValue(ui comp_i,
   d result = 0.;
 
   // Time derivative.
-  result += Un_val[comp_i] * v_val;
+  result += Un_val[comp_i] * v_val / DELTA_T;
 
   return result;
 }
@@ -76,8 +65,6 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
   vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc)
 {
   d result = 0.;
-
-  d a_dot_n = calculate_flux(quadPoint(0), quadPoint(1), normal(0), normal(1));
 
   vec bc_state(COMPONENT_COUNT);
   for (ui i = 0; i < COMPONENT_COUNT; i++)
@@ -100,6 +87,12 @@ d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
   vecDimVec Un_gradN, bool v_N, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
   d result = 0.;
+
+  vec numFlux(COMPONENT_COUNT);
+
+  num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
+
+  result = -numFlux[0] * (v_N ? -v_val : v_val);
 
   return result;
 }
