@@ -30,11 +30,9 @@ public:
     d v_val, vec Un_val, dimVec v_grad,
     vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc);
 
-  static d rhsInternalEdgeValue(ui component_i,
-    d v_val, vec Un_val, dimVec v_grad,
-    vecDimVec Un_grad,
-    d v_valN, vec Un_valN, dimVec v_gradN,
-    vecDimVec Un_gradN, bool v_N, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux);
+  static d rhsInternalEdgeValue(ui comp_i,
+      d v_val, dimVec v_grad, bool v_N, vec Un_val,
+      vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux);
 };
 
 #endif

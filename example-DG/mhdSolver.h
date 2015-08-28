@@ -9,7 +9,7 @@ public:
 
 private:
   void setup_system();
-  void assemble_system();
+  void assemble_system(bool firstIteration);
   void solve(Vector<d> &solution);
   void solveOneStep(Vector<d> &solution);
   void outputResults(ui timeStep, d currentTime) const;

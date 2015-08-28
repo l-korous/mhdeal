@@ -33,7 +33,7 @@ void MHDSolver::setup_system()
     slnPrev.reinit(dofHandler.n_dofs());
 }
 
-void MHDSolver::assemble_system()
+void MHDSolver::assemble_system(bool firstIteration)
 {
     MeshWorker::IntegrationInfoBox<DIM> info_box;
 
@@ -56,6 +56,11 @@ void MHDSolver::assemble_system()
     // \todo This has to be done properly for hpDoFHandler (varying number of DOFs per cell)
     MeshWorker::DoFInfo<DIM> dof_info(dofHandler);
 
+    if (!firstIteration)
+    {
+        systemMatrix.reinit(sparsityPattern);
+        rightHandSide.reinit(dofHandler.n_dofs());
+    }
     MeshWorker::Assembler::SystemSimple < SparseMatrix<d>, Vector<d> > assembler;
     assembler.initialize(systemMatrix, rightHandSide);
 
@@ -170,6 +175,9 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
     FullMatrix<d> &u1_v2_matrix = dinfo2.matrix(0, true).matrix;
     FullMatrix<d> &u2_v2_matrix = dinfo2.matrix(0, false).matrix;
 
+    Vector<d> &v1_vector = dinfo1.vector(0).block(0);
+    Vector<d> &v2_vector = dinfo2.vector(0).block(0);
+
     // Here, following the previous functions, we would have the local right
     // hand side vectors. Fortunately, the interface terms only involve the
     // solution and the right hand side does not receive any contributions.
@@ -186,7 +194,7 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
         for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
             prev_values1[point][i] = info1.values[0][i][point];
 
-    std::vector<dealii::Vector<double> > prev_values2(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+    std::vector<dealii::Vector<double> > prev_values2(fe_v_neighbor.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
     for (ui i = 0; i < COMPONENT_COUNT; i++)
         for (ui point = 0; point < fe_v_neighbor.n_quadrature_points; ++point)
             prev_values2[point][i] = info2.values[0][i][point];
@@ -217,7 +225,7 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
         {
             for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
             {
-                u1_v2_matrix(k, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components1[k],
+                u1_v2_matrix(k, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components2[k],
                     fe_v.shape_value(j, point), fe_v_neighbor.shape_value(k, point),
                     prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v_neighbor.shape_grad(k, point),
                     vecDimVec(), vecDimVec(), false, true, fe_v.quadrature_point(point), normals[point], numFlux);
@@ -228,7 +236,7 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
         {
             for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
             {
-                u2_v1_matrix(i, l) += JxW[point] * Eq::matrixInternalEdgeValue(components1[l], components1[i],
+                u2_v1_matrix(i, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components1[i],
                     fe_v_neighbor.shape_value(l, point), fe_v.shape_value(i, point),
                     prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v.shape_grad(i, point),
                     vecDimVec(), vecDimVec(), true, false, fe_v.quadrature_point(point), normals[point], numFlux);
@@ -239,11 +247,23 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
         {
             for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
             {
-                u2_v2_matrix(k, l) += JxW[point] * Eq::matrixInternalEdgeValue(components1[l], components1[k],
+                u2_v2_matrix(k, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components2[k],
                     fe_v_neighbor.shape_value(l, point), fe_v_neighbor.shape_value(k, point),
                     prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v_neighbor.shape_grad(k, point),
                     vecDimVec(), vecDimVec(), true, true, fe_v.quadrature_point(point), normals[point], numFlux);
             }
+        }
+
+        for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
+        {
+            v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point), fe_v.shape_grad(i, point), false,
+                prev_values1[point], vecDimVec(), prev_values2[point], vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+        }
+
+        for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
+        {
+            v2_vector(l) += JxW[point] * JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point), fe_v_neighbor.shape_grad(l, point), true,
+                prev_values1[point], vecDimVec(), prev_values2[point], vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
         }
     }
 }
@@ -328,12 +348,12 @@ void MHDSolver::run()
     {
         Timer timer;
         timer.start();
-        assemble_system();
+        assemble_system(timeStep == 0);
         solve(solution);
         this->slnPrev = solution;
         outputResults(timeStep, currentTime);
         timer.stop();
-        std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s.";
+        std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s." << std::endl;
     }
 
 }
