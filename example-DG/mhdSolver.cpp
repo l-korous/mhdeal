@@ -24,7 +24,7 @@ void MHDSolver::setup_system()
     dealii::DoFRenumbering::component_wise(dofHandler);
 
     DynamicSparsityPattern dsp(dofHandler.n_dofs());
-    DoFTools::make_sparsity_pattern(dofHandler, dsp);
+    DoFTools::make_flux_sparsity_pattern(dofHandler, dsp);
     sparsityPattern.copy_from(dsp);
 
     systemMatrix.reinit(sparsityPattern);
