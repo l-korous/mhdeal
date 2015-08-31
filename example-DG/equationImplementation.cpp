@@ -1,5 +1,6 @@
 #include "common.h"
 
+// Not used so far
 #pragma region FluxJacobians
 
 #define Rcv (R / c_v)
@@ -106,136 +107,158 @@
 
 d calculate_flux(double x, double y, double nx, double ny)
 {
-  return FLUX;
+    return FLUX;
 }
 
 d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
-  d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, Point<DIM> quadPoint)
+    d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
+    vecDimVec Un_grad, Point<DIM> quadPoint)
 {
-  d result = 0.;
+    d result = 0.;
 
-  // Time derivative.
-  if (comp_i == comp_j)
-  {
-    result += u_val * v_val / DELTA_T;
-  }
+    // Time derivative.
+    if (comp_i == comp_j)
+    {
+        result += u_val * v_val / DELTA_T;
 
-  return result;
+#if TIME_DISCRETIZATION_SEMI_IMPLICIT
+        result -= calculate_flux(quadPoint(0), quadPoint(1), v_grad[0], v_grad[1]) * u_val;
+#endif
+
+    }
+
+    return result;
 }
 
 
 d EquationImplementation::matrixBoundaryEdgeValue(ui comp_i, ui comp_j,
-  d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
+    d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
+    vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
-  d result = 0.;
+    d result = 0.;
 
-  vec numFlux(COMPONENT_COUNT);
+#if TIME_DISCRETIZATION_SEMI_IMPLICIT
 
-  vec bc_state(COMPONENT_COUNT);
-  vec u_state(COMPONENT_COUNT);
-  for (ui i = 0; i < COMPONENT_COUNT; i++)
-  {
-    bc_state = 0.;
-    u_state = u_val;
-  }
+    vec numFlux(COMPONENT_COUNT);
 
-  num_flux->calculate(u_state, bc_state, quadPoint, normal, numFlux);
+    vec bc_state(COMPONENT_COUNT);
+    vec u_state(COMPONENT_COUNT);
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+    {
+        bc_state = 0.;
+        u_state = u_val;
+    }
 
-  result = numFlux[0] * v_val;
+    // Jelikoz kdyz tok vyhodnoti ze je treba pouzit hodnotu nikoliv z elementu, ale ze souseda a jsme na hranici,
+    // tak hodnoty z hranice musi jit na pravou stranu (nepouzije se bazova fce). Proto je tady boundary hodnota 0,
+    // u prave strany (rhsBoundaryEdgeValue) to bude naopak.
+    num_flux->calculate(u_state, bc_state, quadPoint, normal, numFlux);
 
-  return 0.;//result;
+    result += numFlux[0] * v_val;
+#endif
+
+    return result;
 }
 
 
 d EquationImplementation::matrixInternalEdgeValue(ui comp_i, ui comp_j,
-  d u_val, d v_val, vec Un_val, vec Un_valN, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, vecDimVec Un_gradN, bool u_N, bool v_N,
-  Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
+    d u_val, d v_val, vec Un_val, vec Un_valN, dimVec u_grad, dimVec v_grad,
+    vecDimVec Un_grad, vecDimVec Un_gradN, bool u_N, bool v_N,
+    Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
-  d result = 0.;
+    d result = 0.;
 
-  d jump_v = v_N ? -v_val : v_val;
+#if TIME_DISCRETIZATION_SEMI_IMPLICIT
+    d jump_v = v_N ? -v_val : v_val;
 
-  vec numFlux(COMPONENT_COUNT);
+    vec numFlux(COMPONENT_COUNT);
 
-  vec u_state(COMPONENT_COUNT);
-  vec u_stateN(COMPONENT_COUNT);
-  for (ui i = 0; i < COMPONENT_COUNT; i++)
-  {
-    if (u_N)
+    vec u_state(COMPONENT_COUNT);
+    vec u_stateN(COMPONENT_COUNT);
+
+    // Tohle je takove asi matouci, ale takto muzeme mit pouze jednu funkci na vsechny pripady.
+    // Vlastne vyuzivame toho, ze kdyz je u_N (== "u ma support na Neighborovi"), tak je u na aktualnim elementu 0,
+    // a tok pocitam takto. Kdyz neni u_N, tak zase jak to odpovida.
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
     {
-      u_stateN = u_val;
-      u_state = 0.;
+        u_state[i] = 0.;
+        u_stateN[i] = 0.;
+
+        if (u_N)
+            u_stateN[comp_i] = u_val;
+        else
+            u_state[comp_i] = u_val;
     }
-    else
-    {
-      u_state = u_val;
-      u_stateN = 0.;
-    }
-  }
 
-  num_flux->calculate(u_state, u_stateN, quadPoint, normal, numFlux);
+    num_flux->calculate(u_state, u_stateN, quadPoint, normal, numFlux);
 
-  result = numFlux[comp_i] * jump_v;
+    result += numFlux[comp_i] * jump_v;
+#endif
 
-  return 0.;// result;
+    return result;
 }
 
 
 
 d EquationImplementation::rhsVolValue(ui comp_i,
-  d v_val, vec Un_val, dimVec v_grad,
-  vecDimVec Un_grad, Point<DIM> quadPoint)
+    d v_val, vec Un_val, dimVec v_grad,
+    vecDimVec Un_grad, Point<DIM> quadPoint)
 {
-  d result = 0.;
-  d flux;
+    d result = 0.;
 
-  // Time derivative.
-  result += Un_val[comp_i] * v_val / DELTA_T;
-  result += calculate_flux(quadPoint(0), quadPoint(1), v_grad[0], v_grad[1]) * Un_val[0];
+    // Time derivative.
+    result += Un_val[comp_i] * v_val / DELTA_T;
 
-  return result;
+#if !TIME_DISCRETIZATION_SEMI_IMPLICIT
+    result += calculate_flux(quadPoint(0), quadPoint(1), v_grad[0], v_grad[1]) * Un_val[0];
+#endif
+
+    return result;
 }
 
 
 d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
-  d v_val, vec Un_val, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc)
+    d v_val, vec Un_val, dimVec v_grad,
+    vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc)
 {
-  d result = 0.;
+    d result = 0.;
 
-  vec bc_state(COMPONENT_COUNT);
-  vec u_state(COMPONENT_COUNT);
-  for (ui i = 0; i < COMPONENT_COUNT; i++)
-  {
-    u_state = 0.;
-    bc_state = bc->calculate(i, quadPoint);
-  }
-  vec numFlux(COMPONENT_COUNT);
+    vec bc_state(COMPONENT_COUNT);
+    vec u_state(COMPONENT_COUNT);
 
-  num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
+    // Viz poznamka u matrixBoundaryEdgeValue.
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+    {
+        u_state = 0.;
+        bc_state = bc->calculate(i, quadPoint);
+    }
+    vec numFlux(COMPONENT_COUNT);
 
-  result = -numFlux[0] * v_val;
+    num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
 
-  return result;
+    result -= numFlux[0] * v_val;
+
+    return result;
 }
 
 
 d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
-  d v_val, dimVec v_grad, bool v_N, vec Un_val,
-  vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
+    d v_val, dimVec v_grad, bool v_N, vec Un_val,
+    vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
-  d result = 0.;
+    d result = 0.;
 
-  d jump_v = v_N ? -v_val : v_val;
+#if !TIME_DISCRETIZATION_SEMI_IMPLICIT
 
-  vec numFlux(COMPONENT_COUNT);
+    d jump_v = v_N ? -v_val : v_val;
 
-  num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
+    vec numFlux(COMPONENT_COUNT);
 
-  result = numFlux[comp_i] * jump_v;
+    num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
 
-  return -result;
+    result -= numFlux[comp_i] * jump_v;
+
+#endif
+
+    return result;
 }
