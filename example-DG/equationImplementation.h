@@ -29,4 +29,8 @@ public:
     vecDimVec Un_grad,
     d v_valN, vec Un_valN, dimVec v_gradN,
     vecDimVec Un_gradN, bool v_N, Point<DIM> quadPoint, Point<DIM> normal);
+  
+  static void Jacobians(FullMatrix<double> *J,
+                        std::vector<Vector<double> > lv,
+                        const unsigned int qp)
 };
