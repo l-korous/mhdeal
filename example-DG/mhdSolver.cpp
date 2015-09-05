@@ -3,6 +3,8 @@
 typedef EquationImplementation Eq;
 
 Vector<d> MHDSolver::slnPrev;
+// For initial conditions.
+Vector<d> MHDSolver::slnUtil;
 NumFlux* numFlux;
 DirichletBoundaryCondition bc;
 
@@ -31,6 +33,7 @@ void MHDSolver::setup_system()
     rightHandSide.reinit(dofHandler.n_dofs());
     solution.reinit(dofHandler.n_dofs());
     slnPrev.reinit(dofHandler.n_dofs());
+    slnUtil.reinit(dofHandler.n_dofs());
 }
 
 void MHDSolver::assemble_system(bool firstIteration)
@@ -340,8 +343,11 @@ void MHDSolver::run()
         << std::endl;
 
     // Initial sln.
-    VectorFunctionFromScalarFunctionObject<DIM> initialSln(InitialSln::value, 0, COMPONENT_COUNT);
-    VectorTools::interpolate(this->dofHandler, initialSln, this->slnPrev);
+    VectorFunctionFromScalarFunctionObject<DIM> initialSlnRho(InitialSlnRho::value, 0, COMPONENT_COUNT);
+    VectorTools::interpolate(this->dofHandler, initialSlnRho, this->slnPrev);
+    VectorFunctionFromScalarFunctionObject<DIM> initialSlnEnergy(InitialSlnEnergy::value, 4, COMPONENT_COUNT);
+    VectorTools::interpolate(this->dofHandler, initialSlnEnergy, this->slnUtil);
+    this->slnPrev += this->slnUtil;
 
     d currentTime = 0.;
     for (ui timeStep = 0; currentTime < T_FINAL; timeStep++, currentTime += DELTA_T)
@@ -355,5 +361,4 @@ void MHDSolver::run()
         timer.stop();
         std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s." << std::endl;
     }
-
 }

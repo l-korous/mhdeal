@@ -1,6 +1,11 @@
 #include "common.h"
 
-d InitialSln::value(const Point<DIM> &p)
+d InitialSlnRho::value(const Point<DIM> &p)
 {
-  return 0.;
+  return RHO_EXT;
+}
+
+d InitialSlnEnergy::value(const Point<DIM> &p)
+{
+  return E_EXT;
 }

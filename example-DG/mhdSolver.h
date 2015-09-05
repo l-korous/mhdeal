@@ -28,6 +28,8 @@ private:
 
   Vector<d>       solution;
   static Vector<d>       slnPrev;
+  static Vector<d> slnUtil;
+
   Vector<d>       rightHandSide;
 
   typedef MeshWorker::DoFInfo<DIM> DoFInfo;

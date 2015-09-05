@@ -2,8 +2,20 @@
 
 d DirichletBoundaryCondition::calculate(ui component, Point<DIM> point)
 {
-    if (point(0) <= 0.501 && point(1) < 0.0005 && point(0) >=-0.001)
-        return 1.0;
-    else
-        return 0.;
+  switch (component)
+  {
+  case 0:
+    return RHO_EXT;
+  case 1:
+    return RHO_EXT * V1_EXT;
+  case 2:
+    return RHO_EXT * V2_EXT;
+  case 3:
+    return RHO_EXT * V3_EXT;
+  case 4:
+    return E_EXT;
+  }
+
+  abort();
+  return 0.;
 }
