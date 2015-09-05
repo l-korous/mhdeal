@@ -12,7 +12,7 @@ void NumFluxUpwind::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM>
     d x = quadPoint(0), y = quadPoint(1);
     d nx = normal(0), ny = normal(1);
 
-    d flux = FLUX;
+    d flux = nx + ny;
     for (ui i = 0; i < COMPONENT_COUNT; i++)
     {
         if (flux >= 0.)

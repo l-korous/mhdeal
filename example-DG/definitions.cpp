@@ -1,7 +1,7 @@
 #include "common.h"
 
 const ui DG_ORDER = 1;
-const ui INIT_REF_NUM = 4;
+const ui INIT_REF_NUM = 3;
 const ui COMPONENT_COUNT = 1;
 const ui TIME_DISCRETIZATION_SEMI_IMPLICIT = 1;
 
