@@ -1,22 +1,28 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
-// These are problem definitions.
+typedef unsigned int ui;
+typedef double d;
 
+// These are discretization definitions.
+// This is preprocessor because it is used in templates.
 #define DIM 2
-#define DG_ORDER 1
-#define INIT_REF_NUM 4
-#define COMPONENT_COUNT 1
 
-// 1 - SEMI-IMPLICIT
-// 2 - EXPLICIT
-#define TIME_DISCRETIZATION_SEMI_IMPLICIT 1
+extern const ui DG_ORDER;
+extern const ui INIT_REF_NUM;
+extern const ui COMPONENT_COUNT;
+extern const ui TIME_DISCRETIZATION_SEMI_IMPLICIT;
 
-#define T_FINAL 1000.0
-#define DELTA_T 0.1
+extern const d T_FINAL;
+extern const d DELTA_T;
+extern const bool PRINT_ALGEBRA;
 
-const bool PRINT_ALGEBRA = false;
+typedef dealii::Tensor<1, DIM> dimVec;
+typedef std::vector<dimVec> vecDimVec;
+typedef dealii::Vector<d> vec;
 
-#define FLUX nx + ny
+// Problem definitions
+extern const d GAMMA;
+extern const d ETA;
 
 #endif

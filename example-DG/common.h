@@ -55,13 +55,6 @@
 using namespace dealii;
 
 #include "definitions.h"
-
-typedef unsigned int ui;
-typedef double d;
-typedef dealii::Tensor<1, DIM> dimVec;
-typedef std::vector<dimVec> vecDimVec;
-typedef dealii::Vector<d> vec;
-
 #include "postProcessor.h"
 #include "equationImplementation.h"
 #include "mhdSolver.h"

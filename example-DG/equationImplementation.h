@@ -31,8 +31,8 @@ public:
     vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc);
 
   static void Jacobians(FullMatrix<double> *J,
-                        std::vector<Vector<double> > lv,
-                        const unsigned int qp)
+    std::vector<Vector<double> > lv,
+    const unsigned int qp);
 
   static d rhsInternalEdgeValue(ui comp_i,
       d v_val, dimVec v_grad, bool v_N, vec Un_val,
