@@ -132,10 +132,9 @@ d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
 
 d EquationImplementation::matrixBoundaryEdgeValue(ui comp_i, ui comp_j,
   d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
+  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, dealii::types::boundary_id bnd_id)
 {
   d result = 0.;
-
   return result;
 }
 
@@ -167,20 +166,56 @@ d EquationImplementation::rhsVolValue(ui comp_i,
 
 d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
   d v_val, vec Un_val, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc)
+  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
 {
   d result = 0.;
 
-  vec bc_state(COMPONENT_COUNT);
+  if (bnd_id == BOUNDARY_LEFT || bnd_id == BOUNDARY_RIGHT)
+  {
+    vec bc_state(COMPONENT_COUNT);
 
-  for (ui i = 0; i < COMPONENT_COUNT; i++)
-    bc_state = bc->calculate(i, quadPoint);
-  
-  vec numFlux(COMPONENT_COUNT);
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+      bc_state[i] = bc->calculate(i, quadPoint);
 
-  num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
+    vec numFlux(COMPONENT_COUNT);
 
-  result -= numFlux[comp_i] * v_val;
+    num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
+
+    result -= numFlux[comp_i] * v_val;
+  }
+  else
+  {
+    d rho = Un_val[0];
+    d v_1 = Un_val[1] / rho;
+    d v_2 = Un_val[2] / rho;
+    d v_3 = Un_val[3] / rho;
+
+    double P[5][5];
+    for (unsigned int P_i = 0; P_i < 5; P_i++)
+      for (unsigned int P_j = 0; P_j < 5; P_j++)
+        P[P_i][P_j] = 0.0;
+
+    P[1][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * normal(0) / 2.;
+    P[1][1] = (KAPPA - 1.) * (-v_1) * normal(0);
+    P[1][2] = (KAPPA - 1.) * (-v_2) * normal(0);
+    P[1][3] = (KAPPA - 1.) * (-v_3) * normal(0);
+    P[1][4] = (KAPPA - 1.) * normal(0);
+
+    P[2][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * normal(1) / 2.;
+    P[2][1] = (KAPPA - 1.) * (-v_1) * normal(1);
+    P[2][2] = (KAPPA - 1.) * (-v_2) * normal(1);
+    P[2][3] = (KAPPA - 1.) * (-v_3) * normal(1);
+    P[2][4] = (KAPPA - 1.) * normal(1);
+
+    P[3][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * normal(2) / 2.;
+    P[3][1] = (KAPPA - 1.) * (-v_1) * normal(2);
+    P[3][2] = (KAPPA - 1.) * (-v_2) * normal(2);
+    P[3][3] = (KAPPA - 1.) * (-v_3) * normal(2);
+    P[3][4] = (KAPPA - 1.) * normal(2);
+
+    for(ui j = 0; j < COMPONENT_COUNT; j++)
+      result -= P[comp_i][j] * Un_val[j] * v_val;
+  }
 
   return result;
 }

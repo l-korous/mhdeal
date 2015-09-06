@@ -13,6 +13,20 @@ extern const ui INIT_REF_NUM;
 extern const ui COMPONENT_COUNT;
 extern const ui TIME_DISCRETIZATION_SEMI_IMPLICIT;
 
+// boundary id
+extern const unsigned int BOUNDARY_FRONT;
+extern const unsigned int BOUNDARY_RIGHT;
+extern const unsigned int BOUNDARY_BACK;
+extern const unsigned int BOUNDARY_LEFT;
+extern const unsigned int BOUNDARY_BOTTOM;
+extern const unsigned int BOUNDARY_TOP;
+
+// Points defining geometry
+extern const dealii::Point<DIM> p1;
+extern const dealii::Point<DIM> p2;
+extern const dealii::Point<DIM> p3;
+extern const dealii::Point<DIM> p4;
+
 extern const d T_FINAL;
 extern const d DELTA_T;
 extern const bool PRINT_ALGEBRA;
