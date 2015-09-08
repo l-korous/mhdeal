@@ -255,8 +255,8 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   p = GAMMA*(v[7] - v[4] * v[4] + v[5] * v[5] + v[6] * v[6] - Uk);
   gmmo = GAMMA - 1.0;
   Ec1 = (v[3] * v[5] - v[2] * v[6])*iRh;
-  Ec1 = (v[1] * v[6] - v[3] * v[4])*iRh;
-  Ec1 = (v[2] * v[4] - v[1] * v[5])*iRh;
+  Ec2 = (v[1] * v[6] - v[3] * v[4])*iRh;
+  Ec3 = (v[2] * v[4] - v[1] * v[5])*iRh;
   E1 = Ec1 + ETA*v[8];
   E2 = Ec2 + ETA*v[9];
   E3 = Ec3 + ETA*v[10];
@@ -273,19 +273,19 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[0](9, 0) = 0;
   J[0](10, 0) = 0;
 
-  J[0](0, 1) = -(v[1] * v[1] * iRh2) + (gmmo*Uk)*.5*iRh;
-  J[0](1, 1) = (2 * v[1])*iRh - (gmmo*v[1])*iRh;
-  J[0](2, 1) = -((gmmo*v[2])*iRh);
-  J[0](3, 1) = -((gmmo*v[3])*iRh);
-  J[0](4, 1) = -2 * v[4] + 0.5*(2 * v[4] - 2 * gmmo*v[4]);
-  J[0](5, 1) = 0.5*(2 * v[5] - 2 * gmmo*v[5]);
-  J[0](6, 1) = 0.5*(2 * v[6] - 2 * gmmo*v[6]);
+  J[0](0, 1) = -(v[1] * v[1] * iRh2) + gmmo*Uk*.5*iRh;
+  J[0](1, 1) = (2  - gmmo)*v[1]*iRh;
+  J[0](2, 1) = -gmmo*v[2]*iRh;
+  J[0](3, 1) = -gmmo*v[3]*iRh;
+  J[0](4, 1) = -GAMMA*v[4];
+  J[0](5, 1) = (1 - gmmo)*v[5];
+  J[0](6, 1) = (1 - gmmo)*v[6];
   J[0](7, 1) = 0.5*gmmo;
   J[0](8, 1) = 0;
   J[0](9, 1) = 0;
   J[0](10, 1) = 0;
 
-  J[0](0, 2) = -((v[1] * v[2])*iRh2);
+  J[0](0, 2) = -v[1] * v[2]*iRh2;
   J[0](1, 2) = v[2] * iRh;
   J[0](2, 2) = v[1] * iRh;
   J[0](3, 2) = 0;
@@ -297,7 +297,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[0](9, 2) = 0;
   J[0](10, 2) = 0;
 
-  J[0](0, 3) = -((v[1] * v[3])*iRh2);
+  J[0](0, 3) = -v[1] * v[3]*iRh2;
   J[0](1, 3) = v[3] * iRh;
   J[0](2, 3) = 0;
   J[0](3, 3) = v[1] * iRh;
@@ -323,9 +323,9 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
 
   J[0](0, 5) = Ec3*iRh;
   J[0](1, 5) = v[5] * iRh;
-  J[0](2, 5) = -(v[4] * iRh);
+  J[0](2, 5) =-v[4] * iRh;
   J[0](3, 5) = 0;
-  J[0](4, 5) = -(v[2] * iRh);
+  J[0](4, 5) =-v[2] * iRh;
   J[0](5, 5) = v[1] * iRh;
   J[0](6, 5) = 0;
   J[0](7, 5) = 0;
@@ -336,8 +336,8 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[0](0, 6) = -Ec2*iRh;
   J[0](1, 6) = v[6] * iRh;
   J[0](2, 6) = 0;
-  J[0](3, 6) = -(v[4] * iRh);
-  J[0](4, 6) = -(v[3] * iRh);
+  J[0](3, 6) = -v[4] * iRh;
+  J[0](4, 6) = -v[3] * iRh;
   J[0](5, 6) = 0;
   J[0](6, 6) = v[1] * iRh;
   J[0](7, 6) = 0;
@@ -345,14 +345,14 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[0](9, 6) = ETA;
   J[0](10, 6) = 0;
 
-  J[0](0, 7) = 2 * iRh*(v[5] * Ec3 - v[6] * Ec2) + v[1] * gmmo*Uk*iRh2 - (v[1] * (Uk + p))*iRh2;
-  J[0](1, 7) = 2 * (v[5] * v[5] * iRh + v[6] * v[6] * iRh) + (v[1] * ((2 * v[1])*iRh - (2 * GAMMA*v[1])*iRh))*iRh + (Uk + p)*iRh;
-  J[0](2, 7) = -(2 * v[4] * v[5] * iRh) - (v[1] * 2 * gmmo*v[2])*iRh2;
-  J[0](3, 7) = -(2 * v[4] * v[6] * iRh) - (v[1] * 2 * gmmo*v[3])*iRh2;
-  J[0](4, 7) = -(2 * GAMMA*v[4] * v[1] * iRh) + 2 * (-((v[5] * v[2])*iRh) - (v[6] * v[3])*iRh);
-  J[0](5, 7) = -(2 * GAMMA*v[5] * v[1] * iRh) + 2 * ((v[5] * v[1])*iRh - E3);
-  J[0](6, 7) = -(2 * GAMMA*v[6] * v[1] * iRh) + 2 * ((v[6] * v[1])*iRh + E2);
-  J[0](7, 7) = (GAMMA*v[1])*iRh;
+  J[0](0, 7) = 2 * iRh*(v[5]*Ec3 - v[6]*Ec2) + v[1] * gmmo*Uk*iRh2 - v[1]*(Uk + p)*iRh2;
+  J[0](1, 7) = 2 * (v[5] * v[5] + v[6] * v[6])*iRh - 2*v[1] * gmmo*v[1]*iRh2 + (Uk + p)*iRh;
+  J[0](2, 7) = -2 * v[4] * v[5] * iRh - v[1] * 2 * gmmo*v[2]*iRh2;
+  J[0](3, 7) = -2 * v[4] * v[6] * iRh - v[1] * 2 * gmmo*v[3]*iRh2;
+  J[0](4, 7) = -2 * GAMMA*v[4] * v[1] * iRh + 2 * (-v[5] * v[2] - v[6] * v[3])*iRh;
+  J[0](5, 7) = -2 * GAMMA*v[5] * v[1] * iRh + 2 * (v[5] * v[1]*iRh - E3);
+  J[0](6, 7) = -2 * GAMMA*v[6] * v[1] * iRh + 2 * (v[6] * v[1]*iRh + E2);
+  J[0](7, 7) = GAMMA*v[1]*iRh;
   J[0](8, 7) = 0;
   J[0](9, 7) = 2 * ETA*v[6];
   J[0](10, 7) = -2 * ETA*v[5];
@@ -407,7 +407,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[1](9, 0) = 0;
   J[1](10, 0) = 0;
 
-  J[1](0, 1) = -((v[1] * v[2])*iRh2);
+  J[1](0, 1) = -v[1] * v[2]*iRh2;
   J[1](1, 1) = v[2] * iRh;
   J[1](2, 1) = v[1] * iRh;
   J[1](3, 1) = 0;
@@ -419,19 +419,19 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[1](9, 1) = 0;
   J[1](10, 1) = 0;
 
-  J[1](0, 2) = -(v[2] * v[2] * iRh2) + (gmmo*Uk)*.5*iRh;
-  J[1](1, 2) = -((gmmo*v[1])*iRh);
-  J[1](2, 2) = (2 * v[2])*iRh - (gmmo*v[2])*iRh;
-  J[1](3, 2) = -((gmmo*v[3])*iRh);
-  J[1](4, 2) = 0.5*(2 * v[4] - 2 * gmmo*v[4]);
-  J[1](5, 2) = -2 * v[5] + 0.5*(2 * v[5] - 2 * gmmo*v[5]);
-  J[1](6, 2) = 0.5*(2 * v[6] - 2 * gmmo*v[6]);
+  J[1](0, 2) = -v[2] * v[2] * iRh2 + gmmo*Uk*.5*iRh;
+  J[1](1, 2) = -gmmo*v[1]*iRh;
+  J[1](2, 2) = (2 - gmmo)*v[2]*iRh;
+  J[1](3, 2) = -gmmo*v[3]*iRh;
+  J[1](4, 2) = (1 - gmmo)*v[4];
+  J[1](5, 2) = -GAMMA*v[5];
+  J[1](6, 2) = (1 - gmmo)*v[6]);
   J[1](7, 2) = 0.5*gmmo;
   J[1](8, 2) = 0;
   J[1](9, 2) = 0;
   J[1](10, 2) = 0;
 
-  J[1](0, 3) = -((v[2] * v[3])*iRh2);
+  J[1](0, 3) = -v[2] * v[3]*iRh2;
   J[1](1, 3) = 0;
   J[1](2, 3) = v[3] * iRh;
   J[1](3, 3) = v[2] * iRh;
@@ -443,12 +443,12 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[1](9, 3) = 0;
   J[1](10, 3) = 0;
 
-  J[1](0, 4) = -(Ec3*iRh);
-  J[1](1, 4) = -(v[5] * iRh);
+  J[1](0, 4) = -Ec3*iRh;
+  J[1](1, 4) =-v[5] * iRh;
   J[1](2, 4) = v[4] * iRh;
   J[1](3, 4) = 0;
   J[1](4, 4) = v[2] * iRh;
-  J[1](5, 4) = -(v[1] * iRh);
+  J[1](5, 4) =-v[1] * iRh;
   J[1](6, 4) = 0;
   J[1](7, 4) = 0;
   J[1](8, 4) = 0;
@@ -470,23 +470,23 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[1](0, 6) = Ec1*iRh;
   J[1](1, 6) = 0;
   J[1](2, 6) = v[6] * iRh;
-  J[1](3, 6) = -(v[5] * iRh);
+  J[1](3, 6) =-v[5] * iRh;
   J[1](4, 6) = 0;
-  J[1](5, 6) = -(v[3] * iRh);
+  J[1](5, 6) =-v[3] * iRh;
   J[1](6, 6) = v[2] * iRh;
   J[1](7, 6) = 0;
   J[1](8, 6) = -ETA;
   J[1](9, 6) = 0;
   J[1](10, 6) = 0;
-
-  J[1](0, 7) = 2 * iRh*(-(v[4] * Ec3) + v[6] * Ec1) + v[2] * gmmo*Uk*iRh2 - (v[2] * (Uk + p))*iRh2;
-  J[1](1, 7) = -(2 * v[4] * v[5] * iRh) - 2 * gmmo*v[1] * v[2] * iRh2;
-  J[1](2, 7) = 2 * (v[4] * v[4] * iRh + v[6] * v[6] * iRh) + (v[2] * ((2 * v[2])*iRh - (2 * GAMMA*v[2])*iRh))*iRh + (Uk + p)*iRh;
-  J[1](3, 7) = -(2 * v[5] * v[6] * iRh) - 2 * gmmo*v[2] * v[3] * iRh2;
-  J[1](4, 7) = -(2 * GAMMA*v[4] * v[2] * iRh) + 2 * ((v[4] * v[2])*iRh + E3);
-  J[1](5, 7) = -(2 * GAMMA*v[5] * v[2] * iRh) + 2 * (-((v[4] * v[1])*iRh) - (v[6] * v[3])*iRh);
-  J[1](6, 7) = -(2 * GAMMA*v[6] * v[2] * iRh) + 2 * ((v[6] * v[2])*iRh - E1);
-  J[1](7, 7) = (GAMMA*v[2])*iRh;
+  
+  J[1](0, 7) = 2 * iRh*(-v[4]*Ec3 + v[6]*Ec1) + v[2] * gmmo*Uk*iRh2 - v[2]*(Uk + p)*iRh2;
+  J[1](1, 7) = -2 * v[4] * v[5] * iRh - 2 * gmmo*v[1] * v[2] * iRh2;
+  J[1](2, 7) = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2*v[2] * gmmo*v[2]*iRh2 + (Uk + p)*iRh;
+  J[1](3, 7) = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
+  J[1](4, 7) = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2]*iRh + E3);
+  J[1](5, 7) = -2 * GAMMA*v[5] * v[2] * iRh + 2 * (-v[4] * v[1] - v[6] * v[3])*iRh;
+  J[1](6, 7) = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2]*iRh - E1);
+  J[1](7, 7) = GAMMA*v[2]*iRh;
   J[1](8, 7) = -2 * ETA*v[6];
   J[1](9, 7) = 0;
   J[1](10, 7) = 2 * ETA*v[4];
@@ -541,7 +541,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](9, 0) = 0;
   J[2](10, 0) = 0;
 
-  J[2](0, 1) = -((v[1] * v[3])*iRh2);
+  J[2](0, 1) = -v[1] * v[3])*iRh2;
   J[2](1, 1) = v[3] * iRh;
   J[2](2, 1) = 0;
   J[2](3, 1) = v[1] * iRh;
@@ -553,7 +553,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](9, 1) = 0;
   J[2](10, 1) = 0;
 
-  J[2](0, 2) = -((v[2] * v[3])*iRh2);
+  J[2](0, 2) = -v[2] * v[3]*iRh2);
   J[2](1, 2) = 0;
   J[2](2, 2) = v[3] * iRh;
   J[2](3, 2) = v[2] * iRh;
@@ -565,37 +565,37 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](9, 2) = 0;
   J[2](10, 2) = 0;
 
-  J[2](0, 3) = -(v[3] * v[3] * iRh2) + (gmmo*Uk)*.5*iRh;
-  J[2](1, 3) = -((gmmo*v[1])*iRh);
-  J[2](2, 3) = -((gmmo*v[2])*iRh);
-  J[2](3, 3) = (2 * v[3])*iRh - (gmmo*v[3])*iRh;
-  J[2](4, 3) = 0.5*(2 * v[4] - 2 * gmmo*v[4]);
-  J[2](5, 3) = 0.5*(2 * v[5] - 2 * gmmo*v[5]);
-  J[2](6, 3) = -2 * v[6] + 0.5*(2 * v[6] - 2 * gmmo*v[6]);
+  J[2](0, 3) = -v[3] * v[3] * iRh2 + (gmmo*Uk)*.5*iRh;
+  J[2](1, 3) = -gmmo*v[1]*iRh);
+  J[2](2, 3) = -gmmo*v[2]*iRh);
+  J[2](3, 3) = (2 - gmmo)*v[3]*iRh;
+  J[2](4, 3) = (1 - gmmo)*v[4];
+  J[2](5, 3) = (1 - gmmo)*v[5];
+  J[2](6, 3) = -GAMMA*v[6];
   J[2](7, 3) = 0.5*gmmo;
   J[2](8, 3) = 0;
   J[2](9, 3) = 0;
   J[2](10, 3) = 0;
 
   J[2](0, 4) = Ec2*iRh;
-  J[2](1, 4) = -(v[6] * iRh);
+  J[2](1, 4) =-v[6] * iRh;
   J[2](2, 4) = 0;
   J[2](3, 4) = v[4] * iRh;
   J[2](4, 4) = v[3] * iRh;
   J[2](5, 4) = 0;
-  J[2](6, 4) = -(v[1] * iRh);
+  J[2](6, 4) =-v[1] * iRh;
   J[2](7, 4) = 0;
   J[2](8, 4) = 0;
   J[2](9, 4) = -ETA;
   J[2](10, 4) = 0;
 
-  J[2](0, 5) = -(Ec1*iRh);
+  J[2](0, 5) = -Ec1*iRh;
   J[2](1, 5) = 0;
-  J[2](2, 5) = -(v[6] * iRh);
+  J[2](2, 5) =-v[6] * iRh;
   J[2](3, 5) = v[5] * iRh;
   J[2](4, 5) = 0;
   J[2](5, 5) = v[3] * iRh;
-  J[2](6, 5) = -(v[2] * iRh);
+  J[2](6, 5) =-v[2] * iRh;
   J[2](7, 5) = 0;
   J[2](8, 5) = ETA;
   J[2](9, 5) = 0;
@@ -613,14 +613,26 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](9, 6) = 0;
   J[2](10, 6) = 0;
 
-  J[2](0, 7) = 2 * iRh*(v[4] * Ec2 - v[5] * Ec1) + v[3] * gmmo*Uk*iRh2 - (v[3] * (Uk + p))*iRh2;
-  // J[2](1,7)=-((2*v[4]*v[6])*iRh)-2*gmmo*v[1]*v[3])*iRh2;
-  // J[2](2,7)=-((2*v[5]*v[6])*iRh)-2*gmmo*v[2]*v[3])*iRh2;
-  J[2](3, 7) = 2 * (v[4] * v[4] * iRh + v[5] * v[5] * iRh) + (v[3] * ((2 * v[3])*iRh - (2 * GAMMA*v[3])*iRh))*iRh + (Uk + p)*iRh;
-  J[2](4, 7) = -(2 * GAMMA*v[4] * v[3] * iRh) + 2 * ((v[4] * v[3])*iRh - E2);
-  J[2](5, 7) = -(2 * GAMMA*v[5] * v[3] * iRh) + 2 * ((v[5] * v[3])*iRh + E1);
-  J[2](6, 7) = 2 * (-((v[4] * v[1])*iRh) - (v[5] * v[2])*iRh) - (2 * GAMMA*v[6] * v[3])*iRh;
-  J[2](7, 7) = (GAMMA*v[3])*iRh;
+  J[1](0, 7) = 2 * iRh*(-v[4]*Ec3 + v[6]*Ec1) + v[2] * gmmo*Uk*iRh2 - v[2]*(Uk + p)*iRh2;
+  J[1](1, 7) = -2 * v[4] * v[5] * iRh - 2 * gmmo*v[1] * v[2] * iRh2;
+  J[1](2, 7) = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2*v[2] * gmmo*v[2]*iRh2 + (Uk + p)*iRh;
+  J[1](3, 7) = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
+  J[1](4, 7) = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2]*iRh + E3);
+  J[1](5, 7) = -2 * GAMMA*v[5] * v[2] * iRh + 2 * (-v[4] * v[1] - v[6] * v[3])*iRh;
+  J[1](6, 7) = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2]*iRh - E1);
+  J[1](7, 7) = GAMMA*v[2]*iRh;
+  J[1](8, 7) = -2 * ETA*v[6];
+  J[1](9, 7) = 0;
+  J[1](10, 7) = 2 * ETA*v[4];
+  
+  J[2](0, 7) = 2 * iRh*(v[4]*Ec2 - v[5]*Ec1) + v[3] * gmmo*Uk*iRh2 - v[3]*(Uk + p)*iRh2;
+  J[2](1, 7) = -2*v[4]*v[6]*iRh - 2*gmmo*v[1]*v[3]*iRh2;
+  J[2](2, 7) = -2*v[5]*v[6]*iRh - 2*gmmo*v[2]*v[3]*iRh2;
+  J[2](3, 7) = 2 * (v[4] * v[4] + v[5] * v[5])*iRh + 2*v[3] * gmmo*v[3]*iRh2 + (Uk + p)*iRh;
+  J[2](4, 7) = -2 * GAMMA*v[4] * v[3] * iRh + 2 * (v[4] * v[3]*iRh - E2);
+  J[2](5, 7) = -2 * GAMMA*v[5] * v[3] * iRh + 2 * (v[5] * v[3]*iRh + E1);
+  J[2](6, 7) = -2 * GAMMA*v[6] * v[3] * iRh + 2 * (-v[4] * v[1] - v[5] * v[2])*iRh;
+  J[2](7, 7) = GAMMA*v[3]*iRh;
   J[2](8, 7) = 2 * ETA*v[5];
   J[2](9, 7) = -2 * ETA*v[4];
   J[2](10, 7) = 0;
