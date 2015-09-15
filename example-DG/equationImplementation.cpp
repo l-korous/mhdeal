@@ -252,7 +252,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   iRh = 1.0 / v[0];
   iRh2 = iRh*iRh;
   Uk = iRh*(v[1] * v[1] + v[2] * v[2] + v[3] * v[3]);
-  p = GAMMA*(v[7] - v[4] * v[4] + v[5] * v[5] + v[6] * v[6] - Uk);
+  p = GAMMA*(v[7] - (v[4] * v[4] + v[5] * v[5] + v[6] * v[6]) - Uk);
   gmmo = GAMMA - 1.0;
   Ec1 = (v[3] * v[5] - v[2] * v[6])*iRh;
   Ec2 = (v[1] * v[6] - v[3] * v[4])*iRh;
@@ -425,7 +425,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[1](3, 2) = -gmmo*v[3]*iRh;
   J[1](4, 2) = (1 - gmmo)*v[4];
   J[1](5, 2) = -GAMMA*v[5];
-  J[1](6, 2) = (1 - gmmo)*v[6]);
+  J[1](6, 2) = (1 - gmmo)*v[6];
   J[1](7, 2) = 0.5*gmmo;
   J[1](8, 2) = 0;
   J[1](9, 2) = 0;
@@ -541,7 +541,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](9, 0) = 0;
   J[2](10, 0) = 0;
 
-  J[2](0, 1) = -v[1] * v[3])*iRh2;
+  J[2](0, 1) = -v[1] * v[3]*iRh2;
   J[2](1, 1) = v[3] * iRh;
   J[2](2, 1) = 0;
   J[2](3, 1) = v[1] * iRh;
@@ -553,7 +553,7 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](9, 1) = 0;
   J[2](10, 1) = 0;
 
-  J[2](0, 2) = -v[2] * v[3]*iRh2);
+  J[2](0, 2) = -v[2] * v[3]*iRh2;
   J[2](1, 2) = 0;
   J[2](2, 2) = v[3] * iRh;
   J[2](3, 2) = v[2] * iRh;
@@ -566,8 +566,8 @@ void EquationImplementation::Jacobians(FullMatrix<double> *J,
   J[2](10, 2) = 0;
 
   J[2](0, 3) = -v[3] * v[3] * iRh2 + (gmmo*Uk)*.5*iRh;
-  J[2](1, 3) = -gmmo*v[1]*iRh);
-  J[2](2, 3) = -gmmo*v[2]*iRh);
+  J[2](1, 3) = -gmmo*v[1]*iRh;
+  J[2](2, 3) = -gmmo*v[2]*iRh;
   J[2](3, 3) = (2 - gmmo)*v[3]*iRh;
   J[2](4, 3) = (1 - gmmo)*v[4];
   J[2](5, 3) = (1 - gmmo)*v[5];

@@ -22,8 +22,8 @@ const d DELTA_T = 0.001;
 
 const bool PRINT_ALGEBRA = false;
 
-const d GAMMA = 1.0;
-const d ETA = 1.0;
+const d GAMMA = 5.0/3.0;  // monoatomic gas in 3D
+const d ETA = 1.0e-8;
 // ideal gas constant
 const d R = 287.14;
 // specific heat capacity at constant volume
