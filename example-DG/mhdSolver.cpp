@@ -318,7 +318,7 @@ void MHDSolver::outputResults(ui timeStep, d currentTime) const
 {
   Postprocessor postprocessor;
   DataOut<DIM, DoFHandler<DIM> > data_out;
-  data_out.set_flags(DataOutBase::VtkFlags(std::numeric_limits<d>::min(), std::numeric_limits<d>::min(), false, DataOutBase::VtkFlags::no_compression, 6, true));
+  data_out.set_flags(DataOutBase::VtkFlags(std::numeric_limits<d>::min(), std::numeric_limits<d>::min(), false, DataOutBase::VtkFlags::no_compression));
   data_out.attach_dof_handler(dofHandler);
   const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
   data_out.add_data_vector(slnPrev, postprocessor);
