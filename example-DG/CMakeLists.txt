@@ -25,6 +25,7 @@ SET(TARGET_SRC
   boundaryConditions.cpp
   numericalFlux.cpp
   initialSln.cpp
+  definitions.cpp
   
   definitions.h
   postProcessor.h
