@@ -21,6 +21,9 @@ extern const unsigned int BOUNDARY_LEFT;
 extern const unsigned int BOUNDARY_BOTTOM;
 extern const unsigned int BOUNDARY_TOP;
 
+bool BC_IS_IN_WEAKFORM(const unsigned int bnd_marker);
+bool BC_IS_OUTFLOW(const unsigned int bnd_marker);
+
 // Points defining geometry
 extern const dealii::Point<DIM> p1;
 extern const dealii::Point<DIM> p2;
@@ -30,6 +33,7 @@ extern const dealii::Point<DIM> p4;
 extern const d T_FINAL;
 extern const d DELTA_T;
 extern const bool PRINT_ALGEBRA;
+extern const bool DELETE_VTK;
 
 typedef dealii::Tensor<1, DIM> dimVec;
 typedef std::vector<dimVec> vecDimVec;
@@ -42,18 +46,29 @@ extern const d R;
 extern const d C_V;
 extern const d KAPPA;
 
-// Exterior pressure (dimensionless).
-extern const double P_EXT;
-// Inlet density (dimensionless).
-extern const double RHO_EXT;
-// Inlet x-velocity (dimensionless).
-extern const double V1_EXT;
-// Inlet y-velocity (dimensionless).
-extern const double V2_EXT;
-// Inlet z-velocity (dimensionless).
-extern const double V3_EXT;
-// Inlet energy.
-extern const double E_EXT;
+// Left
+extern const double RHO_IN_LEFT;
+extern const double V1_IN_LEFT;
+extern const double V2_IN_LEFT;
+extern const double V3_IN_LEFT;
+extern const double P_IN_LEFT;
+extern const double E_IN_LEFT;
+
+// Top
+extern const double RHO_IN_TOP;
+extern const double V1_IN_TOP;
+extern const double V2_IN_TOP;
+extern const double V3_IN_TOP;
+extern const double P_IN_TOP;
+extern const double E_IN_TOP;
+
+// Init
+extern const double RHO_INIT;
+extern const double V1_INIT;
+extern const double V2_INIT;
+extern const double V3_INIT;
+extern const double P_INIT;
+extern const double E_INIT;
 
 // Not used so far
 #pragma region FluxJacobians

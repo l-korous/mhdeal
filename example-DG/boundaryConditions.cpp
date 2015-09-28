@@ -5,15 +5,30 @@ d DirichletBoundaryCondition::calculate(ui component, Point<DIM> point)
   switch (component)
   {
   case 0:
-    return RHO_EXT;
+    if (point(0) > 1e-8)
+      return RHO_IN_TOP;
+    else
+      return RHO_IN_LEFT;
   case 1:
-    return RHO_EXT * V1_EXT;
+    if(point(0) > 1e-8)
+      return RHO_IN_TOP * V1_IN_TOP;
+    else
+      return RHO_IN_LEFT * V1_IN_LEFT;
   case 2:
-    return RHO_EXT * V2_EXT;
+    if (point(0) > 1e-8)
+      return RHO_IN_TOP * V2_IN_TOP;
+    else
+      return RHO_IN_LEFT * V2_IN_LEFT;
   case 3:
-    return RHO_EXT * V3_EXT;
+    if (point(0) > 1e-8)
+      return RHO_IN_TOP * V3_IN_TOP;
+    else
+      return RHO_IN_LEFT * V3_IN_LEFT;
   case 4:
-    return E_EXT;
+    if (point(0) > 1e-8)
+      return E_IN_TOP;
+    else
+      return E_IN_LEFT;
   }
 
   abort();

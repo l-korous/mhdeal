@@ -358,8 +358,7 @@ void MHDSolver::add_markers(Triangulation<DIM>::cell_iterator cell)
 
 void MHDSolver::run()
 {
-  GridGenerator::hyper_rectangle(triangulation, p1, p4);
-  triangulation.refine_global(INIT_REF_NUM);
+  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM, INIT_REF_NUM, 1 }), p1, p4);
   
   std::string tria_file = "Tria.vtk";
   std::ofstream tria_out(tria_file);

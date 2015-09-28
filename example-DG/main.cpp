@@ -2,6 +2,15 @@
 
 int main()
 {
+  if (DELETE_VTK)
+  {
+#ifdef _MSC_VER
+    system("del *.vtk");
+#else
+    system("rm *.vtk");
+#endif
+  }
+
   try
   {
     MHDSolver feProblem;

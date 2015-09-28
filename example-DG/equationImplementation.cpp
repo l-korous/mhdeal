@@ -170,7 +170,7 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 {
   d result = 0.;
 
-  if (bnd_id == BOUNDARY_LEFT || bnd_id == BOUNDARY_RIGHT)
+  if (!BC_IS_IN_WEAKFORM(bnd_id))
   {
     vec bc_state(COMPONENT_COUNT);
 
@@ -180,6 +180,14 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
     vec numFlux(COMPONENT_COUNT);
 
     num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
+
+    result -= numFlux[comp_i] * v_val;
+  }
+  else if (BC_IS_OUTFLOW)
+  {
+    vec numFlux(COMPONENT_COUNT);
+
+    num_flux->calculate(Un_val, Un_val, quadPoint, normal, numFlux);
 
     result -= numFlux[comp_i] * v_val;
   }
