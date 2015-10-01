@@ -46,6 +46,7 @@ CPackSourceConfig.cmake
 CTestTestfile.cmake
 config_real.cmake
 dealii-mhd
+dealii-mhd.cbp
 *~
 
 # Windows / Visual Studio
