@@ -1,6 +1,13 @@
 #ifndef MHD_SOLVER_H
 #define MHD_SOLVER_H
 
+#include <deal.II/fe/fe_system.h>
+#include <deal.II/meshworker/simple.h>
+#include <deal.II/meshworker/loop.h>
+
+
+#include "definitions.h"
+
 class MHDSolver
 {
 public:
@@ -10,30 +17,30 @@ public:
 private:
   void setup_system();
   void assemble_system(bool firstIteration);
-  void solve(Vector<d> &solution);
-  void solveOneStep(Vector<d> &solution);
+  void solve(dealii::Vector<d> &solution);
+  void solveOneStep(dealii::Vector<d> &solution);
   void outputResults(ui timeStep, d currentTime) const;
-  void add_markers(Triangulation<DIM>::cell_iterator cell);
+  void add_markers(dealii::Triangulation<DIM>::cell_iterator cell);
 
-  Triangulation<DIM>   triangulation;
-  FESystem<DIM> feSystem;
-  const MappingQ1<DIM> mapping;
-  const QGauss<DIM> quad;
-  const QGauss<DIM - 1> quadFace;
-  DoFHandler<DIM>      dofHandler;
-  ConstraintMatrix     hangingNodeConstraints;
+  dealii::Triangulation<DIM>   triangulation;
+  dealii::FESystem<DIM> feSystem;
+  const dealii::MappingQ1<DIM> mapping;
+  const dealii::QGauss<DIM> quad;
+  const dealii::QGauss<DIM - 1> quadFace;
+  dealii::DoFHandler<DIM>      dofHandler;
+  dealii::ConstraintMatrix     hangingNodeConstraints;
 
-  SparsityPattern      sparsityPattern;
-  SparseMatrix<d> systemMatrix;
+  dealii::SparsityPattern      sparsityPattern;
+  dealii::SparseMatrix<d> systemMatrix;
 
-  Vector<d>       solution;
-  static Vector<d>       slnPrev;
-  static Vector<d> slnUtil;
+  dealii::Vector<d>       solution;
+  static dealii::Vector<d>       slnPrev;
+  static dealii::Vector<d> slnUtil;
 
-  Vector<d>       rightHandSide;
+  dealii::Vector<d>       rightHandSide;
 
-  typedef MeshWorker::DoFInfo<DIM> DoFInfo;
-  typedef MeshWorker::IntegrationInfo<DIM> CellInfo;
+  typedef dealii::MeshWorker::DoFInfo<DIM> DoFInfo;
+  typedef dealii::MeshWorker::IntegrationInfo<DIM> CellInfo;
 
   static void assembleVolumetric(DoFInfo &dinfo, CellInfo &info);
   static void assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info);

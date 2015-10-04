@@ -1,4 +1,4 @@
-#include "common.h"
+#include "definitions.h"
 
 const ui DG_ORDER = 0;
 const ui INIT_REF_NUM = 7;

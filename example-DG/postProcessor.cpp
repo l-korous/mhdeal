@@ -1,4 +1,6 @@
-#include "common.h"
+#include "postProcessor.h"
+
+using namespace dealii;
 
 Postprocessor::Postprocessor() : DataPostprocessor<DIM>()
 {}

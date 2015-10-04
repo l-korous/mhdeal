@@ -1,4 +1,10 @@
-#include "common.h"
+#include <deal.II/lac/full_matrix.h>
+
+#include "equationImplementation.h"
+#include "boundaryConditions.h"
+#include "numericalFlux.h"
+
+using namespace dealii;
 
 d calculate_flux(double x, double y, double nx, double ny)
 {
@@ -246,7 +252,7 @@ d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
   return result;
 }
 
-void EquationImplementation::Jacobians(FullMatrix<double> *J,
+void EquationImplementation::Jacobians(dealii::FullMatrix<double> *J,
   std::vector<Vector<double> > lv,
   const unsigned int qp)
 {

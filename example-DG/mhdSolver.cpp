@@ -1,4 +1,27 @@
-#include "common.h"
+#include <fstream>
+#include <vector>
+#include <iostream>
+
+#include <deal.II/dofs/dof_renumbering.h>
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_out.h>
+#include <deal.II/base/timer.h>
+#include <deal.II/lac/sparse_direct.h>
+#include <deal.II/fe/fe_dgq.h>
+#include <deal.II/lac/full_matrix.h>
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/solution_transfer.h>
+
+#include "mhdSolver.h"
+#include "equationImplementation.h"
+#include "postProcessor.h"
+#include "initialSln.h"
+#include "boundaryConditions.h"
+#include "numericalFlux.h"
+
+
+
+using namespace dealii;
 
 typedef EquationImplementation Eq;
 
@@ -77,7 +100,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   CellInfo &info)
 {
   const FEValuesBase<DIM> &fe_v = info.fe_values();
-  FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
+  dealii::FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
   Vector<d> &local_vector = dinfo.vector(0).block(0);
   const std::vector<d> &JxW = fe_v.get_JxW_values();
 
@@ -116,7 +139,7 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
   CellInfo &info)
 {
   const FEValuesBase<DIM> &fe_v = info.fe_values();
-  FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
+  dealii::FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
   Vector<d> &local_vector = dinfo.vector(0).block(0);
 
   const std::vector<d> &JxW = fe_v.get_JxW_values();
@@ -173,10 +196,10 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   // in each info object refer to the test functions on the respective
   // cell. The first matrix contains the interior couplings of that cell,
   // while the second contains the couplings between cells.
-  FullMatrix<d> &u1_v1_matrix = dinfo1.matrix(0, false).matrix;
-  FullMatrix<d> &u2_v1_matrix = dinfo1.matrix(0, true).matrix;
-  FullMatrix<d> &u1_v2_matrix = dinfo2.matrix(0, true).matrix;
-  FullMatrix<d> &u2_v2_matrix = dinfo2.matrix(0, false).matrix;
+  dealii::FullMatrix<d> &u1_v1_matrix = dinfo1.matrix(0, false).matrix;
+  dealii::FullMatrix<d> &u2_v1_matrix = dinfo1.matrix(0, true).matrix;
+  dealii::FullMatrix<d> &u1_v2_matrix = dinfo2.matrix(0, true).matrix;
+  dealii::FullMatrix<d> &u2_v2_matrix = dinfo2.matrix(0, false).matrix;
 
   Vector<d> &v1_vector = dinfo1.vector(0).block(0);
   Vector<d> &v2_vector = dinfo2.vector(0).block(0);

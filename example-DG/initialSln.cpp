@@ -1,4 +1,6 @@
-#include "common.h"
+#include "initialSln.h"
+
+using namespace dealii;
 
 d InitialSlnRho::value(const Point<DIM> &p)
 {

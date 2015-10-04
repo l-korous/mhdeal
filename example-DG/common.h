@@ -55,12 +55,4 @@
 
 using namespace dealii;
 
-#include "definitions.h"
-#include "postProcessor.h"
-#include "equationImplementation.h"
-#include "mhdSolver.h"
-#include "numericalFlux.h"
-#include "boundaryConditions.h"
-#include "initialSln.h"
-
 #endif

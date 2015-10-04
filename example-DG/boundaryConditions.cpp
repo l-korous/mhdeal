@@ -1,4 +1,6 @@
-#include "common.h"
+#include "boundaryConditions.h"
+
+using namespace dealii;
 
 d DirichletBoundaryCondition::calculate(ui component, Point<DIM> point)
 {

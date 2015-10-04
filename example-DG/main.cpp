@@ -1,4 +1,7 @@
-#include "common.h"
+#include "definitions.h"
+#include "mhdSolver.h"
+
+using namespace dealii;
 
 int main()
 {

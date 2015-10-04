@@ -1,4 +1,6 @@
-#include "common.h"
+#include "numericalFlux.h"
+
+using namespace dealii;
 
 void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result)
 {
