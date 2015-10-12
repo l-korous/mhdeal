@@ -189,7 +189,7 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 
     result -= numFlux[comp_i] * v_val;
   }
-  else if (BC_IS_OUTFLOW)
+  else if (BC_IS_OUTFLOW(bnd_id))
   {
     vec numFlux(COMPONENT_COUNT);
 

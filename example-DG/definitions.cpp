@@ -1,7 +1,7 @@
 #include "definitions.h"
 
 const ui DG_ORDER = 0;
-const ui INIT_REF_NUM = 7;
+const ui INIT_REF_NUM = 4;
 const ui COMPONENT_COUNT = 5;
 
 // boundary id
@@ -34,7 +34,7 @@ const dealii::Point<DIM> p1(0., 0., 0.);
 const dealii::Point<DIM> p4(4.1, 1., 1.);
 
 const d T_FINAL = 1000.0;
-const d DELTA_T = 0.000005;
+const d DELTA_T = 0.001;
 
 const bool PRINT_ALGEBRA = false;
 const bool DELETE_VTK = true;
