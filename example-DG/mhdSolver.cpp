@@ -39,7 +39,7 @@ MHDSolver::MHDSolver()
   quad(2 * DG_ORDER),
   quadFace(2 * DG_ORDER)
 {
-  numFlux = new NumFluxCentral();
+  numFlux = new NumFluxVijayasundaram();
 }
 
 void MHDSolver::setup_system()

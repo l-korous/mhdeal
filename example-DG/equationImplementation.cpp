@@ -197,7 +197,7 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 
     result -= numFlux[comp_i] * v_val;
   }
-  else
+  else // Solid wall
   {
     d rho = Un_val[0];
     d v_1 = Un_val[1] / rho;

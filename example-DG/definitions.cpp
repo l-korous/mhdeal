@@ -1,7 +1,7 @@
 #include "definitions.h"
 
 const ui DG_ORDER = 0;
-const ui INIT_REF_NUM = 4;
+const ui INIT_REF_NUM = 6;
 const ui COMPONENT_COUNT = 5;
 
 // boundary id

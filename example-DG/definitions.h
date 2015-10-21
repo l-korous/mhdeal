@@ -109,11 +109,11 @@ extern const double E_INIT;
 #define A_1_4_4 (v1_)
 #define A_1_4_5 (0.)
 
-#define A_1_5_1 (-(v1_ * E) - (v1_ / r) * Rcv * (E - U_k) + v1_ * Rcv * U_k)
-#define A_1_5_2 (en + (1. / r) * Rcv * (E - U_k) - Rcv * U_k * v1_ * v1_)
+#define A_1_5_1 (-(v1_ * en) - (v1_ / r) * Rcv * (E - (r*U_k)) + v1_ * Rcv * U_k)
+#define A_1_5_2 (en + (1. / r) * Rcv * (E - (r*U_k)) - (Rcv * v1_ * v1_))
 #define A_1_5_3 (-Rcv * v1_ * v2_)
 #define A_1_5_4 (-Rcv * v1_ * v3_)
-#define A_1_5_5 (v1_ + Rcv * v1_)
+#define A_1_5_5 (v1_ + (Rcv * v1_))
 
 // A_y)
 #define A_2_1_1 (0.)
@@ -140,9 +140,9 @@ extern const double E_INIT;
 #define A_2_4_4 (v2_)
 #define A_2_4_5 (0.)
 
-#define A_2_5_1 (-(v2_ * E) - (v2_ / r) * Rcv * (E - U_k) + v2_ * Rcv * U_k)
+#define A_2_5_1 (-(v2_ * en) - (v2_ / r) * Rcv * (E - (r*U_k)) + v2_ * Rcv * U_k)
 #define A_2_5_2 (-Rcv * v1_ * v2_)
-#define A_2_5_3 (en + (1. / r) * Rcv * (E - U_k) - Rcv * U_k * v2_ * v2_)
+#define A_2_5_3 (en + (1. / r) * Rcv * (E - (r*U_k)) - (Rcv * v2_ * v2_))
 #define A_2_5_4 (-Rcv * v2_ * v3_)
 #define A_2_5_5 (v2_ + Rcv * v2_)
 
@@ -171,10 +171,10 @@ extern const double E_INIT;
 #define A_3_4_4 (2. * v3_ - Rcv * v3_)
 #define A_3_4_5 (Rcv)
 
-#define A_3_5_1 (-(v3_ * E) - (v3_ / r) * Rcv * (E - U_k) + v3_ * Rcv * U_k)
+#define A_3_5_1 (-(v3_ * en) - (v3_ / r) * Rcv * (E - (r*U_k)) + v3_ * Rcv * U_k)
 #define A_3_5_2 (-Rcv * v1_ * v3_)
 #define A_3_5_3 (-Rcv * v2_ * v3_)
-#define A_3_5_4 (en + (1. / r) * Rcv * (E - U_k) - Rcv * U_k * v3_ * v3_)
+#define A_3_5_4 (en + (1. / r) * Rcv * (E - (r*U_k)) - (Rcv * v3_ * v3_))
 #define A_3_5_5 (v3_ + Rcv * v3_)
 
 #define f_1_1 (A_1_1_1 * r + A_1_1_2 * p1 + A_1_1_3 * p2 + A_1_1_4 * p3 + A_1_1_5 * E)
