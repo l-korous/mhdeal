@@ -1,7 +1,7 @@
 #include "definitions.h"
 
 const ui DG_ORDER = 0;
-const ui INIT_REF_NUM = 6;
+const ui INIT_REF_NUM = 10;
 const ui COMPONENT_COUNT = 5;
 
 // boundary id
@@ -34,9 +34,10 @@ const dealii::Point<DIM> p1(0., 0., 0.);
 const dealii::Point<DIM> p4(4.1, 1., 1.);
 
 const d T_FINAL = 1000.0;
-const d DELTA_T = 0.001;
+const d DELTA_T = 0.01;
 
 const bool PRINT_ALGEBRA = false;
+// Delete VTK on start
 const bool DELETE_VTK = true;
 
 const d GAMMA = 5.0 / 3.0;  // monoatomic gas in 3D

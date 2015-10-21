@@ -172,7 +172,7 @@ void NumFluxVijayasundaram::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Po
   result_temp[4] += f_1_5 * nx + f_2_5 * ny + f_3_5 * nz;
 
   for (unsigned int i = 0; i < 5; i++)
-    result[i] = result_temp[i] / 2.;
+    result_arr[i] = result_temp[i] / 2.;
 
   d w_mean[5];
   w_mean[0] = U_L[0] + U_R[0];
@@ -390,11 +390,11 @@ void NumFluxVijayasundaram::T_4(double result[5][5])
 }
 void NumFluxVijayasundaram::T_5(double result[5][5])
 {
-  result[0][3] = 1.0;
-  result[1][3] = u + a;
-  result[2][3] = v;
-  result[3][3] = w;
-  result[4][3] = (V / 2.0) + (a * a / (KAPPA - 1.0)) + (u * a);
+  result[0][4] = 1.0;
+  result[1][4] = u + a;
+  result[2][4] = v;
+  result[3][4] = w;
+  result[4][4] = (V / 2.0) + (a * a / (KAPPA - 1.0)) + (u * a);
 }
 
 void NumFluxVijayasundaram::T_inv_1(double result[5][5])
