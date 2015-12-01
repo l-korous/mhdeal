@@ -12,8 +12,14 @@ template <typename number> class FullMatrix;
 
 class EquationImplementation
 {
+private:
+  double              A[3][Ne][Ne];
+  double              F[3][Ne];
+  
 public:
 
+  EquationImplementation();
+  
   static d matrixVolValue(ui component_i, ui component_j,
     d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
     vecDimVec Un_grad, dealii::Point<DIM> quadPoint);
@@ -36,9 +42,7 @@ public:
     d v_val, vec Un_val, dimVec v_grad,
     vecDimVec Un_grad, vec U_bnd_val, dealii::Point<DIM> quadPoint, dealii::Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id);
 
-  static void Jacobians(dealii::FullMatrix<double> *J,
-    std::vector<dealii::Vector<double> > lv,
-    const unsigned int qp);
+  void JacobiM(std::vector<dealii::Vector<double> > lv, const unsigned int qp);
 
   static d rhsInternalEdgeValue(ui comp_i,
       d v_val, dimVec v_grad, bool v_N, vec Un_val,

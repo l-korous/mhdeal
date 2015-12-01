@@ -10,6 +10,7 @@ typedef double d;
 // These are discretization definitions.
 // This is preprocessor because it is used in templates.
 #define DIM 3
+#define Ne  11   // Number of MHD equations
 
 extern const ui DG_ORDER;
 extern const ui INIT_REF_NUM;
