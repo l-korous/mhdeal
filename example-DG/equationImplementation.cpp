@@ -522,7 +522,7 @@ void EquationImplementation::JacobiM(std::vector<Vector<double> > lv,
   //A[1][8][3] 0;
   //A[1][8][4] 0;
   //A[1][8][5] 0;
-  A[1][8][6] -1;
+  A[1][8][6] = -1;
   //A[1][8][7] 0;
   //A[1][8][8] 0;
   //A[1][8][9] 0;
@@ -544,7 +544,7 @@ void EquationImplementation::JacobiM(std::vector<Vector<double> > lv,
   //A[1][10][1] - 0;
   //A[1][10][2] - 0;
   //A[1][10][3] - 0;
-  A[1][10][4] - 1;
+  A[1][10][4] = 1;
   //A[1][10][5] - 0;
   //A[1][10][6] - 0;
   //A[1][10][7] - 0;
