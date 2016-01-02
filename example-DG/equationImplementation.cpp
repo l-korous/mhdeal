@@ -138,10 +138,126 @@ d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
 
 d EquationImplementation::matrixBoundaryEdgeValue(ui comp_i, ui comp_j,
   d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, dealii::types::boundary_id bnd_id)
+  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
 {
-  d result = 0.;
-  return result;
+    d result = 0.;
+
+    // Normal
+    d nx = normal(0), ny = normal(1), nz = normal(2);
+
+    if (BC_INFLOW_OUTFLOW(bnd_id))
+    {
+      // Use the right kind of num flux
+      NumFluxVijayasundaram* num_flux_Vijayasundaram = (NumFluxVijayasundaram*)num_flux;
+
+      // BC state
+      d bc_state[COMPONENT_COUNT];
+      for (ui i = 0; i < COMPONENT_COUNT; i++)
+        bc_state[i] = bc->calculate(i, quadPoint);
+
+      // Utility declaration & initialization
+      double w_L[COMPONENT_COUNT], eigenvalues[COMPONENT_COUNT], alpha[COMPONENT_COUNT], q_ji_star[COMPONENT_COUNT], beta[COMPONENT_COUNT], q_ji[COMPONENT_COUNT], w_ji[COMPONENT_COUNT];
+      double T[COMPONENT_COUNT][COMPONENT_COUNT];
+      double T_inv[COMPONENT_COUNT][COMPONENT_COUNT];
+
+      for (ui i = 0; i < COMPONENT_COUNT; i++)
+      {
+        w_L[i] = Un_val[i];
+        alpha[i] = 0.;
+        beta[i] = 0.;
+        q_ji[i] = 0.;
+        w_ji[i] = 0.;
+        eigenvalues[i] = 0.;
+        for (ui j = 0; j < COMPONENT_COUNT; j++)
+        {
+          T[i][j] = 0.;
+          T_inv[i][j] = 0.;
+        }
+      }
+
+      // Transformation of the inner state to the local coordinates.
+      num_flux_Vijayasundaram->Q(num_flux_Vijayasundaram->q, w_L, nx, ny, nz);
+
+      // Calculate Lambda^-.
+      num_flux_Vijayasundaram->Lambda(eigenvalues);
+      num_flux_Vijayasundaram->T(T);
+      num_flux_Vijayasundaram->T_inv(T_inv);
+
+      // Rotate the BC state
+      num_flux_Vijayasundaram->Q(q_ji_star, bc_state, nx, ny, nz);
+
+      for (unsigned int ai = 0; ai < COMPONENT_COUNT; ai++)
+        for (unsigned int aj = 0; aj < COMPONENT_COUNT; aj++)
+          alpha[ai] += T_inv[ai][aj] * num_flux_Vijayasundaram->q[aj];
+
+      for (unsigned int bi = 0; bi < COMPONENT_COUNT; bi++)
+        for (unsigned int bj = 0; bj < COMPONENT_COUNT; bj++)
+          beta[bi] += T_inv[bi][bj] * q_ji_star[bj];
+
+      for (unsigned int si = 0; si < COMPONENT_COUNT; si++)
+        for (unsigned int sj = 0; sj < COMPONENT_COUNT; sj++)
+          if (eigenvalues[sj] < 0)
+            q_ji[si] += beta[sj] * T[si][sj];
+          else
+            q_ji[si] += alpha[sj] * T[si][sj];
+
+      num_flux_Vijayasundaram->Q_inv(w_ji, q_ji, nx, ny, nz);
+
+      d e[5][5] =
+      {
+        { 1., 0, 0, 0, 0 },
+        { 0, 1., 0, 0, 0 },
+        { 0, 0, 1., 0, 0 },
+        { 0, 0, 0, 1., 0 },
+        { 0, 0, 0, 0, 1. }
+      };
+
+      double P_plus[COMPONENT_COUNT];
+      d w_temp[COMPONENT_COUNT];
+
+      for (ui i = 0; i < COMPONENT_COUNT; i++)
+        w_temp[i] = (w_ji[i] + w_L[i]) / 2.;
+
+      num_flux_Vijayasundaram->P_plus(P_plus, w_temp, e[comp_j], nx, ny, nz);
+
+      result = P_plus[comp_i] * u_val * v_val;
+    }
+
+    // Solid wall
+    if (BC_SOLID_WALL(bnd_id))
+    {
+        d rho = Un_val[0];
+        d v_1 = Un_val[1] / rho;
+        d v_2 = Un_val[2] / rho;
+        d v_3 = Un_val[3] / rho;
+
+        double P[5][5];
+        for (unsigned int P_i = 0; P_i < 5; P_i++)
+            for (unsigned int P_j = 0; P_j < 5; P_j++)
+                P[P_i][P_j] = 0.;
+
+        P[1][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * nx / 2.;
+        P[1][1] = (KAPPA - 1.) * (-v_1) * nx;
+        P[1][2] = (KAPPA - 1.) * (-v_2) * nx;
+        P[1][3] = (KAPPA - 1.) * (-v_3) * nx;
+        P[1][4] = (KAPPA - 1.) * nx;
+
+        P[2][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * ny / 2.;
+        P[2][1] = (KAPPA - 1.) * (-v_1) * ny;
+        P[2][2] = (KAPPA - 1.) * (-v_2) * ny;
+        P[2][3] = (KAPPA - 1.) * (-v_3) * ny;
+        P[2][4] = (KAPPA - 1.) * ny;
+
+        P[3][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * nz / 2.;
+        P[3][1] = (KAPPA - 1.) * (-v_1) * nz;
+        P[3][2] = (KAPPA - 1.) * (-v_2) * nz;
+        P[3][3] = (KAPPA - 1.) * (-v_3) * nz;
+        P[3][4] = (KAPPA - 1.) * nz;
+
+        result = P[comp_i][comp_j] * u_val * v_val;
+    }
+
+    return result;
 }
 
 
@@ -150,12 +266,15 @@ d EquationImplementation::matrixInternalEdgeValue(ui comp_i, ui comp_j,
   vecDimVec Un_grad, vecDimVec Un_gradN, bool u_N, bool v_N,
   Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
-  d result = 0.;
+    d result = 0.;
 
-  return result;
+    d jump_v = v_N ? -v_val : v_val;
+
+    result = num_flux->calculate(Un_val, Un_valN, quadPoint, normal, comp_i, comp_j, (u_N ? 2 : 1)) * u_val * jump_v;
+
+    // std::cout << "coord [" << comp_i << ", " << comp_j << "], point [" << quadPoint(0) << ", " << quadPoint(1) << "], normal [" << normal(0) << ", " << normal(1) << "]: " << result << std::endl;
+    return result;
 }
-
-
 
 d EquationImplementation::rhsVolValue(ui comp_i,
   d v_val, vec Un_val, dimVec v_grad,
@@ -176,78 +295,86 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 {
   d result = 0.;
 
-  if (!BC_IS_IN_WEAKFORM(bnd_id))
+  if (BC_INFLOW_OUTFLOW(bnd_id))
   {
-    vec bc_state(COMPONENT_COUNT);
+    // Normal
+    d nx = normal(0), ny = normal(1), nz = normal(2);
 
+    // Use the right kind of num flux
+    NumFluxVijayasundaram* num_flux_Vijayasundaram = (NumFluxVijayasundaram*)num_flux;
+
+    // BC state
+    d bc_state[COMPONENT_COUNT];
     for (ui i = 0; i < COMPONENT_COUNT; i++)
       bc_state[i] = bc->calculate(i, quadPoint);
 
-    vec numFlux(COMPONENT_COUNT);
+    // Utility declaration & initialization
+    double w_L[COMPONENT_COUNT], eigenvalues[COMPONENT_COUNT], alpha[COMPONENT_COUNT], q_ji_star[COMPONENT_COUNT], beta[COMPONENT_COUNT], q_ji[COMPONENT_COUNT], w_ji[COMPONENT_COUNT];
+    double T[COMPONENT_COUNT][COMPONENT_COUNT];
+    double T_inv[COMPONENT_COUNT][COMPONENT_COUNT];
 
-    num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+    {
+      w_L[i] = Un_val[i];
+      alpha[i] = 0.;
+      beta[i] = 0.;
+      q_ji[i] = 0.;
+      w_ji[i] = 0.;
+      eigenvalues[i] = 0.;
+      for (ui j = 0; j < COMPONENT_COUNT; j++)
+      {
+        T[i][j] = 0.;
+        T_inv[i][j] = 0.;
+      }
+    }
 
-    result -= numFlux[comp_i] * v_val;
-  }
-  else if (BC_IS_OUTFLOW(bnd_id))
-  {
-    vec numFlux(COMPONENT_COUNT);
+    // Transformation of the inner state to the local coordinates.
+    num_flux_Vijayasundaram->Q(num_flux_Vijayasundaram->q, w_L, nx, ny, nz);
 
-    num_flux->calculate(Un_val, Un_val, quadPoint, normal, numFlux);
+    // Calculate Lambda^-.
+    num_flux_Vijayasundaram->Lambda(eigenvalues);
+    num_flux_Vijayasundaram->T(T);
+    num_flux_Vijayasundaram->T_inv(T_inv);
 
-    result -= numFlux[comp_i] * v_val;
-  }
-  else // Solid wall
-  {
-    d rho = Un_val[0];
-    d v_1 = Un_val[1] / rho;
-    d v_2 = Un_val[2] / rho;
-    d v_3 = Un_val[3] / rho;
+    // Rotate the BC state
+    num_flux_Vijayasundaram->Q(q_ji_star, bc_state, nx, ny, nz);
 
-    double P[5][5];
-    for (unsigned int P_i = 0; P_i < 5; P_i++)
-      for (unsigned int P_j = 0; P_j < 5; P_j++)
-        P[P_i][P_j] = 0.0;
+    for (unsigned int ai = 0; ai < COMPONENT_COUNT; ai++)
+      for (unsigned int aj = 0; aj < COMPONENT_COUNT; aj++)
+        alpha[ai] += T_inv[ai][aj] * num_flux_Vijayasundaram->q[aj];
 
-    P[1][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * normal(0) / 2.;
-    P[1][1] = (KAPPA - 1.) * (-v_1) * normal(0);
-    P[1][2] = (KAPPA - 1.) * (-v_2) * normal(0);
-    P[1][3] = (KAPPA - 1.) * (-v_3) * normal(0);
-    P[1][4] = (KAPPA - 1.) * normal(0);
+    for (unsigned int bi = 0; bi < COMPONENT_COUNT; bi++)
+      for (unsigned int bj = 0; bj < COMPONENT_COUNT; bj++)
+        beta[bi] += T_inv[bi][bj] * q_ji_star[bj];
 
-    P[2][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * normal(1) / 2.;
-    P[2][1] = (KAPPA - 1.) * (-v_1) * normal(1);
-    P[2][2] = (KAPPA - 1.) * (-v_2) * normal(1);
-    P[2][3] = (KAPPA - 1.) * (-v_3) * normal(1);
-    P[2][4] = (KAPPA - 1.) * normal(1);
+    for (unsigned int si = 0; si < COMPONENT_COUNT; si++)
+      for (unsigned int sj = 0; sj < COMPONENT_COUNT; sj++)
+        if (eigenvalues[sj] < 0)
+          q_ji[si] += beta[sj] * T[si][sj];
+        else
+          q_ji[si] += alpha[sj] * T[si][sj];
 
-    P[3][0] = (KAPPA - 1.) * (v_1 * v_1 + v_2 * v_2 + v_3 * v_3) * normal(2) / 2.;
-    P[3][1] = (KAPPA - 1.) * (-v_1) * normal(2);
-    P[3][2] = (KAPPA - 1.) * (-v_2) * normal(2);
-    P[3][3] = (KAPPA - 1.) * (-v_3) * normal(2);
-    P[3][4] = (KAPPA - 1.) * normal(2);
+    num_flux_Vijayasundaram->Q_inv(w_ji, q_ji, nx, ny, nz);
 
-    for(ui j = 0; j < COMPONENT_COUNT; j++)
-      result -= P[comp_i][j] * Un_val[j] * v_val;
+    d P_minus[COMPONENT_COUNT];
+    d w_temp[COMPONENT_COUNT];
+
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+      w_temp[i] = (w_ji[i] + w_L[i]) / 2.;
+
+    num_flux_Vijayasundaram->P_minus(P_minus, w_temp, w_ji, nx, ny, nz);
+
+    result -= P_minus[comp_i] * v_val;
   }
 
   return result;
 }
-
 
 d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
   d v_val, dimVec v_grad, bool v_N, vec Un_val,
   vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
   d result = 0.;
-
-  d jump_v = v_N ? -v_val : v_val;
-
-  vec numFlux(COMPONENT_COUNT);
-
-  num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
-
-  result -= numFlux[comp_i] * jump_v;
 
   return result;
 }
