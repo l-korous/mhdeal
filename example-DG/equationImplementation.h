@@ -43,6 +43,8 @@ public:
   static d rhsInternalEdgeValue(ui comp_i,
       d v_val, dimVec v_grad, bool v_N, vec Un_val,
       vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, dealii::Point<DIM> quadPoint, dealii::Point<DIM> normal, NumFlux* num_flux);
+
+  static d currentTime;
 };
 
 #endif

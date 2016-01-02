@@ -22,6 +22,7 @@
 
 
 using namespace dealii;
+using namespace std;
 
 typedef EquationImplementation Eq;
 
@@ -93,7 +94,13 @@ void MHDSolver::assemble_system(bool firstIteration)
   // \todo This comes from tutorial, it may need some adjustment.
   MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
     (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
-    &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
+    &MHDSolver::saveInfoBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
+
+  MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
+    (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetricEmpty,
+    &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdgeEmpty, assembler);
+
+  periodicBdr.clear();
 }
 
 void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
@@ -135,8 +142,41 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   }
 }
 
-void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
-  CellInfo &info)
+bool eqiv(double a, double b)
+{
+  return fabs(a-b) < 1e-10;
+}
+
+std::vector<dealii::Vector<double> > MHDSolver::findCorrespondingInfo(dealii::Point<DIM> myCenter)
+{
+  for(PeriodicBdrInfo info : periodicBdr)
+  {
+    if(myCenter[0] != info.center[0] && myCenter[1] == info.center[1] && myCenter[2] == info.center[2])
+    {
+//      cout << "for " << myCenter << " found " << info.center << endl;
+      return info.prev_values;
+    }
+  }
+  assert(false);
+}
+
+void MHDSolver::saveInfoBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
+{
+  if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+  {
+    const FEValuesBase<DIM> &fe_v = info.fe_values();
+    std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+      for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
+        prev_values[point][i] = info.values[0][i][point];
+
+
+    Point<DIM> center = info.fe_values().get_cell()->center();
+    periodicBdr.push_back(PeriodicBdrInfo(center, prev_values));
+  }
+}
+
+void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
 {
   const FEValuesBase<DIM> &fe_v = info.fe_values();
   dealii::FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
@@ -153,10 +193,18 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
     for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
       prev_values[point][i] = info.values[0][i][point];
 
+  std::vector<dealii::Vector<double> > prev_values_oposite_elem;//(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+  if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+  {
+    Point<DIM> center = info.fe_values().get_cell()->center();
+    prev_values_oposite_elem = findCorrespondingInfo(center);
+  }
+
   // Components.
   std::vector<int> components(dofs_per_cell);
   for (ui i = 0; i < dofs_per_cell; ++i)
     components[i] = info.finite_element().system_to_component_index(i).first;
+
 
   for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
   {
@@ -164,18 +212,36 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
     {
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
-        local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
-          fe_v.shape_value(j, point), fe_v.shape_value(i, point),
-          prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
+        if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+        {
+          // no matrix form at the moment
+        }
+        else
+        {
+          local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
+            fe_v.shape_value(j, point), fe_v.shape_value(i, point),
+            prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
+            vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+        }
+      }
+      if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+      {
+        // form taken from InternalEdge
+        local_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components[i], fe_v.shape_value(i, point),
+                        fe_v.shape_grad(i, point), false, prev_values[point], vecDimVec(), prev_values_oposite_elem[point],
+                        vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+
+      }
+      else
+      {
+        local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
+          fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
           vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
       }
-      local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
-        fe_v.shape_value(i, point),
-        prev_values[point], fe_v.shape_grad(i, point),
-        vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
     }
   }
 }
+
 
 void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   DoFInfo &dinfo2,
@@ -282,14 +348,17 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
 
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point), fe_v.shape_grad(i, point), false,
-        prev_values1[point], vecDimVec(), prev_values2[point], vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+      v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point),
+                      fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
+                      vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
 
     for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
     {
-      v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point), fe_v_neighbor.shape_grad(l, point), true,
-        prev_values1[point], vecDimVec(), prev_values2[point], vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+      assert(fe_v.quadrature_point(point) == fe_v_neighbor.quadrature_point(point));
+      v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point),
+                      fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
+                      vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
   }
 }
@@ -381,7 +450,7 @@ void MHDSolver::add_markers(Triangulation<DIM>::cell_iterator cell)
 
 void MHDSolver::run()
 {
-  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM, INIT_REF_NUM, 1 }), p1, p4);
+  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z}), p1, p4);
   
   std::string tria_file = "Tria.vtk";
   std::ofstream tria_out(tria_file);
@@ -434,7 +503,10 @@ void MHDSolver::run()
     solve(solution);
     this->slnPrev = solution;
     outputResults(timeStep, currentTime);
+    Eq::currentTime = currentTime;
     timer.stop();
     std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s." << std::endl;
   }
 }
+
+std::vector<PeriodicBdrInfo> MHDSolver::periodicBdr;

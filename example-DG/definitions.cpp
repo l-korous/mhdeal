@@ -1,7 +1,9 @@
 #include "definitions.h"
 
 const ui DG_ORDER = 0;
-const ui INIT_REF_NUM = 8;
+const ui INIT_REF_NUM_X = 100;
+const ui INIT_REF_NUM_Y = 2;
+const ui INIT_REF_NUM_Z = 2;
 
 // boundary id
 const unsigned int BOUNDARY_FRONT = 1;
@@ -27,13 +29,23 @@ bool BC_SOLID_WALL(const unsigned int bnd_marker)
     return false;
 }
 
+bool BC_IS_SYMMETRIC(const unsigned int bnd_marker)
+{
+  if ((bnd_marker == BOUNDARY_RIGHT) || (bnd_marker == BOUNDARY_LEFT))
+    return true;
+  else
+    return false;
+}
+
+
+
 const dealii::Point<DIM> p1(0., 0., 0.);
 //const dealii::Point<DIM> p2(.3, 1., 1.);
 //const dealii::Point<DIM> p3(.3, .1, 0.);
 const dealii::Point<DIM> p4(4.1, 1., 1.);
 
 const d T_FINAL = 1000.0;
-const d DELTA_T = 1.e-2;
+const d DELTA_T = 0.003;
 
 const bool PRINT_ALGEBRA = false;
 // Delete VTK on start
@@ -52,7 +64,7 @@ const d KAPPA = 1.4;
 
 // Left
 const double RHO_IN_LEFT = 1.0;
-const double V1_IN_LEFT = 2.9;
+const double V1_IN_LEFT = 0.;
 const double V2_IN_LEFT = 0.;
 const double V3_IN_LEFT = 0.;
 const double P_IN_LEFT = 0.714286;

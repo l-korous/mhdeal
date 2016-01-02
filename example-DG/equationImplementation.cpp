@@ -291,7 +291,8 @@ d EquationImplementation::rhsVolValue(ui comp_i,
 
 d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
   d v_val, vec Un_val, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
+  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, 
+  NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
 {
   d result = 0.;
 
@@ -365,6 +366,10 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
     num_flux_Vijayasundaram->P_minus(P_minus, w_temp, w_ji, nx, ny, nz);
 
     result -= P_minus[comp_i] * v_val;
+  }
+  else if (BC_IS_SYMMETRIC(bnd_id))
+  {
+    assert(false);
   }
 
   return result;
@@ -815,3 +820,5 @@ void EquationImplementation::Jacobians(dealii::FullMatrix<double> *J,
   J[2](10, 10) = 0;
 
 }
+
+d EquationImplementation::currentTime;
