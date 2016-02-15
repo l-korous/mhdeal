@@ -22,6 +22,7 @@
 
 
 using namespace dealii;
+using namespace std;
 
 typedef EquationImplementation Eq;
 
@@ -40,6 +41,12 @@ MHDSolver::MHDSolver()
   quadFace(2 * DG_ORDER)
 {
   numFlux = new NumFluxVijayasundaram();
+  
+  for(unsigned int i=0;i<COMPONENT_COUNT;i++){
+    for(unsigned int j=0;j<COMPONENT_COUNT;j++){
+      A[0][i][j]=A[1][i][j]=A[2][i][j]=0.0;
+    }
+  }
 }
 
 void MHDSolver::setup_system()
@@ -71,6 +78,11 @@ void MHDSolver::assemble_system(bool firstIteration)
   info_box.cell_selector.add("solution", true, false, false);
   info_box.boundary_selector.add("solution", true, false, false);
   info_box.face_selector.add("solution", true, false, false);
+  
+  solution_data.add(&slnLin, "linearization");
+  info_box.cell_selector.add("linearization", true, false, false);
+  info_box.boundary_selector.add("linearization", true, false, false);
+  info_box.face_selector.add("linearization", true, false, false);
 
   info_box.initialize_update_flags();
   UpdateFlags update_flags = update_quadrature_points | update_values | update_gradients;
@@ -93,12 +105,19 @@ void MHDSolver::assemble_system(bool firstIteration)
   // \todo This comes from tutorial, it may need some adjustment.
   MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
     (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
-    &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
+    &MHDSolver::saveInfoBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
+
+  MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
+    (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetricEmpty,
+    &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdgeEmpty, assembler);
+
+  periodicBdr.clear();
 }
 
 void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   CellInfo &info)
 {
+  double rhs[COMPONENT_COUNT];
   const FEValuesBase<DIM> &fe_v = info.fe_values();
   dealii::FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
   Vector<d> &local_vector = dinfo.vector(0).block(0);
@@ -106,10 +125,17 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   const ui dofs_per_cell = info.finite_element().dofs_per_cell;
 
-  std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
-  for (ui i = 0; i < COMPONENT_COUNT; i++)
-    for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
-      prev_values[point][i] = info.values[0][i][point];
+  std::vector<dealii::Vector<double> > &prev_values = info.values[0];
+  //(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+  std::vector<std::vector<Tensor<1,DIM> > > &prev_grads = info.gradients[0];
+  //(fe_v.n_quadrature_points, std::vector<Tensor<1,DIM> >(COMPONENT_COUNT));
+  std::vector<dealii::Vector<double> > &lin_values = info.values[1];
+//   for (ui i = 0; i < COMPONENT_COUNT; i++)
+//     for (ui point = 0; point < fe_v.n_quadrature_points; ++point){
+//       prev_values[point][i] = info.values[0][i][point];
+//       prev_grads[point][i] = info.gradients[0][i][point];
+//       lin_values[point][i] = info.values[1][i][point];
+//     }
 
   // Components
   std::vector<int> components(dofs_per_cell);
@@ -118,25 +144,67 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
   {
+    JacobiM(A,lin_values[point],point);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-    {
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
-      {
-        local_matrix(i, j) += JxW[point] * Eq::matrixVolValue(components[j], components[i],
-          fe_v.shape_value(j, point), fe_v.shape_value(i, point),
-          prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
-          vecDimVec(), fe_v.quadrature_point(point));
+      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u + dt * sum_d A_d * u * dv/dx_d
+        local_matrix(i, j) += JxW[point]*(fe_v.shape_value(i, point)+ DELTA_T*(
+           A[0][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[0]+
+           A[1][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[1]+
+           A[2][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[2])
+           );
       }
-      local_vector(i) += JxW[point] * Eq::rhsVolValue(components[i],
-        fe_v.shape_value(i, point),
-        prev_values[point], fe_v.shape_grad(i, point),
-        vecDimVec(), fe_v.quadrature_point(point));
+    JacobiM(A,prev_values[point],point);
+    for(ui i=0;i<COMPONENT_COUNT;i++){  //  sum_d dF_d(u_old)/dx_d
+      rhs[0]=A[0][0][0]*prev_grads[point][0][0]
+            +A[1][0][0]*prev_grads[point][0][0]
+            +A[2][0][0]*prev_grads[point][0][0];
+      for(ui j=1;j<COMPONENT_COUNT;j++)
+        rhs[j]+=A[0][i][j]*prev_grads[point][components[j]][0]
+               +A[1][i][j]*prev_grads[point][components[j]][0]
+               +A[2][i][j]*prev_grads[point][components[j]][0];
+    }
+    for (ui i = 0; i < fe_v.dofs_per_cell; ++i){  // u_old - dt * sum_d dF_d(u_old)/dx_d
+      local_vector(i) += JxW[point] * (prev_values[point] - DELTA_T*
+            rhs[components[i]]*prev_grads[point][i][0] );
     }
   }
 }
 
-void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
-  CellInfo &info)
+bool eqiv(double a, double b)
+{
+  return fabs(a-b) < 1e-10;
+}
+
+std::vector<dealii::Vector<double> > MHDSolver::findCorrespondingInfo(dealii::Point<DIM> myCenter)
+{
+  for(PeriodicBdrInfo info : periodicBdr)
+  {
+    if(myCenter[0] != info.center[0] && myCenter[1] == info.center[1] && myCenter[2] == info.center[2])
+    {
+//      cout << "for " << myCenter << " found " << info.center << endl;
+      return info.prev_values;
+    }
+  }
+  assert(false);
+}
+
+void MHDSolver::saveInfoBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
+{
+  if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+  {
+    const FEValuesBase<DIM> &fe_v = info.fe_values();
+    std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+    for (ui i = 0; i < COMPONENT_COUNT; i++)
+      for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
+        prev_values[point][i] = info.values[0][i][point];
+
+
+    Point<DIM> center = info.fe_values().get_cell()->center();
+    periodicBdr.push_back(PeriodicBdrInfo(center, prev_values));
+  }
+}
+
+void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
 {
   const FEValuesBase<DIM> &fe_v = info.fe_values();
   dealii::FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
@@ -153,10 +221,18 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
     for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
       prev_values[point][i] = info.values[0][i][point];
 
+  std::vector<dealii::Vector<double> > prev_values_oposite_elem;//(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+  if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+  {
+    Point<DIM> center = info.fe_values().get_cell()->center();
+    prev_values_oposite_elem = findCorrespondingInfo(center);
+  }
+
   // Components.
   std::vector<int> components(dofs_per_cell);
   for (ui i = 0; i < dofs_per_cell; ++i)
     components[i] = info.finite_element().system_to_component_index(i).first;
+
 
   for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
   {
@@ -164,18 +240,36 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo,
     {
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
-        local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
-          fe_v.shape_value(j, point), fe_v.shape_value(i, point),
-          prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
-          vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, dinfo.face->boundary_id());
+        if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+        {
+          // no matrix form at the moment
+        }
+        else
+        {
+          local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
+            fe_v.shape_value(j, point), fe_v.shape_value(i, point),
+            prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
+            vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+        }
       }
-      local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
-        fe_v.shape_value(i, point),
-        prev_values[point], fe_v.shape_grad(i, point),
-        vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+      if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
+      {
+        // form taken from InternalEdge
+        local_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components[i], fe_v.shape_value(i, point),
+                        fe_v.shape_grad(i, point), false, prev_values[point], vecDimVec(), prev_values_oposite_elem[point],
+                        vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+
+      }
+      else
+      {
+        local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
+          fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
+          vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+      }
     }
   }
 }
+
 
 void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   DoFInfo &dinfo2,
@@ -241,7 +335,7 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
         u1_v1_matrix(i, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components1[i],
-          fe_v.shape_value(j, point), fe_v.shape_value(i, point),
+          fe_v.shape_value(i, point), fe_v.shape_value(j, point),
           prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
           vecDimVec(), vecDimVec(), false, false, fe_v.quadrature_point(point), normals[point], numFlux);
       }
@@ -252,9 +346,9 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
         u1_v2_matrix(k, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components2[k],
-          fe_v.shape_value(j, point), fe_v_neighbor.shape_value(k, point),
+          fe_v.shape_value(k, point), fe_v_neighbor.shape_value(j, point),
           prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v_neighbor.shape_grad(k, point),
-          vecDimVec(), vecDimVec(), false, true, fe_v.quadrature_point(point), normals[point], numFlux);
+          vecDimVec(), vecDimVec(), true, false, fe_v.quadrature_point(point), normals[point], numFlux);
       }
     }
 
@@ -263,9 +357,9 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
       {
         u2_v1_matrix(i, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components1[i],
-          fe_v_neighbor.shape_value(l, point), fe_v.shape_value(i, point),
+          fe_v_neighbor.shape_value(i, point), fe_v.shape_value(l, point),
           prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v.shape_grad(i, point),
-          vecDimVec(), vecDimVec(), true, false, fe_v.quadrature_point(point), normals[point], numFlux);
+          vecDimVec(), vecDimVec(), false, true, fe_v.quadrature_point(point), normals[point], numFlux);
       }
     }
 
@@ -274,7 +368,7 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
       {
         u2_v2_matrix(k, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components2[k],
-          fe_v_neighbor.shape_value(l, point), fe_v_neighbor.shape_value(k, point),
+          fe_v_neighbor.shape_value(k, point), fe_v_neighbor.shape_value(l, point),
           prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v_neighbor.shape_grad(k, point),
           vecDimVec(), vecDimVec(), true, true, fe_v.quadrature_point(point), normals[point], numFlux);
       }
@@ -282,14 +376,17 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
 
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point), fe_v.shape_grad(i, point), false,
-        prev_values1[point], vecDimVec(), prev_values2[point], vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+      v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point),
+                      fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
+                      vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
 
     for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
     {
-      v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point), fe_v_neighbor.shape_grad(l, point), true,
-        prev_values1[point], vecDimVec(), prev_values2[point], vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+      assert(fe_v.quadrature_point(point) == fe_v_neighbor.quadrature_point(point));
+      v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point),
+                      fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
+                      vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
   }
 }
@@ -334,7 +431,7 @@ void MHDSolver::solve(Vector<d> &solution)
 
   solver.initialize(systemMatrix);
 
-  solver.vmult(solution, rightHandSide);
+  solver.Tvmult(solution, rightHandSide);
 }
 
 void MHDSolver::outputResults(ui timeStep, d currentTime) const
@@ -381,7 +478,7 @@ void MHDSolver::add_markers(Triangulation<DIM>::cell_iterator cell)
 
 void MHDSolver::run()
 {
-  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM, INIT_REF_NUM, 1 }), p1, p4);
+  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z}), p1, p4);
   
   std::string tria_file = "Tria.vtk";
   std::ofstream tria_out(tria_file);
@@ -434,7 +531,10 @@ void MHDSolver::run()
     solve(solution);
     this->slnPrev = solution;
     outputResults(timeStep, currentTime);
+    Eq::currentTime = currentTime;
     timer.stop();
     std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s." << std::endl;
   }
 }
+
+std::vector<PeriodicBdrInfo> MHDSolver::periodicBdr;

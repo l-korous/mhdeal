@@ -10,11 +10,10 @@ typedef double d;
 // These are discretization definitions.
 // This is preprocessor because it is used in templates.
 #define DIM 3
-#define Ne  11   // Number of MHD equations
 
 extern const ui DG_ORDER;
-extern const ui INIT_REF_NUM;
-extern const ui COMPONENT_COUNT;
+extern const ui INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z;
+#define COMPONENT_COUNT 5
 extern const ui TIME_DISCRETIZATION_SEMI_IMPLICIT;
 
 // boundary id
@@ -25,8 +24,9 @@ extern const unsigned int BOUNDARY_LEFT;
 extern const unsigned int BOUNDARY_BOTTOM;
 extern const unsigned int BOUNDARY_TOP;
 
-bool BC_IS_IN_WEAKFORM(const unsigned int bnd_marker);
-bool BC_IS_OUTFLOW(const unsigned int bnd_marker);
+bool BC_INFLOW_OUTFLOW(const unsigned int bnd_marker);
+bool BC_SOLID_WALL(const unsigned int bnd_marker);
+bool BC_IS_SYMMETRIC(const unsigned int bnd_marker);
 
 // Points defining geometry
 extern const dealii::Point<DIM> p1;

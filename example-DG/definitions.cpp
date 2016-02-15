@@ -1,8 +1,9 @@
 #include "definitions.h"
 
 const ui DG_ORDER = 0;
-const ui INIT_REF_NUM = 10;
-const ui COMPONENT_COUNT = 5;
+const ui INIT_REF_NUM_X = 100;
+const ui INIT_REF_NUM_Y = 2;
+const ui INIT_REF_NUM_Z = 2;
 
 // boundary id
 const unsigned int BOUNDARY_FRONT = 1;
@@ -12,21 +13,31 @@ const unsigned int BOUNDARY_LEFT = 4;
 const unsigned int BOUNDARY_BOTTOM = 5;
 const unsigned int BOUNDARY_TOP = 6;
 
-bool BC_IS_IN_WEAKFORM(const unsigned int bnd_marker)
+bool BC_INFLOW_OUTFLOW(const unsigned int bnd_marker)
 {
-  if (bnd_marker == BOUNDARY_LEFT || bnd_marker == BOUNDARY_TOP)
-    return false;
-  else
+  if (bnd_marker == BOUNDARY_LEFT || bnd_marker == BOUNDARY_TOP || bnd_marker == BOUNDARY_RIGHT)
     return true;
+  else
+    return false;
 }
 
-bool BC_IS_OUTFLOW(const unsigned int bnd_marker)
+bool BC_SOLID_WALL(const unsigned int bnd_marker)
 {
-  if (bnd_marker == BOUNDARY_RIGHT)
+  if (bnd_marker == BOUNDARY_BOTTOM)
     return true;
   else
     return false;
 }
+
+bool BC_IS_SYMMETRIC(const unsigned int bnd_marker)
+{
+  if ((bnd_marker == BOUNDARY_RIGHT) || (bnd_marker == BOUNDARY_LEFT))
+    return true;
+  else
+    return false;
+}
+
+
 
 const dealii::Point<DIM> p1(0., 0., 0.);
 //const dealii::Point<DIM> p2(.3, 1., 1.);
@@ -34,7 +45,7 @@ const dealii::Point<DIM> p1(0., 0., 0.);
 const dealii::Point<DIM> p4(4.1, 1., 1.);
 
 const d T_FINAL = 1000.0;
-const d DELTA_T = 0.01;
+const d DELTA_T = 0.003;
 
 const bool PRINT_ALGEBRA = false;
 // Delete VTK on start
@@ -46,11 +57,14 @@ const d ETA = 1.0e-8;
 const d R = 287.14;
 // specific heat capacity at constant volume
 const d C_V = 717.5;
-const d KAPPA = 1.0 + (R / C_V);
+// This is somehow wrong -- ?
+// const d KAPPA = 1.0 + (R / C_V);
+
+const d KAPPA = 1.4;
 
 // Left
 const double RHO_IN_LEFT = 1.0;
-const double V1_IN_LEFT = 2.9;
+const double V1_IN_LEFT = 0.;
 const double V2_IN_LEFT = 0.;
 const double V3_IN_LEFT = 0.;
 const double P_IN_LEFT = 0.714286;

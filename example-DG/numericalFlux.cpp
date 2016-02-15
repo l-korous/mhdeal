@@ -52,7 +52,7 @@ void NumFlux::Q_inv(double result[5], double state_vector[5], double nx, double 
   result[4] = state_vector[4];
 }
 
-void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result)
+void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
 {
   d x = quadPoint(0), y = quadPoint(1), z = quadPoint(2);
   d nx = normal(0), ny = normal(1), nz = normal(2);
@@ -90,7 +90,7 @@ void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM
   result[4] = result[4] / 2.;
 }
 
-void NumFluxUpwind::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result)
+void NumFluxUpwind::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
 {
   d x = quadPoint(0), y = quadPoint(1), z = quadPoint(2);
   d nx = normal(0), ny = normal(1), nz = normal(2);
@@ -129,63 +129,63 @@ void NumFluxUpwind::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM>
   result[4] = f_1_5 * nx + f_2_5 * ny + f_3_5 * nz;
 }
 
-void NumFluxVijayasundaram::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result)
+void NumFluxVijayasundaram::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
 {
-  d x = quadPoint(0), y = quadPoint(1), z = quadPoint(2);
   d nx = normal(0), ny = normal(1), nz = normal(2);
 
-  d r, p1, p2, p3, E;
+  d U_L_arr[COMPONENT_COUNT];
+  d U_R_arr[COMPONENT_COUNT];
+  d w_mean[COMPONENT_COUNT];
 
-  d result_arr[5];
-  d U_L_arr[5];
-  d U_R_arr[5];
-  for (unsigned int i = 0; i < COMPONENT_COUNT; i++)
+  d result_arr[COMPONENT_COUNT];
+  d result_temp[COMPONENT_COUNT];
+
+  for (ui i = 0; i < COMPONENT_COUNT; i++)
   {
+    w_mean[i] = (U_L[i] + U_R[i]) / 2.;
     U_L_arr[i] = U_L[i];
     U_R_arr[i] = U_R[i];
+    result_arr[i] = 0.;
+    result_temp[i] = 0.;
   }
 
-  d result_temp[5];
-  r = U_L[0];
-  p1 = U_L[1];
-  p2 = U_L[2];
-  p3 = U_L[3];
-  E = U_L[4];
-
-  result_temp[0] = f_1_1 * nx + f_2_1 * ny + f_3_1 * nz;
-  result_temp[1] = f_1_2 * nx + f_2_2 * ny + f_3_2 * nz;
-  result_temp[2] = f_1_3 * nx + f_2_3 * ny + f_3_3 * nz;
-  result_temp[3] = f_1_4 * nx + f_2_4 * ny + f_3_4 * nz;
-  result_temp[4] = f_1_5 * nx + f_2_5 * ny + f_3_5 * nz;
-
-  //////////////
-  r = U_R[0];
-  p1 = U_R[1];
-  p2 = U_R[2];
-  p3 = U_R[3];
-  E = U_R[4];
-
-  result_temp[0] += f_1_1 * nx + f_2_1 * ny + f_3_1 * nz;
-  result_temp[1] += f_1_2 * nx + f_2_2 * ny + f_3_2 * nz;
-  result_temp[2] += f_1_3 * nx + f_2_3 * ny + f_3_3 * nz;
-  result_temp[3] += f_1_4 * nx + f_2_4 * ny + f_3_4 * nz;
-  result_temp[4] += f_1_5 * nx + f_2_5 * ny + f_3_5 * nz;
-
-  for (unsigned int i = 0; i < 5; i++)
-    result_arr[i] = result_temp[i] / 2.;
-
-  d w_mean[5];
-  w_mean[0] = U_L[0] + U_R[0];
-  w_mean[1] = U_L[1] + U_R[1];
-  w_mean[2] = U_L[2] + U_R[2];
-  w_mean[3] = U_L[3] + U_R[3];
-  w_mean[4] = U_L[4] + U_R[4];
-
-  P_plus(result_temp, w_mean, U_L_arr, nx, ny, nz);
-  P_minus(result_arr, w_mean, U_R_arr, nx, ny, nz);
+  if (only_part == 0 || only_part == 1)
+    P_plus(result_temp, w_mean, U_L_arr, nx, ny, nz);
+  if (only_part == 0 || only_part == 2)
+    P_minus(result_arr, w_mean, U_R_arr, nx, ny, nz);
 
   for (unsigned int i = 0; i < COMPONENT_COUNT; i++)
     result[i] = result_arr[i] + result_temp[i];
+}
+
+d NumFluxVijayasundaram::calculate(vec U_L_prev, vec U_R_prev, dealii::Point<DIM> quadPoint, dealii::Point<DIM> normal, ui comp_i, ui comp_j, ui only_part)
+{
+  d nx = normal(0), ny = normal(1), nz = normal(2);
+  d e[5][5] =
+  {
+    { 1., 0, 0, 0, 0 },
+    { 0, 1., 0, 0, 0 },
+    { 0, 0, 1., 0, 0 },
+    { 0, 0, 0, 1., 0 },
+    { 0, 0, 0, 0, 1. }
+  };
+
+  d U_L[COMPONENT_COUNT], U_R[COMPONENT_COUNT];
+  d result[COMPONENT_COUNT];
+  for (ui i = 0; i < 5; i++)
+  {
+    U_L[i] = U_L_prev[i];
+    U_R[i] = U_R_prev[i];
+    result[i] = 0.;
+  }
+
+
+  if (only_part == 1)
+    P_plus(result, U_L, e[comp_j], nx, ny, nz);
+  if (only_part == 2)
+    P_minus(result, U_R, e[comp_j], nx, ny, nz);
+
+  return result[comp_i];
 }
 
 void NumFluxVijayasundaram::P_plus(double* result, double w[5], double param[5], double nx, double ny, d nz)
@@ -356,6 +356,15 @@ void NumFluxVijayasundaram::Lambda(double result[5])
   result[4] = u + a;
 }
 
+void NumFluxVijayasundaram::T(double result[5][5])
+{
+  this->T_1(result);
+  this->T_2(result);
+  this->T_3(result);
+  this->T_4(result);
+  this->T_5(result);
+}
+
 void NumFluxVijayasundaram::T_1(double result[5][5])
 {
   result[0][0] = 1.0;
@@ -395,6 +404,15 @@ void NumFluxVijayasundaram::T_5(double result[5][5])
   result[2][4] = v;
   result[3][4] = w;
   result[4][4] = (V / 2.0) + (a * a / (KAPPA - 1.0)) + (u * a);
+}
+
+void NumFluxVijayasundaram::T_inv(double result[5][5])
+{
+  this->T_inv_1(result);
+  this->T_inv_2(result);
+  this->T_inv_3(result);
+  this->T_inv_4(result);
+  this->T_inv_5(result);
 }
 
 void NumFluxVijayasundaram::T_inv_1(double result[5][5])
@@ -527,7 +545,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
 
     // Upwind flux in the case of supersonic flow
     if (sp[0]>=0.0){  // use F_L
-      for(register int j=0;j<Ne;j++)
+      for(register int j=0;j<COMPONENT_COUNT;j++)
         F[j]=Fl[j];
 #ifndef _Pb_
       F[1]+=GAMMA*pml-B2;
@@ -536,7 +554,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
       return;
     }
     if (sp[4]<=0.0){  // use F_R
-      for(register int j=0;j<Ne;j++)
+      for(register int j=0;j<COMPONENT_COUNT;j++)
         F[j]=Fr[j];
 #ifndef _Pb_
       F[1]+=GAMMA*pmr-B2;
@@ -619,7 +637,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
           ((ur[1]*Ur[4]+ur[2]*ur[5]+ur[3]*ur[6])*hr[0]-vbstr))/smr;
 
     if (sp[1]>=0.0){
-      for(register int j=0;j<Ne;j++)
+      for(register int j=0;j<COMPONENT_COUNT;j++)
         F[j]=Fl[j]+sp[0]*(Ul[j]-ul[j]);
 #ifndef _Pb_
       F[1]+=GAMMA*pml-B2;
@@ -629,7 +647,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
       return;
     }
     if (sp[3]<=0.0 && sp[2]<0.0){
-      for(register int j=0;j<Ne;j++)
+      for(register int j=0;j<COMPONENT_COUNT;j++)
         F[j]=Fr[j]+sp[4]*(Ur[j]-ur[j]);
 #ifndef _Pb_
       F[1]+=GAMMA*pmr-B2;
@@ -641,7 +659,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
     
     // F**_L and F**_R
     if (B2<SMNUM*(ptst+ptstr)){
-      for(register int j=0;j<Ne;j++){
+      for(register int j=0;j<COMPONENT_COUNT;j++){
         Udl[j]=Ul[j];
         Udr[j]=Ur[j];
       }
@@ -682,7 +700,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
 
     if (sp[2]>=0.0){
       cm=sp[1]-sp[0];
-      for(register int j=0;j<Ne;j++)
+      for(register int j=0;j<COMPONENT_COUNT;j++)
         F[j]=Fl[j]+sp[1]*Udl[j]-sp[0]*ul[j]-cm*Ul[j];
 #ifndef _Pb_
       F[1]+=GAMMA*pml-B2;
@@ -692,7 +710,7 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
       return;
     }
     cm=sp[3]-sp[4];
-    for(register int j=0;j<Ne;j++){
+    for(register int j=0;j<COMPONENT_COUNT;j++){
       F[j]=Fr[j]+sp[3]*Udr[j]-sp[4]*ur[j]-cm*Ur[j];
     }
 #ifndef _Pb_

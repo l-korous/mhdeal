@@ -8,6 +8,22 @@
 
 #include "definitions.h"
 
+
+typedef dealii::MeshWorker::DoFInfo<DIM> DoFInfo;
+typedef dealii::MeshWorker::IntegrationInfo<DIM> CellInfo;
+
+class PeriodicBdrInfo
+{
+public:
+  dealii::Point<DIM> center;
+  std::vector<dealii::Vector<double> > prev_values;
+
+  PeriodicBdrInfo(dealii::Point<DIM> center, std::vector<dealii::Vector<double> > prev_values) :
+    center(center), prev_values(prev_values)
+  {}
+
+};
+
 class MHDSolver
 {
 public:
@@ -34,17 +50,25 @@ private:
   dealii::SparseMatrix<d> systemMatrix;
 
   dealii::Vector<d>       solution;
-  static dealii::Vector<d>       slnPrev;
+  static dealii::Vector<d> slnPrev;
+  static dealii::Vector<d> slnLin;
   static dealii::Vector<d> slnUtil;
 
   dealii::Vector<d>       rightHandSide;
+  d A[3][COMPONENT_COUNT][COMPONENT_COUNT];         // Jacobi matrixes of the fluxes
 
-  typedef dealii::MeshWorker::DoFInfo<DIM> DoFInfo;
-  typedef dealii::MeshWorker::IntegrationInfo<DIM> CellInfo;
+
+  static std::vector<PeriodicBdrInfo> periodicBdr;
+
+  // todo: this is now implemented assuming that periodic BC is on left and right boundary only
+  static std::vector<dealii::Vector<double> > findCorrespondingInfo(dealii::Point<DIM> myCenter);
 
   static void assembleVolumetric(DoFInfo &dinfo, CellInfo &info);
+  static void assembleVolumetricEmpty(DoFInfo &dinfo, CellInfo &info) {}
+  static void saveInfoBoundaryEdge(DoFInfo &dinfo, CellInfo &info);
   static void assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info);
   static void assembleInternalEdge(DoFInfo &dinfo1, DoFInfo &dinfo2, CellInfo &info1, CellInfo &info2);
+  static void assembleInternalEdgeEmpty(DoFInfo &dinfo1, DoFInfo &dinfo2, CellInfo &info1, CellInfo &info2) {}
 };
 
 #endif
