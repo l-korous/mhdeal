@@ -171,8 +171,12 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
     double Udl[COMPONENT_COUNT_T],Udr[COMPONENT_COUNT_T],Ul[COMPONENT_COUNT_T],Ur[COMPONENT_COUNT_T],cl,cm,cr,ptl,ptr;
     double sp[5],sml,smr,ptst,ptstr,vbstl,vbstr,Bsgnl,Bsgnr,invsumd;
 
+    
+    //std::cout<<ul[0]<<" "<<ul[1]<<" "<<ul[2]<<" "<<ul[3]<<" "<<ul[4]<<" "<<ul[5]<<" "<<ul[6]<<" "<<ul[7]<<" "<<"---\n";
     Q(ul,ul,normal[0],normal[1],normal[2]);
     Q(ur,ur,normal[0],normal[1],normal[2]);
+
+    //std::cout<<ul[0]<<" "<<ul[1]<<" "<<ul[2]<<" "<<ul[3]<<" "<<ul[4]<<" "<<ul[5]<<" "<<ul[6]<<" "<<ul[7]<<" "<<"\n";
     
     B=0.5*(ul[4]+ur[4]);  // Simple average of mag. field in direction of normal vector
     B2=B*B;

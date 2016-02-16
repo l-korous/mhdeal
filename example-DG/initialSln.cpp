@@ -11,7 +11,7 @@ d InitialSlnRho::value(const Point<DIM> &p)
 
 d InitialSlnMomentumX::value(const Point<DIM> &p)
 {
-  return p[0] * RHO_EXT;
+  //return p[0] * RHO_EXT;
   return V1_EXT;
 }
 

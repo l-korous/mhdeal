@@ -147,27 +147,26 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   {
     JacobiM(A,lin_values[point]);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u + dt * sum_d A_d * u * dv/dx_d
-        local_matrix(i, j) += JxW[point]*(fe_v.shape_value(i, point)+ DELTA_T*(
-           A[0][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[0]+
-           A[1][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[1]+
-           A[2][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[2])
-           );
+      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u.v + dt * sum_d A_d * u * dv/dx_d
+        if (components[i]==components[j])
+          local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
+        for(ui d=0;d<DIM;d++)
+          local_matrix(i, j) += JxW[point]* DELTA_T*
+           A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
       }
 
     JacobiM(A,prev_values[point]);
     for(ui i=0;i<COMPONENT_COUNT_T;i++){  //  sum_d dF_d(u_old)/dx_d
-      rhs[0]=A[0][0][0]*prev_grads[point][0][0]
-            +A[1][0][0]*prev_grads[point][0][0]
-            +A[2][0][0]*prev_grads[point][0][0];
-      for(ui j=1;j<COMPONENT_COUNT;j++)
-        rhs[j]+=A[0][i][j]*prev_grads[point][components[j]][0]
-               +A[1][i][j]*prev_grads[point][components[j]][0]
-               +A[2][i][j]*prev_grads[point][components[j]][0];
+      rhs[i]=A[0][i][0]*prev_grads[point][0][0];
+      for(ui d=1;d<DIM;d++)
+        rhs[i]+=A[d][i][0]*prev_grads[point][0][d];
+      for(ui d=0;d<DIM;d++)
+        for(ui j=1;j<COMPONENT_COUNT;j++)
+          rhs[i]+=A[d][i][j]*prev_grads[point][j][d];
     }
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i){  // u_old - dt * sum_d dF_d(u_old)/dx_d
-      local_vector(i) += JxW[point] * (prev_values[point][i] - DELTA_T*
-            rhs[components[i]]*prev_grads[point][i][0] );
+      local_vector(i) += JxW[point] * (prev_values[point][components[i]] - DELTA_T*
+            rhs[components[i]] );
     }
   }
 }
@@ -279,12 +278,12 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   std::vector<dealii::Vector<double> > prev_values1(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   for (ui i = 0; i < COMPONENT_COUNT; i++)
     for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
-      prev_values1[point][i] = info1.values[0][i][point];
+      prev_values1[point][i] = info1.values[1][i][point];
 
   std::vector<dealii::Vector<double> > prev_values2(fe_v_neighbor.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   for (ui i = 0; i < COMPONENT_COUNT; i++)
     for (ui point = 0; point < fe_v_neighbor.n_quadrature_points; ++point)
-      prev_values2[point][i] = info2.values[0][i][point];
+      prev_values2[point][i] = info2.values[1][i][point];
 
   // Components.
   std::vector<int> components1(dofs_per_cell1);
@@ -463,8 +462,20 @@ void MHDSolver::run()
   VectorFunctionFromScalarFunctionObject<DIM> InitialSlnMomentumZ(InitialSlnMomentumZ::value, 3, COMPONENT_COUNT);
   VectorTools::interpolate(this->dofHandler, InitialSlnMomentumZ, this->slnUtil);
   this->slnPrev += this->slnUtil;
+  
+  VectorFunctionFromScalarFunctionObject<DIM> InitialSlnB1(InitialSlnB1::value, 4, COMPONENT_COUNT);
+  VectorTools::interpolate(this->dofHandler, InitialSlnB1, this->slnUtil);
+  this->slnPrev += this->slnUtil;
 
-  VectorFunctionFromScalarFunctionObject<DIM> initialSlnEnergy(InitialSlnEnergy::value, 4, COMPONENT_COUNT);
+  VectorFunctionFromScalarFunctionObject<DIM> InitialSlnB2(InitialSlnB2::value, 5, COMPONENT_COUNT);
+  VectorTools::interpolate(this->dofHandler, InitialSlnB2, this->slnUtil);
+  this->slnPrev += this->slnUtil;
+
+  VectorFunctionFromScalarFunctionObject<DIM> InitialSlnB3(InitialSlnB3::value, 6, COMPONENT_COUNT);
+  VectorTools::interpolate(this->dofHandler, InitialSlnB3, this->slnUtil);
+  this->slnPrev += this->slnUtil;
+
+  VectorFunctionFromScalarFunctionObject<DIM> initialSlnEnergy(InitialSlnEnergy::value, 7, COMPONENT_COUNT);
   VectorTools::interpolate(this->dofHandler, initialSlnEnergy, this->slnUtil);
   this->slnPrev += this->slnUtil;
 
@@ -483,6 +494,12 @@ void MHDSolver::run()
       std::cout << "   ln: " << l << " er: " << this->slnUtil.linfty_norm() << std::endl; // debug only
       if (this->slnUtil.linfty_norm()<1e-10) break;
     }
+//     for(ui i=0;i<this->slnPrev.size();i+=COMPONENT_COUNT){ // display arrays
+//       for(ui k=0;k<COMPONENT_COUNT;k++)
+//         std::cout <<this->slnPrev[i+k]<<":"<<solution[i+k]<<" ";
+//       std::cout << std::endl;
+//     }
+    //break;
     this->slnPrev = this->slnLin;
     outputResults(timeStep, currentTime);
     Eq::currentTime = currentTime;
