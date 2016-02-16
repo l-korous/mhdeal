@@ -37,6 +37,8 @@ private:
   void solveOneStep(dealii::Vector<d> &solution);
   void outputResults(ui timeStep, d currentTime) const;
   void add_markers(dealii::Triangulation<DIM>::cell_iterator cell);
+  static void JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT], 
+               dealii::Vector<double> lv);
 
   dealii::Triangulation<DIM>   triangulation;
   dealii::FESystem<DIM> feSystem;
@@ -55,7 +57,7 @@ private:
   static dealii::Vector<d> slnUtil;
 
   dealii::Vector<d>       rightHandSide;
-  d A[3][COMPONENT_COUNT][COMPONENT_COUNT];         // Jacobi matrixes of the fluxes
+  static d A[3][COMPONENT_COUNT][COMPONENT_COUNT];         // Jacobi matrixes of the fluxes
 
 
   static std::vector<PeriodicBdrInfo> periodicBdr;

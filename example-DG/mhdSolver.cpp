@@ -75,7 +75,7 @@ void MHDSolver::assemble_system(bool firstIteration)
 
   AnyData solution_data;
   solution_data.add(&slnPrev, "solution");
-  info_box.cell_selector.add("solution", true, false, false);
+  info_box.cell_selector.add("solution", true, true, false);
   info_box.boundary_selector.add("solution", true, false, false);
   info_box.face_selector.add("solution", true, false, false);
   
@@ -125,17 +125,15 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   const ui dofs_per_cell = info.finite_element().dofs_per_cell;
 
-  std::vector<dealii::Vector<double> > &prev_values = info.values[0];
-  //(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
-  std::vector<std::vector<Tensor<1,DIM> > > &prev_grads = info.gradients[0];
-  //(fe_v.n_quadrature_points, std::vector<Tensor<1,DIM> >(COMPONENT_COUNT));
-  std::vector<dealii::Vector<double> > &lin_values = info.values[1];
-//   for (ui i = 0; i < COMPONENT_COUNT; i++)
-//     for (ui point = 0; point < fe_v.n_quadrature_points; ++point){
-//       prev_values[point][i] = info.values[0][i][point];
-//       prev_grads[point][i] = info.gradients[0][i][point];
-//       lin_values[point][i] = info.values[1][i][point];
-//     }
+  std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+  std::vector<std::vector<Tensor<1,DIM> > > prev_grads(fe_v.n_quadrature_points, std::vector<Tensor<1,DIM> >(COMPONENT_COUNT));
+  std::vector<dealii::Vector<double> > lin_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
+  for (ui i = 0; i < COMPONENT_COUNT; i++)
+    for (ui point = 0; point < fe_v.n_quadrature_points; ++point){
+      prev_values[point][i] = info.values[0][i][point];
+      prev_grads[point][i] = info.gradients[0][i][point];
+      lin_values[point][i] = info.values[1][i][point];
+    }
 
   // Components
   std::vector<int> components(dofs_per_cell);
@@ -144,7 +142,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
   {
-    JacobiM(A,lin_values[point],point);
+    JacobiM(A,lin_values[point]);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ 
         if (components[i]>=COMPONENT_COUNT_T)  // u + sum_d A_d * u * dv/dx_d
@@ -160,7 +158,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
            A[2][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[2])
            );
       }
-    JacobiM(A,prev_values[point],point);
+    JacobiM(A,prev_values[point]);
     for(ui i=0;i<COMPONENT_COUNT_T;i++){  //  sum_d dF_d(u_old)/dx_d
       rhs[0]=A[0][0][0]*prev_grads[point][0][0]
             +A[1][0][0]*prev_grads[point][0][0]
@@ -171,7 +169,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
                +A[2][i][j]*prev_grads[point][components[j]][0];
     }
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i){  // u_old - dt * sum_d dF_d(u_old)/dx_d
-      local_vector(i) += JxW[point] * (prev_values[point] - DELTA_T*
+      local_vector(i) += JxW[point] * (prev_values[point][i] - DELTA_T*
             rhs[components[i]]*prev_grads[point][i][0] );
     }
   }
@@ -545,3 +543,426 @@ void MHDSolver::run()
 }
 
 std::vector<PeriodicBdrInfo> MHDSolver::periodicBdr;
+
+void MHDSolver::JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT], 
+                              Vector<double> lv)
+{
+  double v[COMPONENT_COUNT], iRh, iRh2, Uk, p, gmmo, Ec1, Ec2, Ec3, E1, E2, E3;
+
+  // using shorter notation for old solution
+  // order of the variables is following: rho, v(3), B(3), U, J(3)
+  for (unsigned int i = 0; i < COMPONENT_COUNT; i++)
+    v[i] = lv[i];
+
+  iRh = 1.0 / v[0];
+  iRh2 = iRh*iRh;
+  Uk = iRh*(v[1] * v[1] + v[2] * v[2] + v[3] * v[3]);
+  p = GAMMA*(v[7] - (v[4] * v[4] + v[5] * v[5] + v[6] * v[6]) - Uk);
+  gmmo = GAMMA - 1.0;
+  Ec1 = (v[3] * v[5] - v[2] * v[6])*iRh;
+  Ec2 = (v[1] * v[6] - v[3] * v[4])*iRh;
+  Ec3 = (v[2] * v[4] - v[1] * v[5])*iRh;
+  E1 = Ec1 + ETA*v[8];
+  E2 = Ec2 + ETA*v[9];
+  E3 = Ec3 + ETA*v[10];
+
+  //A[0][0][0] = 0;
+  A[0][0][1] = 1;
+  //A[0][0][2] = 0;
+  //A[0][0][3] = 0;
+  //A[0][0][4] = 0;
+  //A[0][0][5] = 0;
+  //A[0][0][6] = 0;
+  //A[0][0][7] = 0;
+  //A[0][0][8] = 0;
+  //A[0][0][9] = 0;
+  //A[0][0][10] = 0;
+
+  A[0][1][0] = -(v[1] * v[1] * iRh2) + gmmo*Uk*.5*iRh;
+  A[0][1][1] = (2  - gmmo)*v[1]*iRh;
+  A[0][1][2] = -gmmo*v[2]*iRh;
+  A[0][1][3] = -gmmo*v[3]*iRh;
+  A[0][1][4] = -GAMMA*v[4];
+  A[0][1][5] = (1 - gmmo)*v[5];
+  A[0][1][6] = (1 - gmmo)*v[6];
+  A[0][1][7] = 0.5*gmmo;
+  //A[0][1][8] = 0;
+  //A[0][1][9] = 0;
+  //A[0][1][10] = 0;
+
+  A[0][2][0] = -v[1] * v[2]*iRh2;
+  A[0][2][1] = v[2] * iRh;
+  A[0][2][2] = v[1] * iRh;
+  //A[0][2][3] = 0;
+  A[0][2][4] = -v[5];
+  A[0][2][5] = -v[4];
+  //A[0][2][6] = 0;
+  //A[0][2][7] = 0;
+  //A[0][2][8] = 0;
+  //A[0][2][9] = 0;
+  //A[0][2][10] = 0;
+
+  A[0][3][0] = -v[1] * v[3]*iRh2;
+  A[0][3][1] = v[3] * iRh;
+  //A[0][3][2] = 0;
+  A[0][3][3] = v[1] * iRh;
+  A[0][3][4] = -v[6];
+  //A[0][3][5] = 0;
+  A[0][3][6] = -v[4];
+  //A[0][3][7] = 0;
+  //A[0][3][8] = 0;
+  //A[0][3][9] = 0;
+  //A[0][3][10] = 0;
+
+  //A[0][4][0] = 0;
+  //A[0][4][1] = 0;
+  //A[0][4][2] = 0;
+  //A[0][4][3] = 0;
+  //A[0][4][4] = 0;
+  //A[0][4][5] = 0;
+  //A[0][4][6] = 0;
+  //A[0][4][7] = 0;
+  //A[0][4][8] = 0;
+  //A[0][4][9] = 0;
+  //A[0][4][10] = 0;
+
+  A[0][5][0] = Ec3*iRh;
+  A[0][5][1] = v[5] * iRh;
+  A[0][5][2] =-v[4] * iRh;
+  //A[0][5][3] = 0;
+  A[0][5][4] =-v[2] * iRh;
+  A[0][5][5] = v[1] * iRh;
+  //A[0][5][6] = 0;
+  //A[0][5][7] = 0;
+  //A[0][5][8] = 0;
+  //A[0][5][9] = 0;
+  A[0][5][10] = -ETA;
+
+  A[0][6][0] = -Ec2*iRh;
+  A[0][6][1] = v[6] * iRh;
+  //A[0][6][2] = 0;
+  A[0][6][3] = -v[4] * iRh;
+  A[0][6][4] = -v[3] * iRh;
+  //A[0][6][5] = 0;
+  A[0][6][6] = v[1] * iRh;
+  //A[0][6][7] = 0;
+  //A[0][6][8] = 0;
+  A[0][6][9] = ETA;
+  //A[0][6][10] = 0;
+
+  A[0][7][0] = 2 * iRh*(v[5]*Ec3 - v[6]*Ec2) + v[1] * gmmo*Uk*iRh2 - v[1]*(Uk + p)*iRh2;
+  A[0][7][1] = 2 * (v[5] * v[5] + v[6] * v[6])*iRh - 2*v[1] * gmmo*v[1]*iRh2 + (Uk + p)*iRh;
+  A[0][7][2] = -2 * v[4] * v[5] * iRh - v[1] * 2 * gmmo*v[2]*iRh2;
+  A[0][7][3] = -2 * v[4] * v[6] * iRh - v[1] * 2 * gmmo*v[3]*iRh2;
+  A[0][7][4] = -2 * GAMMA*v[4] * v[1] * iRh + 2 * (-v[5] * v[2] - v[6] * v[3])*iRh;
+  A[0][7][5] = -2 * GAMMA*v[5] * v[1] * iRh + 2 * (v[5] * v[1]*iRh - E3);
+  A[0][7][6] = -2 * GAMMA*v[6] * v[1] * iRh + 2 * (v[6] * v[1]*iRh + E2);
+  A[0][7][7] = GAMMA*v[1]*iRh;
+  //A[0][7][8] = 0;
+  A[0][7][9] = 2 * ETA*v[6];
+  A[0][7][10] = -2 * ETA*v[5];
+
+  //A[0][8][0] = 0;
+  //A[0][8][1] = 0;
+  //A[0][8][2] = 0;
+  //A[0][8][3] = 0;
+  //A[0][8][4] = 0;
+  //A[0][8][5] = 0;
+  //A[0][8][6] = 0;
+  //A[0][8][7] = 0;
+  //A[0][8][8] = 0;
+  //A[0][8][9] = 0;
+  //A[0][8][10] = 0;
+
+  //A[0][9][0] = 0;
+  //A[0][9][1] = 0;
+  //A[0][9][2] = 0;
+  //A[0][9][3] = 0;
+  //A[0][9][4] = 0;
+  //A[0][9][5] = 0;
+  A[0][9][6] = 1;
+  //A[0][9][7] = 0;
+  //A[0][9][8] = 0;
+  //A[0][9][9] = 0;
+  //A[0][9][10] = 0;
+
+  //A[0][10][0] = 0;
+  //A[0][10][1] = 0;
+  //A[0][10][2] = 0;
+  //A[0][10][3] = 0;
+  //A[0][10][4] = 0;
+  A[0][10][5] = -1;
+  //A[0][10][6] = 0;
+  //A[0][10][7] = 0;
+  //A[0][10][8] = 0;
+  //A[0][10][9] = 0;
+  //A[0][10][10] = 0;
+
+  if (DIM>1){
+  //A[1][0][0] = 0;
+  //A[1][0][1] = 0;
+  A[1][0][2] = 1;
+  //A[1][0][3] = 0;
+  //A[1][0][4] = 0;
+  //A[1][0][5] = 0;
+  //A[1][0][6] = 0;
+  //A[1][0][7] = 0;
+  //A[1][0][8] = 0;
+  //A[1][0][9] = 0;
+  //A[1][0][10] = 0;
+
+  A[1][1][0] = -v[1] * v[2]*iRh2;
+  A[1][1][1] = v[2] * iRh;
+  A[1][1][2] = v[1] * iRh;
+  //A[1][1][3] = 0;
+  A[1][1][4] = -v[5];
+  A[1][1][5] = -v[4];
+  //A[1][1][6] = 0;
+  //A[1][1][7] = 0;
+  //A[1][1][8] = 0;
+  //A[1][1][9] = 0;
+  //A[1][1][10] = 0;
+
+  A[1][2][0] = -v[2] * v[2] * iRh2 + gmmo*Uk*.5*iRh;
+  A[1][2][1] = -gmmo*v[1]*iRh;
+  A[1][2][2] = (2 - gmmo)*v[2]*iRh;
+  A[1][2][3] = -gmmo*v[3]*iRh;
+  A[1][2][4] = (1 - gmmo)*v[4];
+  A[1][2][5] = -GAMMA*v[5];
+  A[1][2][6] = (1 - gmmo)*v[6];
+  A[1][2][7] = 0.5*gmmo;
+  //A[1][2][8] = 0;
+  //A[1][2][9] = 0;
+  //A[1][2][10] = 0;
+
+  A[1][3][0] = -v[2] * v[3]*iRh2;
+  //A[1][3][1] = 0;
+  A[1][3][2] = v[3] * iRh;
+  A[1][3][3] = v[2] * iRh;
+  //A[1][3][4] = 0;
+  A[1][3][5] = -v[6];
+  A[1][3][6] = -v[5];
+  //A[1][3][7] = 0;
+  //A[1][3][8] = 0;
+  //A[1][3][9] = 0;
+  //A[1][3][10] = 0;
+
+  A[1][4][0] = -Ec3*iRh;
+  A[1][4][1] =-v[5] * iRh;
+  A[1][4][2] = v[4] * iRh;
+  //A[1][4][3] = 0;
+  A[1][4][4] = v[2] * iRh;
+  A[1][4][5] =-v[1] * iRh;
+  //A[1][4][6] = 0;
+  //A[1][4][7] = 0;
+  //A[1][4][8] = 0;
+  //A[1][4][9] = 0;
+  A[1][4][10] = ETA;
+
+  //A[1][5][0] = 0;
+  //A[1][5][1] = 0;
+  //A[1][5][2] = 0;
+  //A[1][5][3] = 0;
+  //A[1][5][4] = 0;
+  //A[1][5][5] = 0;
+  //A[1][5][6] = 0;
+  //A[1][5][7] = 0;
+  //A[1][5][8] = 0;
+  //A[1][5][9] = 0;
+  //A[1][5][10] = 0;
+
+  A[1][6][0] = Ec1*iRh;
+  //A[1][6][1] = 0;
+  A[1][6][2] = v[6] * iRh;
+  A[1][6][3] =-v[5] * iRh;
+  //A[1][6][4] = 0;
+  A[1][6][5] =-v[3] * iRh;
+  A[1][6][6] = v[2] * iRh;
+  //A[1][6][7] = 0;
+  A[1][6][8] = -ETA;
+  //A[1][6][9] = 0;
+  //A[1][6][10] = 0;
+
+  A[1][7][0] = 2 * iRh*(-v[4]*Ec3 + v[6]*Ec1) + v[2] * gmmo*Uk*iRh2 - v[2]*(Uk + p)*iRh2;
+  A[1][7][1] = -2 * v[4] * v[5] * iRh - 2 * gmmo*v[1] * v[2] * iRh2;
+  A[1][7][2] = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2*v[2] * gmmo*v[2]*iRh2 + (Uk + p)*iRh;
+  A[1][7][3] = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
+  A[1][7][4] = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2]*iRh + E3);
+  A[1][7][5] = -2 * GAMMA*v[5] * v[2] * iRh + 2 * (-v[4] * v[1] - v[6] * v[3])*iRh;
+  A[1][7][6] = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2]*iRh - E1);
+  A[1][7][7] = GAMMA*v[2]*iRh;
+  A[1][7][8] = -2 * ETA*v[6];
+  //A[1][7][9] = 0;
+  A[1][7][10] = 2 * ETA*v[4];
+
+  //A[1][8][0] 0;
+  //A[1][8][1] 0;
+  //A[1][8][2] 0;
+  //A[1][8][3] 0;
+  //A[1][8][4] 0;
+  //A[1][8][5] 0;
+  A[1][8][6] = -1;
+  //A[1][8][7] 0;
+  //A[1][8][8] 0;
+  //A[1][8][9] 0;
+  //A[1][8][10] 0;
+
+  //A[1][9][0] = 0;
+  //A[1][9][1] = 0;
+  //A[1][9][2] = 0;
+  //A[1][9][3] = 0;
+  //A[1][9][4] = 0;
+  //A[1][9][5] = 0;
+  //A[1][9][6] = 0;
+  //A[1][9][7] = 0;
+  //A[1][9][8] = 0;
+  //A[1][9][9] = 0;
+  //A[1][9][10] = 0;
+
+  //A[1][10][0] - 0;
+  //A[1][10][1] - 0;
+  //A[1][10][2] - 0;
+  //A[1][10][3] - 0;
+  A[1][10][4] = 1;
+  //A[1][10][5] - 0;
+  //A[1][10][6] - 0;
+  //A[1][10][7] - 0;
+  //A[1][10][8] - 0;
+  //A[1][10][9] - 0;
+  //A[1][10][10] - 0;
+  }
+
+  if (DIM>2){
+  //A[2][0][0] = 0;
+  //A[2][0][1] = 0;
+  //A[2][0][2] = 0;
+  A[2][0][3] = 1;
+  //A[2][0][4] = 0;
+  //A[2][0][5] = 0;
+  //A[2][0][6] = 0;
+  //A[2][0][7] = 0;
+  //A[2][0][8] = 0;
+  //A[2][0][9] = 0;
+  //A[2][0][10] = 0;
+
+  A[2][1][0] = -v[1] * v[3]*iRh2;
+  A[2][1][1] = v[3] * iRh;
+  //A[2][1][2] = 0;
+  A[2][1][3] = v[1] * iRh;
+  A[2][1][4] = -v[6];
+  //A[2][1][5] = 0;
+  A[2][1][6] = -v[4];
+  //A[2][1][7] = 0;
+  //A[2][1][8] = 0;
+  //A[2][1][9] = 0;
+  //A[2][1][10] = 0;
+
+  A[2][2][0] = -v[2] * v[3]*iRh2;
+  //A[2][2][1] = 0;
+  A[2][2][2] = v[3] * iRh;
+  A[2][2][3] = v[2] * iRh;
+  //A[2][2][4] = 0;
+  A[2][2][5] = -v[6];
+  A[2][2][6] = -v[5];
+  //A[2][2][7] = 0;
+  //A[2][2][8] = 0;
+  //A[2][2][9] = 0;
+  //A[2][2][10] = 0;
+
+  A[2][3][0] = -v[3] * v[3] * iRh2 + (gmmo*Uk)*.5*iRh;
+  A[2][3][1] = -gmmo*v[1]*iRh;
+  A[2][3][2] = -gmmo*v[2]*iRh;
+  A[2][3][3] = (2 - gmmo)*v[3]*iRh;
+  A[2][3][4] = (1 - gmmo)*v[4];
+  A[2][3][5] = (1 - gmmo)*v[5];
+  A[2][3][6] = -GAMMA*v[6];
+  A[2][3][7] = 0.5*gmmo;
+  //A[2][3][8] = 0;
+  //A[2][3][9] = 0;
+  //A[2][3][10] = 0;
+
+  A[2][4][0] = Ec2*iRh;
+  A[2][4][1] =-v[6] * iRh;
+  //A[2][4][2] = 0;
+  A[2][4][3] = v[4] * iRh;
+  A[2][4][4] = v[3] * iRh;
+  //A[2][4][5] = 0;
+  A[2][4][6] =-v[1] * iRh;
+  //A[2][4][7] = 0;
+  //A[2][4][8] = 0;
+  A[2][4][9] = -ETA;
+  //A[2][4][10] = 0;
+
+  A[2][5][0] = -Ec1*iRh;
+  //A[2][5][1] = 0;
+  A[2][5][2] =-v[6] * iRh;
+  A[2][5][3] = v[5] * iRh;
+  //A[2][5][4] = 0;
+  A[2][5][5] = v[3] * iRh;
+  A[2][5][6] =-v[2] * iRh;
+  //A[2][5][7] = 0;
+  A[2][5][8] = ETA;
+  //A[2][5][9] = 0;
+  //A[2][5][10] = 0;
+
+  //A[2][6][0] = 0;
+  //A[2][6][1] = 0;
+  //A[2][6][2] = 0;
+  //A[2][6][3] = 0;
+  //A[2][6][4] = 0;
+  //A[2][6][5] = 0;
+  //A[2][6][6] = 0;
+  //A[2][6][7] = 0;
+  //A[2][6][8] = 0;
+  //A[2][6][9] = 0;
+  //A[2][6][10] = 0;
+
+  A[2][7][0] = 2 * iRh*(v[4]*Ec2 - v[5]*Ec1) + v[3] * gmmo*Uk*iRh2 - v[3]*(Uk + p)*iRh2;
+  A[2][7][1] = -2*v[4]*v[6]*iRh - 2*gmmo*v[1]*v[3]*iRh2;
+  A[2][7][2] = -2*v[5]*v[6]*iRh - 2*gmmo*v[2]*v[3]*iRh2;
+  A[2][7][3] = 2 * (v[4] * v[4] + v[5] * v[5])*iRh + 2*v[3] * gmmo*v[3]*iRh2 + (Uk + p)*iRh;
+  A[2][7][4] = -2 * GAMMA*v[4] * v[3] * iRh + 2 * (v[4] * v[3]*iRh - E2);
+  A[2][7][5] = -2 * GAMMA*v[5] * v[3] * iRh + 2 * (v[5] * v[3]*iRh + E1);
+  A[2][7][6] = -2 * GAMMA*v[6] * v[3] * iRh + 2 * (-v[4] * v[1] - v[5] * v[2])*iRh;
+  A[2][7][7] = GAMMA*v[3]*iRh;
+  A[2][7][8] = 2 * ETA*v[5];
+  A[2][7][9] = -2 * ETA*v[4];
+  //A[2][7][10] = 0;
+
+  //A[2][8][0] = 0;
+  //A[2][8][1] = 0;
+  //A[2][8][2] = 0;
+  //A[2][8][3] = 0;
+  //A[2][8][4] = 0;
+  A[2][8][5] = 1;
+  //A[2][8][6] = 0;
+  //A[2][8][7] = 0;
+  //A[2][8][8] = 0;
+  //A[2][8][9] = 0;
+  //A[2][8][10] = 0;
+
+  //A[2][9][0] = 0;
+  //A[2][9][1] = 0;
+  //A[2][9][2] = 0;
+  //A[2][9][3] = 0;
+  A[2][9][4] = -1;
+  //A[2][9][5] = 0;
+  //A[2][9][6] = 0;
+  //A[2][9][7] = 0;
+  //A[2][9][8] = 0;
+  //A[2][9][9] = 0;
+  //A[2][9][10] = 0;
+
+  //A[2][10][0] = 0;
+  //A[2][10][1] = 0;
+  //A[2][10][2] = 0;
+  //A[2][10][3] = 0;
+  //A[2][10][4] = 0;
+  //A[2][10][5] = 0;
+  //A[2][10][6] = 0;
+  //A[2][10][7] = 0;
+  //A[2][10][8] = 0;
+  //A[2][10][9] = 0;
+  //A[2][10][10] = 0;
+    }
+}
