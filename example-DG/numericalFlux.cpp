@@ -28,42 +28,53 @@ static double calc_sound_speed(double rho, double rho_v_x, double rho_v_y, doubl
   return to_return;
 }
 
-void NumFlux::Q(double result[5], double state_vector[5], double nx, double ny, double nz)
+void NumFlux::Q(double result[COMPONENT_COUNT_T], double state_vector[COMPONENT_COUNT_T], double nx, double ny, double nz)
 {
+  // Density
   result[0] = state_vector[0];
+  // Momentum (x3)
   double temp_result_1 = nx * state_vector[1] + ny * state_vector[2] + nz * state_vector[3];
   double temp_result_2 = -ny * state_vector[1] + nx * state_vector[2];
   double temp_result_3 = -nz * state_vector[1] + nx * state_vector[3];
-  double temp_result_4 = nx * state_vector[4] + ny * state_vector[5] + nz * state_vector[6];
-  double temp_result_5 = -ny * state_vector[4] + nx * state_vector[5];
-  double temp_result_7 = -nz * state_vector[4] + nx * state_vector[6];
   result[1] = temp_result_1;
   result[2] = temp_result_2;
   result[3] = temp_result_3;
-  result[4] = temp_result_4;
+  // Energy
+  result[4] = state_vector[4];
+
+  // B (x3)
+  double temp_result_5 = nx * state_vector[5] + ny * state_vector[6] + nz * state_vector[7];
+  double temp_result_6 = -ny * state_vector[5] + nx * state_vector[6];
+  double temp_result_7 = -nz * state_vector[5] + nx * state_vector[7];
   result[5] = temp_result_5;
   result[6] = temp_result_6;
-  result[7] = state_vector[7];
+  result[7] = temp_result_7;
 }
 
-void NumFlux::Q_inv(double result[5], double state_vector[5], double nx, double ny, double nz)
+void NumFlux::Q_inv(double result[COMPONENT_COUNT_T], double state_vector[COMPONENT_COUNT_T], double nx, double ny, double nz)
 {
+  // Density
   result[0] = state_vector[0];
+  // Momentum (x3)
   double temp_result_1 = nx * state_vector[1] - ny * state_vector[2] - nz * state_vector[3];
   double temp_result_2 = ny * state_vector[1] + nx * state_vector[2];
   double temp_result_3 = nz * state_vector[1] + nx * state_vector[3];
-  double temp_result_4 = nx * state_vector[4] - ny * state_vector[5] - nz * state_vector[6];
-  double temp_result_5 = ny * state_vector[4] + nx * state_vector[5];
-  double temp_result_6 = nz * state_vector[4] + nx * state_vector[6];
   result[1] = temp_result_1;
   result[2] = temp_result_2;
   result[3] = temp_result_3;
-  result[4] = temp_result_4;
-  result[5] = temp_result_5;
-  result[6] = temp_result_6;
-  result[7] = state_vector[7];
+  // Energy
+  result[4] = state_vector[4];
+
+  // B (x3)
+  double temp_result_5 = nx * state_vector[5] - ny * state_vector[6] - nz * state_vector[7];
+  double temp_result_6 = ny * state_vector[5] + nx * state_vector[6];
+  double temp_result_7 = nz * state_vector[5] + nx * state_vector[7];
+  result[4] = temp_result_5;
+  result[5] = temp_result_6;
+  result[6] = temp_result_7;
 }
 
+#pragma region central_and_upwind
 void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
 {
   d x = quadPoint(0), y = quadPoint(1), z = quadPoint(2);
@@ -140,7 +151,8 @@ void NumFluxUpwind::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM>
   result[3] = f_1_4 * nx + f_2_4 * ny + f_3_4 * nz;
   result[4] = f_1_5 * nx + f_2_5 * ny + f_3_5 * nz;
 }
-
+#pragma endregion
+#pragma region vijayasundaram
 void NumFluxVijayasundaram::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
 {
   d nx = normal(0), ny = normal(1), nz = normal(2);
@@ -468,6 +480,7 @@ void NumFluxVijayasundaram::T_inv_5(double result[5][5])
   result[4][4] = (1.0 / (a * a)) * (KAPPA - 1.0) / 2.0;
 }
 
+#pragma endregion
 
 #define _Pb_  // The magnetic pressure is calculated separately for left and right flux, otherwise the average of B is used
 #define SMNUM 1e-8
@@ -477,8 +490,8 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
                             Point<DIM> normal, vec& F, ui /*only_part*/)
 //void /*class::*/hlld(double *ul,double *ur, double *F)
 {
-    double srdl,srdr,Fl[8],Fr[8],hl[2],hr[2],Uk,Um,E2,E3,Sl,Sr,pml,pmr,B,B2;
-    double Udl[8],Udr[8],Ul[8],Ur[8],cl,cm,cr,ptl,ptr;
+    double srdl,srdr,Fl[COMPONENT_COUNT_T],Fr[COMPONENT_COUNT_T],hl[2],hr[2],Uk,Um,E2,E3,Sl,Sr,pml,pmr,B,B2;
+    double Udl[COMPONENT_COUNT_T],Udr[COMPONENT_COUNT_T],Ul[COMPONENT_COUNT_T],Ur[COMPONENT_COUNT_T],cl,cm,cr,ptl,ptr;
     double sp[5],sml,smr,ptst,ptstr,vbstl,vbstr,Bsgnl,Bsgnr,invsumd;
 
     Q(ul,ul,normal[0],normal[1],normal[2]);

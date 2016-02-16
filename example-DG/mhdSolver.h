@@ -57,6 +57,7 @@ private:
   dealii::Vector<d>       rightHandSide;
   d A[3][COMPONENT_COUNT][COMPONENT_COUNT];         // Jacobi matrixes of the fluxes
 
+  void JacobiM(double A[][COMPONENT_COUNT][COMPONENT_COUNT], std::vector<dealii::Vector<double> > lv, const unsigned int qp);
 
   static std::vector<PeriodicBdrInfo> periodicBdr;
 

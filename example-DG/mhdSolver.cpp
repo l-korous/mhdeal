@@ -146,14 +146,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   {
     JacobiM(A,lin_values[point],point);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ 
-        if (components[i]>=COMPONENT_COUNT_T)  // u + sum_d A_d * u * dv/dx_d
-          local_matrix(i, j) += JxW[point]*(fe_v.shape_value(i, point)+ (
-           A[0][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[0]+
-           A[1][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[1]+
-           A[2][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[2])
-           );
-        else  // u + dt * sum_d A_d * u * dv/dx_d
+      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u + dt * sum_d A_d * u * dv/dx_d
         local_matrix(i, j) += JxW[point]*(fe_v.shape_value(i, point)+ DELTA_T*(
            A[0][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[0]+
            A[1][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[1]+
@@ -161,7 +154,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
            );
       }
     JacobiM(A,prev_values[point],point);
-    for(ui i=0;i<COMPONENT_COUNT_T;i++){  //  sum_d dF_d(u_old)/dx_d
+    for(ui i=0;i<COMPONENT_COUNT;i++){  //  sum_d dF_d(u_old)/dx_d
       rhs[0]=A[0][0][0]*prev_grads[point][0][0]
             +A[1][0][0]*prev_grads[point][0][0]
             +A[2][0][0]*prev_grads[point][0][0];

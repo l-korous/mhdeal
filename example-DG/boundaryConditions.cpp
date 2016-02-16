@@ -4,35 +4,30 @@ using namespace dealii;
 
 d DirichletBoundaryCondition::calculate(ui component, Point<DIM> point)
 {
-  bool top = (point(0) > 1e-8);
-
   switch (component)
   {
   case 0:
-    if(top)
-      return RHO_IN_TOP;
-    else
-      return RHO_IN_LEFT;
+      return RHO_EXT;
   case 1:
-    if (top)
-      return RHO_IN_TOP * V1_IN_TOP;
-    else
-      return RHO_IN_LEFT * V1_IN_LEFT;
+      return RHO_EXT * V1_EXT;
   case 2:
-    if(top)
-      return RHO_IN_TOP * V2_IN_TOP;
-    else
-      return RHO_IN_LEFT * V2_IN_LEFT;
+      return RHO_EXT * V2_EXT;
   case 3:
-    if(top)
-      return RHO_IN_TOP * V3_IN_TOP;
-    else
-      return RHO_IN_LEFT * V3_IN_LEFT;
+      return RHO_EXT * V3_EXT;
   case 4:
-    if(top)
-      return E_IN_TOP;
-    else
-      return E_IN_LEFT;
+    return E_EXT;
+  case 5:
+    return B1_EXT;
+  case 6:
+    return B2_EXT;
+  case 7:
+    return B3_EXT;
+  case 8:
+    return J1_EXT;
+  case 9:
+    return J2_EXT;
+  case 10:
+    return J3_EXT;
   }
 
   abort();
