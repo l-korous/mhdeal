@@ -7,30 +7,6 @@ const ui INIT_REF_NUM_X = 4;
 const ui INIT_REF_NUM_Y = 4;
 const ui INIT_REF_NUM_Z = 4;
 
-bool BC_INFLOW_OUTFLOW(const unsigned int bnd_marker)
-{
-  if (bnd_marker == BOUNDARY_LEFT || bnd_marker == BOUNDARY_TOP || bnd_marker == BOUNDARY_RIGHT)
-    return true;
-  else
-    return false;
-}
-
-bool BC_SOLID_WALL(const unsigned int bnd_marker)
-{
-  if (bnd_marker == BOUNDARY_BOTTOM)
-    return true;
-  else
-    return false;
-}
-
-bool BC_IS_SYMMETRIC(const unsigned int bnd_marker)
-{
-  if ((bnd_marker == BOUNDARY_RIGHT) || (bnd_marker == BOUNDARY_LEFT))
-    return true;
-  else
-    return false;
-}
-
 const dealii::Point<DIM> p1(0., 0., 0.);
 const dealii::Point<DIM> p4(4.1, 1., 1.);
 

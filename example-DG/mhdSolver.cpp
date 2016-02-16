@@ -192,18 +192,6 @@ std::vector<dealii::Vector<double> > MHDSolver::findCorrespondingInfo(dealii::Po
 
 void MHDSolver::saveInfoBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
 {
-  if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
-  {
-    const FEValuesBase<DIM> &fe_v = info.fe_values();
-    std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
-    for (ui i = 0; i < COMPONENT_COUNT; i++)
-      for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
-        prev_values[point][i] = info.values[0][i][point];
-
-
-    Point<DIM> center = info.fe_values().get_cell()->center();
-    periodicBdr.push_back(PeriodicBdrInfo(center, prev_values));
-  }
 }
 
 void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
@@ -224,11 +212,6 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
       prev_values[point][i] = info.values[0][i][point];
 
   std::vector<dealii::Vector<double> > prev_values_oposite_elem;//(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
-  if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
-  {
-    Point<DIM> center = info.fe_values().get_cell()->center();
-    prev_values_oposite_elem = findCorrespondingInfo(center);
-  }
 
   // Components.
   std::vector<int> components(dofs_per_cell);
@@ -242,32 +225,14 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
     {
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
-        if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
-        {
-          // no matrix form at the moment
-        }
-        else
-        {
           local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
             fe_v.shape_value(j, point), fe_v.shape_value(i, point),
             prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
             vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
-        }
       }
-      if(BC_IS_SYMMETRIC(dinfo.face->boundary_id()))
-      {
-        // form taken from InternalEdge
-        local_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components[i], fe_v.shape_value(i, point),
-                        fe_v.shape_grad(i, point), false, prev_values[point], vecDimVec(), prev_values_oposite_elem[point],
-                        vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
-
-      }
-      else
-      {
         local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
           fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
           vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
-      }
     }
   }
 }
@@ -455,27 +420,6 @@ void MHDSolver::outputResults(ui timeStep, d currentTime) const
 
 void MHDSolver::add_markers(Triangulation<DIM>::cell_iterator cell)
 {
-  // Surface.
-  for (unsigned int face_number = 0; face_number < GeometryInfo<DIM>::faces_per_cell; ++face_number)
-  {
-    if (std::fabs(cell->face(face_number)->center()(2) - p1(2)) < 1e-12)
-      cell->face(face_number)->set_boundary_indicator(BOUNDARY_BACK);
-
-    if (std::fabs(cell->face(face_number)->center()(0) - p1(0)) < 1e-12)
-      cell->face(face_number)->set_boundary_indicator(BOUNDARY_LEFT);
-
-    if (std::fabs(cell->face(face_number)->center()(2) - p4(2)) < 1e-12)
-      cell->face(face_number)->set_boundary_indicator(BOUNDARY_FRONT);
-
-    if (std::fabs(cell->face(face_number)->center()(0) - p4(0)) < 1e-12)
-      cell->face(face_number)->set_boundary_indicator(BOUNDARY_RIGHT);
-
-    if (std::fabs(cell->face(face_number)->center()(1) - p1(1)) < 1e-12)
-      cell->face(face_number)->set_boundary_indicator(BOUNDARY_BOTTOM);
-
-    if (std::fabs(cell->face(face_number)->center()(1) - p4(1)) < 1e-12)
-      cell->face(face_number)->set_boundary_indicator(BOUNDARY_TOP);
-  }
 }
 
 void MHDSolver::run()
