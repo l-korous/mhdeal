@@ -13,7 +13,8 @@ typedef double d;
 
 extern const ui DG_ORDER;
 extern const ui INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z;
-#define COMPONENT_COUNT 5
+#define COMPONENT_COUNT 11
+#define COMPONENT_COUNT_T 8
 extern const ui TIME_DISCRETIZATION_SEMI_IMPLICIT;
 
 // boundary id

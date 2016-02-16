@@ -34,10 +34,16 @@ void NumFlux::Q(double result[5], double state_vector[5], double nx, double ny, 
   double temp_result_1 = nx * state_vector[1] + ny * state_vector[2] + nz * state_vector[3];
   double temp_result_2 = -ny * state_vector[1] + nx * state_vector[2];
   double temp_result_3 = -nz * state_vector[1] + nx * state_vector[3];
+  double temp_result_4 = nx * state_vector[4] + ny * state_vector[5] + nz * state_vector[6];
+  double temp_result_5 = -ny * state_vector[4] + nx * state_vector[5];
+  double temp_result_7 = -nz * state_vector[4] + nx * state_vector[6];
   result[1] = temp_result_1;
   result[2] = temp_result_2;
   result[3] = temp_result_3;
-  result[4] = state_vector[4];
+  result[4] = temp_result_4;
+  result[5] = temp_result_5;
+  result[6] = temp_result_6;
+  result[7] = state_vector[7];
 }
 
 void NumFlux::Q_inv(double result[5], double state_vector[5], double nx, double ny, double nz)
@@ -46,10 +52,16 @@ void NumFlux::Q_inv(double result[5], double state_vector[5], double nx, double 
   double temp_result_1 = nx * state_vector[1] - ny * state_vector[2] - nz * state_vector[3];
   double temp_result_2 = ny * state_vector[1] + nx * state_vector[2];
   double temp_result_3 = nz * state_vector[1] + nx * state_vector[3];
+  double temp_result_4 = nx * state_vector[4] - ny * state_vector[5] - nz * state_vector[6];
+  double temp_result_5 = ny * state_vector[4] + nx * state_vector[5];
+  double temp_result_6 = nz * state_vector[4] + nx * state_vector[6];
   result[1] = temp_result_1;
   result[2] = temp_result_2;
   result[3] = temp_result_3;
-  result[4] = state_vector[4];
+  result[4] = temp_result_4;
+  result[5] = temp_result_5;
+  result[6] = temp_result_6;
+  result[7] = state_vector[7];
 }
 
 void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
@@ -460,12 +472,18 @@ void NumFluxVijayasundaram::T_inv_5(double result[5][5])
 #define _Pb_  // The magnetic pressure is calculated separately for left and right flux, otherwise the average of B is used
 #define SMNUM 1e-8
 // HLLD approximate Riemann solver (Mioyshi T., Kusano K., 2005)
-void /*class::*/hlld(double *ul,double *ur, double *F)
+
+void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
+                            Point<DIM> normal, vec& F, ui /*only_part*/)
+//void /*class::*/hlld(double *ul,double *ur, double *F)
 {
     double srdl,srdr,Fl[8],Fr[8],hl[2],hr[2],Uk,Um,E2,E3,Sl,Sr,pml,pmr,B,B2;
     double Udl[8],Udr[8],Ul[8],Ur[8],cl,cm,cr,ptl,ptr;
     double sp[5],sml,smr,ptst,ptstr,vbstl,vbstr,Bsgnl,Bsgnr,invsumd;
 
+    Q(ul,ul,normal[0],normal[1],normal[2]);
+    Q(ur,ur,normal[0],normal[1],normal[2]);
+    
     B=0.5*(ul[4]+ur[4]);  // Simple average of mag. field in direction of normal vector
     B2=B*B;
 
@@ -545,21 +563,23 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
 
     // Upwind flux in the case of supersonic flow
     if (sp[0]>=0.0){  // use F_L
-      for(register int j=0;j<COMPONENT_COUNT;j++)
+      for(register int j=0;j<COMPONENT_COUNT_T;j++)
         F[j]=Fl[j];
 #ifndef _Pb_
       F[1]+=GAMMA*pml-B2;
       F[7]-=GAMMA*ul[1]*hl[0]*pml;
 #endif
+      Q_inv(F,F,normal[0],normal[1],normal[2]);
       return;
     }
     if (sp[4]<=0.0){  // use F_R
-      for(register int j=0;j<COMPONENT_COUNT;j++)
+      for(register int j=0;j<COMPONENT_COUNT_T;j++)
         F[j]=Fr[j];
 #ifndef _Pb_
       F[1]+=GAMMA*pmr-B2;
       F[7]-=GAMMA*ur[1]*hr[0]*pmr;
 #endif
+      Q_inv(F,F,normal[0],normal[1],normal[2]);
       return;
     }
 
@@ -637,29 +657,31 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
           ((ur[1]*Ur[4]+ur[2]*ur[5]+ur[3]*ur[6])*hr[0]-vbstr))/smr;
 
     if (sp[1]>=0.0){
-      for(register int j=0;j<COMPONENT_COUNT;j++)
+      for(register int j=0;j<COMPONENT_COUNT_T;j++)
         F[j]=Fl[j]+sp[0]*(Ul[j]-ul[j]);
 #ifndef _Pb_
       F[1]+=GAMMA*pml-B2;
       F[4]=0.0;
       F[7]-=GAMMA*ul[1]*hl[0]*pml;
 #endif
+      Q_inv(F,F,normal[0],normal[1],normal[2]);
       return;
     }
     if (sp[3]<=0.0 && sp[2]<0.0){
-      for(register int j=0;j<COMPONENT_COUNT;j++)
+      for(register int j=0;j<COMPONENT_COUNT_T;j++)
         F[j]=Fr[j]+sp[4]*(Ur[j]-ur[j]);
 #ifndef _Pb_
       F[1]+=GAMMA*pmr-B2;
       F[4]=0.0;
       F[7]-=GAMMA*ur[1]*hr[0]*pmr;
 #endif
+      Q_inv(F,F,normal[0],normal[1],normal[2]);
       return;
     }
     
     // F**_L and F**_R
     if (B2<SMNUM*(ptst+ptstr)){
-      for(register int j=0;j<COMPONENT_COUNT;j++){
+      for(register int j=0;j<COMPONENT_COUNT_T;j++){
         Udl[j]=Ul[j];
         Udr[j]=Ur[j];
       }
@@ -700,17 +722,18 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
 
     if (sp[2]>=0.0){
       cm=sp[1]-sp[0];
-      for(register int j=0;j<COMPONENT_COUNT;j++)
+      for(register int j=0;j<COMPONENT_COUNT_T;j++)
         F[j]=Fl[j]+sp[1]*Udl[j]-sp[0]*ul[j]-cm*Ul[j];
 #ifndef _Pb_
       F[1]+=GAMMA*pml-B2;
       F[4]=0.0;
       F[7]-=GAMMA*ul[1]*hl[0]*pml;
 #endif
+      Q_inv(F,F,normal[0],normal[1],normal[2]);
       return;
     }
     cm=sp[3]-sp[4];
-    for(register int j=0;j<COMPONENT_COUNT;j++){
+    for(register int j=0;j<COMPONENT_COUNT_T;j++){
       F[j]=Fr[j]+sp[3]*Udr[j]-sp[4]*ur[j]-cm*Ur[j];
     }
 #ifndef _Pb_
@@ -718,6 +741,6 @@ void /*class::*/hlld(double *ul,double *ur, double *F)
     F[4]=0.0;
     F[7]-=GAMMA*ur[1]*hr[0]*pmr;
 #endif
-    
+    Q_inv(F,F,normal[0],normal[1],normal[2]);
     return;
 }

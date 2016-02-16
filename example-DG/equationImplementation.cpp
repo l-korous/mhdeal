@@ -280,9 +280,9 @@ d EquationImplementation::matrixInternalEdgeValue(ui comp_i, ui comp_j,
 {
     d result = 0.;
 
-    d jump_v = v_N ? -v_val : v_val;
+    //d jump_v = v_N ? -v_val : v_val;
 
-    result = num_flux->calculate(Un_val, Un_valN, quadPoint, normal, comp_i, comp_j, (u_N ? 2 : 1)) * u_val * jump_v;
+    //result = num_flux->calculate(Un_val, Un_valN, quadPoint, normal, comp_i, comp_j, (u_N ? 2 : 1)) * u_val * jump_v;
 
     // std::cout << "coord [" << comp_i << ", " << comp_j << "], point [" << quadPoint(0) << ", " << quadPoint(1) << "], normal [" << normal(0) << ", " << normal(1) << "]: " << result << std::endl;
     return result;
@@ -391,9 +391,11 @@ d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
   d v_val, dimVec v_grad, bool v_N, vec Un_val,
   vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
-  d result = 0.;
+  vec F(COMPONENT_COUNT_T);
+  
+  num_flux->calculate(Un_val, Un_valN, quadPoint, normal, F, 0);
 
-  return result;
+  return F[comp_i];
 }
 
 
