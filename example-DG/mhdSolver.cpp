@@ -42,7 +42,7 @@ MHDSolver::MHDSolver()
   quad(2 * DG_ORDER),
   quadFace(2 * DG_ORDER)
 {
-  numFlux = new NumFluxVijayasundaram();
+  numFlux = new NumFluxHLLD();
   
   for(unsigned int i=0;i<COMPONENT_COUNT;i++){
     for(unsigned int j=0;j<COMPONENT_COUNT;j++){
