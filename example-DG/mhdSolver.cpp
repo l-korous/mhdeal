@@ -26,7 +26,9 @@ using namespace std;
 
 typedef EquationImplementation Eq;
 
+d MHDSolver::A[3][COMPONENT_COUNT][COMPONENT_COUNT];
 Vector<d> MHDSolver::slnPrev;
+Vector<d> MHDSolver::slnLin;
 // For initial conditions.
 Vector<d> MHDSolver::slnUtil;
 NumFlux* numFlux;
@@ -63,6 +65,7 @@ void MHDSolver::setup_system()
   rightHandSide.reinit(dofHandler.n_dofs());
   solution.reinit(dofHandler.n_dofs());
   slnPrev.reinit(dofHandler.n_dofs());
+  slnLin.reinit(dofHandler.n_dofs());
   slnUtil.reinit(dofHandler.n_dofs());
 }
 
@@ -144,20 +147,14 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   {
     JacobiM(A,lin_values[point]);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ 
-        if (components[i]>=COMPONENT_COUNT_T)  // u + sum_d A_d * u * dv/dx_d
-          local_matrix(i, j) += JxW[point]*(fe_v.shape_value(i, point)+ (
-           A[0][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[0]+
-           A[1][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[1]+
-           A[2][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[2])
-           );
-        else  // u + dt * sum_d A_d * u * dv/dx_d
+      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u + dt * sum_d A_d * u * dv/dx_d
         local_matrix(i, j) += JxW[point]*(fe_v.shape_value(i, point)+ DELTA_T*(
            A[0][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[0]+
            A[1][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[1]+
            A[2][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[2])
            );
       }
+
     JacobiM(A,prev_values[point]);
     for(ui i=0;i<COMPONENT_COUNT_T;i++){  //  sum_d dF_d(u_old)/dx_d
       rhs[0]=A[0][0][0]*prev_grads[point][0][0]
@@ -527,14 +524,22 @@ void MHDSolver::run()
   VectorTools::interpolate(this->dofHandler, initialSlnEnergy, this->slnUtil);
   this->slnPrev += this->slnUtil;
 
+  this->slnLin = this->slnPrev;
   d currentTime = 0.;
   for (ui timeStep = 0; currentTime < T_FINAL; timeStep++, currentTime += DELTA_T)
   {
     Timer timer;
     timer.start();
-    assemble_system(timeStep == 0);
-    solve(solution);
-    this->slnPrev = solution;
+    for(ui l=0;l<8;l++){
+      assemble_system(timeStep == 0);
+      solve(solution);
+      this->slnUtil= solution;
+      this->slnUtil-=this->slnLin;
+      this->slnLin = solution;
+      std::cout << "   ln: " << l << " er: " << this->slnUtil.linfty_norm() << std::endl; // debug only
+      if (this->slnUtil.linfty_norm()<1e-10) break;
+    }
+    this->slnPrev = this->slnLin;
     outputResults(timeStep, currentTime);
     Eq::currentTime = currentTime;
     timer.stop();

@@ -13,11 +13,12 @@ public:
   virtual d calculate(vec U_L_prev, vec U_R_prev, dealii::Point<DIM> quadPoint, dealii::Point<DIM> normal, ui comp_i, ui comp_j, ui only_part = 0) = 0;
   
   /// Rotates the state_vector into the local coordinate system.
-  void Q(double result[5], double state_vector[5], double nx, double ny, double nz);
+  template<typename arr>
+  void Q(arr result, arr state_vector, double nx, double ny, double nz);
 
   /// Rotates the state_vector back from the local coordinate system.
-  void Q_inv(double result[5], double state_vector[5], double nx, double ny, double nz);
-
+  template<typename arr>
+  void Q_inv(arr result, arr state_vector, double nx, double ny, double nz);
 };
 
 class NumFluxCentral : public NumFlux

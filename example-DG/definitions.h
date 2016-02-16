@@ -52,28 +52,18 @@ extern const d C_V;
 extern const d KAPPA;
 
 // Left
-extern const double RHO_IN_LEFT;
-extern const double V1_IN_LEFT;
-extern const double V2_IN_LEFT;
-extern const double V3_IN_LEFT;
-extern const double P_IN_LEFT;
-extern const double E_IN_LEFT;
-
-// Top
-extern const double RHO_IN_TOP;
-extern const double V1_IN_TOP;
-extern const double V2_IN_TOP;
-extern const double V3_IN_TOP;
-extern const double P_IN_TOP;
-extern const double E_IN_TOP;
-
-// Init
-extern const double RHO_INIT;
-extern const double V1_INIT;
-extern const double V2_INIT;
-extern const double V3_INIT;
-extern const double P_INIT;
-extern const double E_INIT;
+extern const double RHO_EXT;
+extern const double V1_EXT;
+extern const double V2_EXT;
+extern const double V3_EXT;
+extern const double P_EXT;
+extern const double E_EXT;
+extern const double B1_EXT;
+extern const double B2_EXT;
+extern const double B3_EXT;
+extern const double J1_EXT;
+extern const double J2_EXT;
+extern const double J3_EXT;
 
 // Not used so far
 #pragma region FluxJacobians
@@ -198,6 +188,5 @@ extern const double E_INIT;
 #define f_3_5 (A_3_5_1 * r + A_3_5_2 * p1 + A_3_5_3 * p2 + A_3_5_4 * p3 + A_3_5_5 * E)
 
 #pragma endregion
-
 
 #endif
