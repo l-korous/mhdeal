@@ -81,6 +81,8 @@ Debug/
 *.sty
 *.dvi
 *.vtk
+Matrix.txt
+Rhs.txt
 
 # Misc
 !CMakeLists.txt
