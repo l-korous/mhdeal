@@ -200,7 +200,7 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 
   num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
 
-  result -= numFlux[comp_i] * v_val;
+  result -= 0.5*DELTA_T*numFlux[comp_i] * v_val;
 
   return result;
 }
@@ -220,7 +220,7 @@ d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
 
   num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
 
-  result -= numFlux[comp_i] * jump_v;
+  result -= 0.5*DELTA_T*numFlux[comp_i] * jump_v;
 
   return result;
 }

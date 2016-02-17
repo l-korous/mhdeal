@@ -40,19 +40,18 @@ void NumFlux::Q(arr result, arr state_vector, double nx, double ny, double nz)
   result[1] = temp_result_1;
   result[2] = temp_result_2;
   result[3] = temp_result_3;
-  // Energy
-  result[4] = state_vector[4];
-
   // B (x3)
-  double temp_result_5 = nx * state_vector[5] + ny * state_vector[6] + nz * state_vector[7];
-  double temp_result_6 = -ny * state_vector[5] + nx * state_vector[6];
-  double temp_result_7 = -nz * state_vector[5] + nx * state_vector[7];
+  double temp_result_4 = nx * state_vector[4] + ny * state_vector[5] + nz * state_vector[6];
+  double temp_result_5 = -ny * state_vector[4] + nx * state_vector[5];
+  double temp_result_6 = -nz * state_vector[4] + nx * state_vector[6];
+  result[4] = temp_result_4;
   result[5] = temp_result_5;
   result[6] = temp_result_6;
-  result[7] = temp_result_7;
+  // Energy
+  result[7] = state_vector[7];
 }
 template void NumFlux::Q(double[COMPONENT_COUNT_T],double[COMPONENT_COUNT_T],double,double,double);
-template void NumFlux::Q(vec,vec,double,double,double);
+template void NumFlux::Q(vec&,vec&,double,double,double); // TODO: it is not working - it makes just local copy
 
 template<typename arr>
 void NumFlux::Q_inv(arr result, arr state_vector, double nx, double ny, double nz)
@@ -66,19 +65,18 @@ void NumFlux::Q_inv(arr result, arr state_vector, double nx, double ny, double n
   result[1] = temp_result_1;
   result[2] = temp_result_2;
   result[3] = temp_result_3;
-  // Energy
-  result[4] = state_vector[4];
-
   // B (x3)
-  double temp_result_5 = nx * state_vector[5] - ny * state_vector[6] - nz * state_vector[7];
-  double temp_result_6 = ny * state_vector[5] + nx * state_vector[6];
-  double temp_result_7 = nz * state_vector[5] + nx * state_vector[7];
-  result[4] = temp_result_5;
-  result[5] = temp_result_6;
-  result[6] = temp_result_7;
+  double temp_result_4 = nx * state_vector[4] - ny * state_vector[5] - nz * state_vector[6];
+  double temp_result_5 = ny * state_vector[4] + nx * state_vector[5];
+  double temp_result_6 = nz * state_vector[4] + nx * state_vector[6];
+  result[4] = temp_result_4;
+  result[5] = temp_result_5;
+  result[6] = temp_result_6;
+  // Energy
+  result[7] = state_vector[7];
 }
 template void NumFlux::Q_inv(double[COMPONENT_COUNT_T],double[COMPONENT_COUNT_T],double,double,double);
-template void NumFlux::Q_inv(vec,vec,double,double,double);
+template void NumFlux::Q_inv(vec&,vec&,double,double,double);
 
 #pragma region central_and_upwind
 void NumFluxCentral::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM> normal, vec& result, ui only_part)
@@ -165,18 +163,14 @@ void NumFluxUpwind::calculate(vec U_L, vec U_R, Point<DIM> quadPoint, Point<DIM>
 
 void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
                             Point<DIM> normal, vec& F, ui /*only_part*/)
-//void /*class::*/hlld(double *ul,double *ur, double *F)
 {
     double srdl,srdr,Fl[COMPONENT_COUNT_T],Fr[COMPONENT_COUNT_T],hl[2],hr[2],Uk,Um,E2,E3,Sl,Sr,pml,pmr,B,B2;
     double Udl[COMPONENT_COUNT_T],Udr[COMPONENT_COUNT_T],Ul[COMPONENT_COUNT_T],Ur[COMPONENT_COUNT_T],cl,cm,cr,ptl,ptr;
     double sp[5],sml,smr,ptst,ptstr,vbstl,vbstr,Bsgnl,Bsgnr,invsumd;
-
     
-    //std::cout<<ul[0]<<" "<<ul[1]<<" "<<ul[2]<<" "<<ul[3]<<" "<<ul[4]<<" "<<ul[5]<<" "<<ul[6]<<" "<<ul[7]<<" "<<"---\n";
-    Q(ul,ul,normal[0],normal[1],normal[2]);
-    Q(ur,ur,normal[0],normal[1],normal[2]);
-
-    //std::cout<<ul[0]<<" "<<ul[1]<<" "<<ul[2]<<" "<<ul[3]<<" "<<ul[4]<<" "<<ul[5]<<" "<<ul[6]<<" "<<ul[7]<<" "<<"\n";
+    Q(&ul[0],&ul[0],normal[0],normal[1],normal[2]);
+    Q(&ur[0],&ur[0],normal[0],normal[1],normal[2]);
+//std::cout<<ul[0]<<" "<<ul[1]<<" "<<ul[2]<<" "<<ul[3]<<" "<<ul[4]<<" "<<ul[5]<<" "<<ul[6]<<" "<<ul[7]<<" "<<"\n";
     
     B=0.5*(ul[4]+ur[4]);  // Simple average of mag. field in direction of normal vector
     B2=B*B;
@@ -263,7 +257,7 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
       F[1]+=GAMMA*pml-B2;
       F[7]-=GAMMA*ul[1]*hl[0]*pml;
 #endif
-      Q_inv(F,F,normal[0],normal[1],normal[2]);
+      Q_inv(&F[0],&F[0],normal[0],normal[1],normal[2]);
       return;
     }
     if (sp[4]<=0.0){  // use F_R
@@ -273,7 +267,7 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
       F[1]+=GAMMA*pmr-B2;
       F[7]-=GAMMA*ur[1]*hr[0]*pmr;
 #endif
-      Q_inv(F,F,normal[0],normal[1],normal[2]);
+      Q_inv(&F[0],&F[0],normal[0],normal[1],normal[2]);
       return;
     }
 
@@ -358,7 +352,7 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
       F[4]=0.0;
       F[7]-=GAMMA*ul[1]*hl[0]*pml;
 #endif
-      Q_inv(F,F,normal[0],normal[1],normal[2]);
+      Q_inv(&F[0],&F[0],normal[0],normal[1],normal[2]);
       return;
     }
     if (sp[3]<=0.0 && sp[2]<0.0){
@@ -369,7 +363,7 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
       F[4]=0.0;
       F[7]-=GAMMA*ur[1]*hr[0]*pmr;
 #endif
-      Q_inv(F,F,normal[0],normal[1],normal[2]);
+      Q_inv(&F[0],&F[0],normal[0],normal[1],normal[2]);
       return;
     }
     
@@ -423,7 +417,7 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
       F[4]=0.0;
       F[7]-=GAMMA*ul[1]*hl[0]*pml;
 #endif
-      Q_inv(F,F,normal[0],normal[1],normal[2]);
+      Q_inv(&F[0],&F[0],normal[0],normal[1],normal[2]);
       return;
     }
     cm=sp[3]-sp[4];
@@ -435,6 +429,6 @@ void NumFluxHLLD::calculate(vec ul, vec ur, Point<DIM> /*quadPoint*/,
     F[4]=0.0;
     F[7]-=GAMMA*ur[1]*hr[0]*pmr;
 #endif
-    Q_inv(F,F,normal[0],normal[1],normal[2]);
+    Q_inv(&F[0],&F[0],normal[0],normal[1],normal[2]);
     return;
 }

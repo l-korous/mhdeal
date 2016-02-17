@@ -151,7 +151,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
         if (components[i]==components[j])
           local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
         for(ui d=0;d<DIM;d++)
-          local_matrix(i, j) += JxW[point]* DELTA_T*
+          local_matrix(i, j) += JxW[point]* 0.5*DELTA_T*
            A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
       }
 
@@ -165,7 +165,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
           rhs[i]+=A[d][i][j]*prev_grads[point][j][d];
     }
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i){  // u_old - dt * sum_d dF_d(u_old)/dx_d
-      local_vector(i) += JxW[point] * (prev_values[point][components[i]] - DELTA_T*
+      local_vector(i) += JxW[point] * (prev_values[point][components[i]] - 0.5*DELTA_T*
             rhs[components[i]] );
     }
   }
@@ -494,9 +494,9 @@ void MHDSolver::run()
       std::cout << "   ln: " << l << " er: " << this->slnUtil.linfty_norm() << std::endl; // debug only
       if (this->slnUtil.linfty_norm()<1e-10) break;
     }
-//     for(ui i=0;i<this->slnPrev.size();i+=COMPONENT_COUNT){ // display arrays
+//    for(ui i=0;i<this->slnPrev.size();i+=COMPONENT_COUNT){ // display arrays
 //       for(ui k=0;k<COMPONENT_COUNT;k++)
-//         std::cout <<this->slnPrev[i+k]<<":"<<solution[i+k]<<" ";
+//         std::cout <<this->slnPrev[i+k]<<":"<<this->slnLin[i+k]<<" ";
 //       std::cout << std::endl;
 //     }
     //break;
