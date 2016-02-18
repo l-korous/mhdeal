@@ -148,11 +148,19 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
     JacobiM(A,lin_values[point]);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u.v + dt * sum_d A_d * u * dv/dx_d
-        if (components[i]==components[j])
-          local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
-        for(ui d=0;d<DIM;d++)
-          local_matrix(i, j) += JxW[point]* 0.5*DELTA_T*
-           A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
+        if (components[i]<COMPONENT_COUNT_T){  // time dependent equations
+          if (components[i]==components[j])
+            local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
+          for(ui d=0;d<DIM;d++)
+            local_matrix(i, j) += JxW[point]* 0.5*DELTA_T*
+            A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
+        }else{                                  // time independent equations
+          if (components[i]==components[j])
+            local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
+          for(ui d=0;d<DIM;d++)
+            local_matrix(i, j) += JxW[point]*
+            A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
+        }
       }
 
     JacobiM(A,prev_values[point]);
@@ -165,7 +173,8 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
           rhs[i]+=A[d][i][j]*prev_grads[point][j][d];
     }
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i){  // u_old - dt * sum_d dF_d(u_old)/dx_d
-      local_vector(i) += JxW[point] * (prev_values[point][components[i]] - 0.5*DELTA_T*
+      if (components[i]<COMPONENT_COUNT_T)
+        local_vector(i) += JxW[point] * (prev_values[point][components[i]] - 0.5*DELTA_T*
             rhs[components[i]] );
     }
   }
