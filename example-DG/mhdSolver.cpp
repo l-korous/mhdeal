@@ -36,11 +36,11 @@ DirichletBoundaryCondition bc;
 
 MHDSolver::MHDSolver()
   :
-  feSystem(dealii::FE_DGQ<DIM>(DG_ORDER), COMPONENT_COUNT),
-  dofHandler(triangulation),
-  mapping(),
-  quad(2 * DG_ORDER),
-  quadFace(2 * DG_ORDER)
+    feSystem(dealii::FE_DGQ<DIM>(DG_ORDER), COMPONENT_COUNT),
+    dofHandler(triangulation),
+    mapping(),
+    quad(2 * DG_ORDER),
+    quadFace(2 * DG_ORDER)
 {
   numFlux = new NumFluxHLLD();
   
@@ -107,18 +107,18 @@ void MHDSolver::assemble_system(bool firstIteration)
 
   // \todo This comes from tutorial, it may need some adjustment.
   MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
-    (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
-    &MHDSolver::saveInfoBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
+      (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
+       &MHDSolver::saveInfoBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
 
   MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
-    (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetricEmpty,
-    &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdgeEmpty, assembler);
+      (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetricEmpty,
+       &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdgeEmpty, assembler);
 
   periodicBdr.clear();
 }
 
 void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
-  CellInfo &info)
+                                   CellInfo &info)
 {
   double rhs[COMPONENT_COUNT];
   const FEValuesBase<DIM> &fe_v = info.fe_values();
@@ -153,13 +153,13 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
             local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
           for(ui d=0;d<DIM;d++)
             local_matrix(i, j) += JxW[point]* 0.5*DELTA_T*
-            A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
+                A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
         }else{                                  // time independent equations
           if (components[i]==components[j])
             local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
           for(ui d=0;d<DIM;d++)
             local_matrix(i, j) += JxW[point]*
-            A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
+                A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
         }
       }
 
@@ -191,7 +191,7 @@ std::vector<dealii::Vector<double> > MHDSolver::findCorrespondingInfo(dealii::Po
   {
     if(myCenter[0] != info.center[0] && myCenter[1] == info.center[1] && myCenter[2] == info.center[2])
     {
-//      cout << "for " << myCenter << " found " << info.center << endl;
+      //      cout << "for " << myCenter << " found " << info.center << endl;
       return info.prev_values;
     }
   }
@@ -233,23 +233,23 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
     {
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
-          local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
-            fe_v.shape_value(j, point), fe_v.shape_value(i, point),
-            prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
-            vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+        local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
+                                                                       fe_v.shape_value(j, point), fe_v.shape_value(i, point),
+                                                                       prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
+                                                                       vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
       }
-        local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
-          fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
-          vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+      local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
+                                                               fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
+                                                               vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
     }
   }
 }
 
 
 void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
-  DoFInfo &dinfo2,
-  CellInfo &info1,
-  CellInfo &info2)
+                                     DoFInfo &dinfo2,
+                                     CellInfo &info1,
+                                     CellInfo &info2)
 {
   // For quadrature points, weights, etc., we use the FEValuesBase object of
   // the first argument.
@@ -310,9 +310,9 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
         u1_v1_matrix(i, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components1[i],
-          fe_v.shape_value(i, point), fe_v.shape_value(j, point),
-          prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
-          vecDimVec(), vecDimVec(), false, false, fe_v.quadrature_point(point), normals[point], numFlux);
+                                                                       fe_v.shape_value(i, point), fe_v.shape_value(j, point),
+                                                                       prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
+                                                                       vecDimVec(), vecDimVec(), false, false, fe_v.quadrature_point(point), normals[point], numFlux);
       }
     }
 
@@ -321,9 +321,9 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
       {
         u1_v2_matrix(k, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components2[k],
-          fe_v.shape_value(k, point), fe_v_neighbor.shape_value(j, point),
-          prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v_neighbor.shape_grad(k, point),
-          vecDimVec(), vecDimVec(), true, false, fe_v.quadrature_point(point), normals[point], numFlux);
+                                                                       fe_v.shape_value(k, point), fe_v_neighbor.shape_value(j, point),
+                                                                       prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v_neighbor.shape_grad(k, point),
+                                                                       vecDimVec(), vecDimVec(), true, false, fe_v.quadrature_point(point), normals[point], numFlux);
       }
     }
 
@@ -332,9 +332,9 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
       {
         u2_v1_matrix(i, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components1[i],
-          fe_v_neighbor.shape_value(i, point), fe_v.shape_value(l, point),
-          prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v.shape_grad(i, point),
-          vecDimVec(), vecDimVec(), false, true, fe_v.quadrature_point(point), normals[point], numFlux);
+                                                                       fe_v_neighbor.shape_value(i, point), fe_v.shape_value(l, point),
+                                                                       prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v.shape_grad(i, point),
+                                                                       vecDimVec(), vecDimVec(), false, true, fe_v.quadrature_point(point), normals[point], numFlux);
       }
     }
 
@@ -343,25 +343,25 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
       for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
       {
         u2_v2_matrix(k, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components2[k],
-          fe_v_neighbor.shape_value(k, point), fe_v_neighbor.shape_value(l, point),
-          prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v_neighbor.shape_grad(k, point),
-          vecDimVec(), vecDimVec(), true, true, fe_v.quadrature_point(point), normals[point], numFlux);
+                                                                       fe_v_neighbor.shape_value(k, point), fe_v_neighbor.shape_value(l, point),
+                                                                       prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v_neighbor.shape_grad(k, point),
+                                                                       vecDimVec(), vecDimVec(), true, true, fe_v.quadrature_point(point), normals[point], numFlux);
       }
     }
 
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
       v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point),
-                      fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
-                      vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+                                                            fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
+                                                            vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
 
     for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
     {
       assert(fe_v.quadrature_point(point) == fe_v_neighbor.quadrature_point(point));
       v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point),
-                      fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
-                      vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+                                                            fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
+                                                            vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
   }
 }
@@ -523,7 +523,7 @@ void MHDSolver::run()
 std::vector<PeriodicBdrInfo> MHDSolver::periodicBdr;
 
 void MHDSolver::JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT], 
-                              Vector<double> lv)
+Vector<double> lv)
 {
   double v[COMPONENT_COUNT], iRh, iRh2, Uk, p, gmmo, Ec1, Ec2, Ec3, E1, E2, E3;
 
@@ -677,270 +677,270 @@ void MHDSolver::JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT],
   //A[0][10][10] = 0;
 
   if (DIM>1){
-  //A[1][0][0] = 0;
-  //A[1][0][1] = 0;
-  A[1][0][2] = 1;
-  //A[1][0][3] = 0;
-  //A[1][0][4] = 0;
-  //A[1][0][5] = 0;
-  //A[1][0][6] = 0;
-  //A[1][0][7] = 0;
-  //A[1][0][8] = 0;
-  //A[1][0][9] = 0;
-  //A[1][0][10] = 0;
+    //A[1][0][0] = 0;
+    //A[1][0][1] = 0;
+    A[1][0][2] = 1;
+    //A[1][0][3] = 0;
+    //A[1][0][4] = 0;
+    //A[1][0][5] = 0;
+    //A[1][0][6] = 0;
+    //A[1][0][7] = 0;
+    //A[1][0][8] = 0;
+    //A[1][0][9] = 0;
+    //A[1][0][10] = 0;
 
-  A[1][1][0] = -v[1] * v[2]*iRh2;
-  A[1][1][1] = v[2] * iRh;
-  A[1][1][2] = v[1] * iRh;
-  //A[1][1][3] = 0;
-  A[1][1][4] = -v[5];
-  A[1][1][5] = -v[4];
-  //A[1][1][6] = 0;
-  //A[1][1][7] = 0;
-  //A[1][1][8] = 0;
-  //A[1][1][9] = 0;
-  //A[1][1][10] = 0;
+    A[1][1][0] = -v[1] * v[2]*iRh2;
+    A[1][1][1] = v[2] * iRh;
+    A[1][1][2] = v[1] * iRh;
+    //A[1][1][3] = 0;
+    A[1][1][4] = -v[5];
+    A[1][1][5] = -v[4];
+    //A[1][1][6] = 0;
+    //A[1][1][7] = 0;
+    //A[1][1][8] = 0;
+    //A[1][1][9] = 0;
+    //A[1][1][10] = 0;
 
-  A[1][2][0] = -v[2] * v[2] * iRh2 + gmmo*Uk*.5*iRh;
-  A[1][2][1] = -gmmo*v[1]*iRh;
-  A[1][2][2] = (2 - gmmo)*v[2]*iRh;
-  A[1][2][3] = -gmmo*v[3]*iRh;
-  A[1][2][4] = (1 - gmmo)*v[4];
-  A[1][2][5] = -GAMMA*v[5];
-  A[1][2][6] = (1 - gmmo)*v[6];
-  A[1][2][7] = 0.5*gmmo;
-  //A[1][2][8] = 0;
-  //A[1][2][9] = 0;
-  //A[1][2][10] = 0;
+    A[1][2][0] = -v[2] * v[2] * iRh2 + gmmo*Uk*.5*iRh;
+    A[1][2][1] = -gmmo*v[1]*iRh;
+    A[1][2][2] = (2 - gmmo)*v[2]*iRh;
+    A[1][2][3] = -gmmo*v[3]*iRh;
+    A[1][2][4] = (1 - gmmo)*v[4];
+    A[1][2][5] = -GAMMA*v[5];
+    A[1][2][6] = (1 - gmmo)*v[6];
+    A[1][2][7] = 0.5*gmmo;
+    //A[1][2][8] = 0;
+    //A[1][2][9] = 0;
+    //A[1][2][10] = 0;
 
-  A[1][3][0] = -v[2] * v[3]*iRh2;
-  //A[1][3][1] = 0;
-  A[1][3][2] = v[3] * iRh;
-  A[1][3][3] = v[2] * iRh;
-  //A[1][3][4] = 0;
-  A[1][3][5] = -v[6];
-  A[1][3][6] = -v[5];
-  //A[1][3][7] = 0;
-  //A[1][3][8] = 0;
-  //A[1][3][9] = 0;
-  //A[1][3][10] = 0;
+    A[1][3][0] = -v[2] * v[3]*iRh2;
+    //A[1][3][1] = 0;
+    A[1][3][2] = v[3] * iRh;
+    A[1][3][3] = v[2] * iRh;
+    //A[1][3][4] = 0;
+    A[1][3][5] = -v[6];
+    A[1][3][6] = -v[5];
+    //A[1][3][7] = 0;
+    //A[1][3][8] = 0;
+    //A[1][3][9] = 0;
+    //A[1][3][10] = 0;
 
-  A[1][4][0] = -Ec3*iRh;
-  A[1][4][1] =-v[5] * iRh;
-  A[1][4][2] = v[4] * iRh;
-  //A[1][4][3] = 0;
-  A[1][4][4] = v[2] * iRh;
-  A[1][4][5] =-v[1] * iRh;
-  //A[1][4][6] = 0;
-  //A[1][4][7] = 0;
-  //A[1][4][8] = 0;
-  //A[1][4][9] = 0;
-  A[1][4][10] = ETA;
+    A[1][4][0] = -Ec3*iRh;
+    A[1][4][1] =-v[5] * iRh;
+    A[1][4][2] = v[4] * iRh;
+    //A[1][4][3] = 0;
+    A[1][4][4] = v[2] * iRh;
+    A[1][4][5] =-v[1] * iRh;
+    //A[1][4][6] = 0;
+    //A[1][4][7] = 0;
+    //A[1][4][8] = 0;
+    //A[1][4][9] = 0;
+    A[1][4][10] = ETA;
 
-  //A[1][5][0] = 0;
-  //A[1][5][1] = 0;
-  //A[1][5][2] = 0;
-  //A[1][5][3] = 0;
-  //A[1][5][4] = 0;
-  //A[1][5][5] = 0;
-  //A[1][5][6] = 0;
-  //A[1][5][7] = 0;
-  //A[1][5][8] = 0;
-  //A[1][5][9] = 0;
-  //A[1][5][10] = 0;
+    //A[1][5][0] = 0;
+    //A[1][5][1] = 0;
+    //A[1][5][2] = 0;
+    //A[1][5][3] = 0;
+    //A[1][5][4] = 0;
+    //A[1][5][5] = 0;
+    //A[1][5][6] = 0;
+    //A[1][5][7] = 0;
+    //A[1][5][8] = 0;
+    //A[1][5][9] = 0;
+    //A[1][5][10] = 0;
 
-  A[1][6][0] = Ec1*iRh;
-  //A[1][6][1] = 0;
-  A[1][6][2] = v[6] * iRh;
-  A[1][6][3] =-v[5] * iRh;
-  //A[1][6][4] = 0;
-  A[1][6][5] =-v[3] * iRh;
-  A[1][6][6] = v[2] * iRh;
-  //A[1][6][7] = 0;
-  A[1][6][8] = -ETA;
-  //A[1][6][9] = 0;
-  //A[1][6][10] = 0;
+    A[1][6][0] = Ec1*iRh;
+    //A[1][6][1] = 0;
+    A[1][6][2] = v[6] * iRh;
+    A[1][6][3] =-v[5] * iRh;
+    //A[1][6][4] = 0;
+    A[1][6][5] =-v[3] * iRh;
+    A[1][6][6] = v[2] * iRh;
+    //A[1][6][7] = 0;
+    A[1][6][8] = -ETA;
+    //A[1][6][9] = 0;
+    //A[1][6][10] = 0;
 
-  A[1][7][0] = 2 * iRh*(-v[4]*Ec3 + v[6]*Ec1) + v[2] * gmmo*Uk*iRh2 - v[2]*(Uk + p)*iRh2;
-  A[1][7][1] = -2 * v[4] * v[5] * iRh - 2 * gmmo*v[1] * v[2] * iRh2;
-  A[1][7][2] = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2*v[2] * gmmo*v[2]*iRh2 + (Uk + p)*iRh;
-  A[1][7][3] = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
-  A[1][7][4] = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2]*iRh + E3);
-  A[1][7][5] = -2 * GAMMA*v[5] * v[2] * iRh + 2 * (-v[4] * v[1] - v[6] * v[3])*iRh;
-  A[1][7][6] = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2]*iRh - E1);
-  A[1][7][7] = GAMMA*v[2]*iRh;
-  A[1][7][8] = -2 * ETA*v[6];
-  //A[1][7][9] = 0;
-  A[1][7][10] = 2 * ETA*v[4];
+    A[1][7][0] = 2 * iRh*(-v[4]*Ec3 + v[6]*Ec1) + v[2] * gmmo*Uk*iRh2 - v[2]*(Uk + p)*iRh2;
+    A[1][7][1] = -2 * v[4] * v[5] * iRh - 2 * gmmo*v[1] * v[2] * iRh2;
+    A[1][7][2] = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2*v[2] * gmmo*v[2]*iRh2 + (Uk + p)*iRh;
+    A[1][7][3] = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
+    A[1][7][4] = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2]*iRh + E3);
+    A[1][7][5] = -2 * GAMMA*v[5] * v[2] * iRh + 2 * (-v[4] * v[1] - v[6] * v[3])*iRh;
+    A[1][7][6] = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2]*iRh - E1);
+    A[1][7][7] = GAMMA*v[2]*iRh;
+    A[1][7][8] = -2 * ETA*v[6];
+    //A[1][7][9] = 0;
+    A[1][7][10] = 2 * ETA*v[4];
 
-  //A[1][8][0] 0;
-  //A[1][8][1] 0;
-  //A[1][8][2] 0;
-  //A[1][8][3] 0;
-  //A[1][8][4] 0;
-  //A[1][8][5] 0;
-  A[1][8][6] = -1;
-  //A[1][8][7] 0;
-  //A[1][8][8] 0;
-  //A[1][8][9] 0;
-  //A[1][8][10] 0;
+    //A[1][8][0] 0;
+    //A[1][8][1] 0;
+    //A[1][8][2] 0;
+    //A[1][8][3] 0;
+    //A[1][8][4] 0;
+    //A[1][8][5] 0;
+    A[1][8][6] = -1;
+    //A[1][8][7] 0;
+    //A[1][8][8] 0;
+    //A[1][8][9] 0;
+    //A[1][8][10] 0;
 
-  //A[1][9][0] = 0;
-  //A[1][9][1] = 0;
-  //A[1][9][2] = 0;
-  //A[1][9][3] = 0;
-  //A[1][9][4] = 0;
-  //A[1][9][5] = 0;
-  //A[1][9][6] = 0;
-  //A[1][9][7] = 0;
-  //A[1][9][8] = 0;
-  //A[1][9][9] = 0;
-  //A[1][9][10] = 0;
+    //A[1][9][0] = 0;
+    //A[1][9][1] = 0;
+    //A[1][9][2] = 0;
+    //A[1][9][3] = 0;
+    //A[1][9][4] = 0;
+    //A[1][9][5] = 0;
+    //A[1][9][6] = 0;
+    //A[1][9][7] = 0;
+    //A[1][9][8] = 0;
+    //A[1][9][9] = 0;
+    //A[1][9][10] = 0;
 
-  //A[1][10][0] - 0;
-  //A[1][10][1] - 0;
-  //A[1][10][2] - 0;
-  //A[1][10][3] - 0;
-  A[1][10][4] = 1;
-  //A[1][10][5] - 0;
-  //A[1][10][6] - 0;
-  //A[1][10][7] - 0;
-  //A[1][10][8] - 0;
-  //A[1][10][9] - 0;
-  //A[1][10][10] - 0;
+    //A[1][10][0] - 0;
+    //A[1][10][1] - 0;
+    //A[1][10][2] - 0;
+    //A[1][10][3] - 0;
+    A[1][10][4] = 1;
+    //A[1][10][5] - 0;
+    //A[1][10][6] - 0;
+    //A[1][10][7] - 0;
+    //A[1][10][8] - 0;
+    //A[1][10][9] - 0;
+    //A[1][10][10] - 0;
   }
 
   if (DIM>2){
-  //A[2][0][0] = 0;
-  //A[2][0][1] = 0;
-  //A[2][0][2] = 0;
-  A[2][0][3] = 1;
-  //A[2][0][4] = 0;
-  //A[2][0][5] = 0;
-  //A[2][0][6] = 0;
-  //A[2][0][7] = 0;
-  //A[2][0][8] = 0;
-  //A[2][0][9] = 0;
-  //A[2][0][10] = 0;
+    //A[2][0][0] = 0;
+    //A[2][0][1] = 0;
+    //A[2][0][2] = 0;
+    A[2][0][3] = 1;
+    //A[2][0][4] = 0;
+    //A[2][0][5] = 0;
+    //A[2][0][6] = 0;
+    //A[2][0][7] = 0;
+    //A[2][0][8] = 0;
+    //A[2][0][9] = 0;
+    //A[2][0][10] = 0;
 
-  A[2][1][0] = -v[1] * v[3]*iRh2;
-  A[2][1][1] = v[3] * iRh;
-  //A[2][1][2] = 0;
-  A[2][1][3] = v[1] * iRh;
-  A[2][1][4] = -v[6];
-  //A[2][1][5] = 0;
-  A[2][1][6] = -v[4];
-  //A[2][1][7] = 0;
-  //A[2][1][8] = 0;
-  //A[2][1][9] = 0;
-  //A[2][1][10] = 0;
+    A[2][1][0] = -v[1] * v[3]*iRh2;
+    A[2][1][1] = v[3] * iRh;
+    //A[2][1][2] = 0;
+    A[2][1][3] = v[1] * iRh;
+    A[2][1][4] = -v[6];
+    //A[2][1][5] = 0;
+    A[2][1][6] = -v[4];
+    //A[2][1][7] = 0;
+    //A[2][1][8] = 0;
+    //A[2][1][9] = 0;
+    //A[2][1][10] = 0;
 
-  A[2][2][0] = -v[2] * v[3]*iRh2;
-  //A[2][2][1] = 0;
-  A[2][2][2] = v[3] * iRh;
-  A[2][2][3] = v[2] * iRh;
-  //A[2][2][4] = 0;
-  A[2][2][5] = -v[6];
-  A[2][2][6] = -v[5];
-  //A[2][2][7] = 0;
-  //A[2][2][8] = 0;
-  //A[2][2][9] = 0;
-  //A[2][2][10] = 0;
+    A[2][2][0] = -v[2] * v[3]*iRh2;
+    //A[2][2][1] = 0;
+    A[2][2][2] = v[3] * iRh;
+    A[2][2][3] = v[2] * iRh;
+    //A[2][2][4] = 0;
+    A[2][2][5] = -v[6];
+    A[2][2][6] = -v[5];
+    //A[2][2][7] = 0;
+    //A[2][2][8] = 0;
+    //A[2][2][9] = 0;
+    //A[2][2][10] = 0;
 
-  A[2][3][0] = -v[3] * v[3] * iRh2 + (gmmo*Uk)*.5*iRh;
-  A[2][3][1] = -gmmo*v[1]*iRh;
-  A[2][3][2] = -gmmo*v[2]*iRh;
-  A[2][3][3] = (2 - gmmo)*v[3]*iRh;
-  A[2][3][4] = (1 - gmmo)*v[4];
-  A[2][3][5] = (1 - gmmo)*v[5];
-  A[2][3][6] = -GAMMA*v[6];
-  A[2][3][7] = 0.5*gmmo;
-  //A[2][3][8] = 0;
-  //A[2][3][9] = 0;
-  //A[2][3][10] = 0;
+    A[2][3][0] = -v[3] * v[3] * iRh2 + (gmmo*Uk)*.5*iRh;
+    A[2][3][1] = -gmmo*v[1]*iRh;
+    A[2][3][2] = -gmmo*v[2]*iRh;
+    A[2][3][3] = (2 - gmmo)*v[3]*iRh;
+    A[2][3][4] = (1 - gmmo)*v[4];
+    A[2][3][5] = (1 - gmmo)*v[5];
+    A[2][3][6] = -GAMMA*v[6];
+    A[2][3][7] = 0.5*gmmo;
+    //A[2][3][8] = 0;
+    //A[2][3][9] = 0;
+    //A[2][3][10] = 0;
 
-  A[2][4][0] = Ec2*iRh;
-  A[2][4][1] =-v[6] * iRh;
-  //A[2][4][2] = 0;
-  A[2][4][3] = v[4] * iRh;
-  A[2][4][4] = v[3] * iRh;
-  //A[2][4][5] = 0;
-  A[2][4][6] =-v[1] * iRh;
-  //A[2][4][7] = 0;
-  //A[2][4][8] = 0;
-  A[2][4][9] = -ETA;
-  //A[2][4][10] = 0;
+    A[2][4][0] = Ec2*iRh;
+    A[2][4][1] =-v[6] * iRh;
+    //A[2][4][2] = 0;
+    A[2][4][3] = v[4] * iRh;
+    A[2][4][4] = v[3] * iRh;
+    //A[2][4][5] = 0;
+    A[2][4][6] =-v[1] * iRh;
+    //A[2][4][7] = 0;
+    //A[2][4][8] = 0;
+    A[2][4][9] = -ETA;
+    //A[2][4][10] = 0;
 
-  A[2][5][0] = -Ec1*iRh;
-  //A[2][5][1] = 0;
-  A[2][5][2] =-v[6] * iRh;
-  A[2][5][3] = v[5] * iRh;
-  //A[2][5][4] = 0;
-  A[2][5][5] = v[3] * iRh;
-  A[2][5][6] =-v[2] * iRh;
-  //A[2][5][7] = 0;
-  A[2][5][8] = ETA;
-  //A[2][5][9] = 0;
-  //A[2][5][10] = 0;
+    A[2][5][0] = -Ec1*iRh;
+    //A[2][5][1] = 0;
+    A[2][5][2] =-v[6] * iRh;
+    A[2][5][3] = v[5] * iRh;
+    //A[2][5][4] = 0;
+    A[2][5][5] = v[3] * iRh;
+    A[2][5][6] =-v[2] * iRh;
+    //A[2][5][7] = 0;
+    A[2][5][8] = ETA;
+    //A[2][5][9] = 0;
+    //A[2][5][10] = 0;
 
-  //A[2][6][0] = 0;
-  //A[2][6][1] = 0;
-  //A[2][6][2] = 0;
-  //A[2][6][3] = 0;
-  //A[2][6][4] = 0;
-  //A[2][6][5] = 0;
-  //A[2][6][6] = 0;
-  //A[2][6][7] = 0;
-  //A[2][6][8] = 0;
-  //A[2][6][9] = 0;
-  //A[2][6][10] = 0;
+    //A[2][6][0] = 0;
+    //A[2][6][1] = 0;
+    //A[2][6][2] = 0;
+    //A[2][6][3] = 0;
+    //A[2][6][4] = 0;
+    //A[2][6][5] = 0;
+    //A[2][6][6] = 0;
+    //A[2][6][7] = 0;
+    //A[2][6][8] = 0;
+    //A[2][6][9] = 0;
+    //A[2][6][10] = 0;
 
-  A[2][7][0] = 2 * iRh*(v[4]*Ec2 - v[5]*Ec1) + v[3] * gmmo*Uk*iRh2 - v[3]*(Uk + p)*iRh2;
-  A[2][7][1] = -2*v[4]*v[6]*iRh - 2*gmmo*v[1]*v[3]*iRh2;
-  A[2][7][2] = -2*v[5]*v[6]*iRh - 2*gmmo*v[2]*v[3]*iRh2;
-  A[2][7][3] = 2 * (v[4] * v[4] + v[5] * v[5])*iRh + 2*v[3] * gmmo*v[3]*iRh2 + (Uk + p)*iRh;
-  A[2][7][4] = -2 * GAMMA*v[4] * v[3] * iRh + 2 * (v[4] * v[3]*iRh - E2);
-  A[2][7][5] = -2 * GAMMA*v[5] * v[3] * iRh + 2 * (v[5] * v[3]*iRh + E1);
-  A[2][7][6] = -2 * GAMMA*v[6] * v[3] * iRh + 2 * (-v[4] * v[1] - v[5] * v[2])*iRh;
-  A[2][7][7] = GAMMA*v[3]*iRh;
-  A[2][7][8] = 2 * ETA*v[5];
-  A[2][7][9] = -2 * ETA*v[4];
-  //A[2][7][10] = 0;
+    A[2][7][0] = 2 * iRh*(v[4]*Ec2 - v[5]*Ec1) + v[3] * gmmo*Uk*iRh2 - v[3]*(Uk + p)*iRh2;
+    A[2][7][1] = -2*v[4]*v[6]*iRh - 2*gmmo*v[1]*v[3]*iRh2;
+    A[2][7][2] = -2*v[5]*v[6]*iRh - 2*gmmo*v[2]*v[3]*iRh2;
+    A[2][7][3] = 2 * (v[4] * v[4] + v[5] * v[5])*iRh + 2*v[3] * gmmo*v[3]*iRh2 + (Uk + p)*iRh;
+    A[2][7][4] = -2 * GAMMA*v[4] * v[3] * iRh + 2 * (v[4] * v[3]*iRh - E2);
+    A[2][7][5] = -2 * GAMMA*v[5] * v[3] * iRh + 2 * (v[5] * v[3]*iRh + E1);
+    A[2][7][6] = -2 * GAMMA*v[6] * v[3] * iRh + 2 * (-v[4] * v[1] - v[5] * v[2])*iRh;
+    A[2][7][7] = GAMMA*v[3]*iRh;
+    A[2][7][8] = 2 * ETA*v[5];
+    A[2][7][9] = -2 * ETA*v[4];
+    //A[2][7][10] = 0;
 
-  //A[2][8][0] = 0;
-  //A[2][8][1] = 0;
-  //A[2][8][2] = 0;
-  //A[2][8][3] = 0;
-  //A[2][8][4] = 0;
-  A[2][8][5] = 1;
-  //A[2][8][6] = 0;
-  //A[2][8][7] = 0;
-  //A[2][8][8] = 0;
-  //A[2][8][9] = 0;
-  //A[2][8][10] = 0;
+    //A[2][8][0] = 0;
+    //A[2][8][1] = 0;
+    //A[2][8][2] = 0;
+    //A[2][8][3] = 0;
+    //A[2][8][4] = 0;
+    A[2][8][5] = 1;
+    //A[2][8][6] = 0;
+    //A[2][8][7] = 0;
+    //A[2][8][8] = 0;
+    //A[2][8][9] = 0;
+    //A[2][8][10] = 0;
 
-  //A[2][9][0] = 0;
-  //A[2][9][1] = 0;
-  //A[2][9][2] = 0;
-  //A[2][9][3] = 0;
-  A[2][9][4] = -1;
-  //A[2][9][5] = 0;
-  //A[2][9][6] = 0;
-  //A[2][9][7] = 0;
-  //A[2][9][8] = 0;
-  //A[2][9][9] = 0;
-  //A[2][9][10] = 0;
+    //A[2][9][0] = 0;
+    //A[2][9][1] = 0;
+    //A[2][9][2] = 0;
+    //A[2][9][3] = 0;
+    A[2][9][4] = -1;
+    //A[2][9][5] = 0;
+    //A[2][9][6] = 0;
+    //A[2][9][7] = 0;
+    //A[2][9][8] = 0;
+    //A[2][9][9] = 0;
+    //A[2][9][10] = 0;
 
-  //A[2][10][0] = 0;
-  //A[2][10][1] = 0;
-  //A[2][10][2] = 0;
-  //A[2][10][3] = 0;
-  //A[2][10][4] = 0;
-  //A[2][10][5] = 0;
-  //A[2][10][6] = 0;
-  //A[2][10][7] = 0;
-  //A[2][10][8] = 0;
-  //A[2][10][9] = 0;
-  //A[2][10][10] = 0;
-    }
+    //A[2][10][0] = 0;
+    //A[2][10][1] = 0;
+    //A[2][10][2] = 0;
+    //A[2][10][3] = 0;
+    //A[2][10][4] = 0;
+    //A[2][10][5] = 0;
+    //A[2][10][6] = 0;
+    //A[2][10][7] = 0;
+    //A[2][10][8] = 0;
+    //A[2][10][9] = 0;
+    //A[2][10][10] = 0;
+  }
 }
