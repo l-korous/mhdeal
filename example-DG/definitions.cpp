@@ -3,9 +3,9 @@
 // Rad, 0 = konecne objemy
 const ui DG_ORDER = 0;
 // Zjemneni site
-const ui INIT_REF_NUM_X = 4;
-const ui INIT_REF_NUM_Y = 4;
-const ui INIT_REF_NUM_Z = 4;
+const ui INIT_REF_NUM_X = 6;
+const ui INIT_REF_NUM_Y = 6;
+const ui INIT_REF_NUM_Z = 6;
 
 const dealii::Point<DIM> p1(0., 0., 0.);
 const dealii::Point<DIM> p4(1., 1., 1.);
