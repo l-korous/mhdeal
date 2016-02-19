@@ -8,7 +8,7 @@ const ui INIT_REF_NUM_Y = 4;
 const ui INIT_REF_NUM_Z = 4;
 
 const dealii::Point<DIM> p1(0., 0., 0.);
-const dealii::Point<DIM> p4(4.1, 1., 1.);
+const dealii::Point<DIM> p4(1., 1., 1.);
 
 const d T_FINAL = 100.0;
 const d DELTA_T = 0.001;
