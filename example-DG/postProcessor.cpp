@@ -42,8 +42,43 @@ std::vector<std::string> Postprocessor::get_names() const
   for (ui d = 0; d < COMPONENT_COUNT; ++d)
   {
     std::stringstream ss;
-    ss << "solution_";
-    ss << std::to_string(d);
+    switch(d)
+    {
+      case 0:
+      ss << "Density";
+      break;
+    case 1:
+      ss << "X_momentum";
+      break;
+    case 2:
+      ss << "Y_momentum";
+      break;
+    case 3:
+      ss << "Z_momentum";
+      break;
+    case 4:
+      ss << "Energy";
+      break;
+    case 5:
+      ss << "X_mag_field";
+      break;
+    case 6:
+      ss << "Y_mag_field";
+      break;
+    case 7:
+      ss << "Z_mag_field";
+      break;
+    case 8:
+      ss << "X_current_density";
+      break;
+    case 9:
+      ss << "Y_current_density";
+      break;
+    case 10:
+      ss << "Z_current_density";
+      break;
+    }
+
     names.push_back(ss.str());
   }
   return names;

@@ -409,18 +409,25 @@ void MHDSolver::solve(Vector<d> &solution)
   solver.Tvmult(solution, rightHandSide);
 }
 
-void MHDSolver::outputResults(ui timeStep, d currentTime) const
+void MHDSolver::outputResults(ui timeStep, d currentTime, int linStep) const
 {
   Postprocessor postprocessor;
   DataOut<DIM, DoFHandler<DIM> > data_out;
   data_out.set_flags(DataOutBase::VtkFlags(std::numeric_limits<d>::min(), std::numeric_limits<d>::min(), false, DataOutBase::VtkFlags::no_compression));
   data_out.attach_dof_handler(dofHandler);
   const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
-  data_out.add_data_vector(slnPrev, postprocessor);
+
+  if(linStep >= 0)
+    data_out.add_data_vector(slnLin, postprocessor);
+  else
+    data_out.add_data_vector(slnPrev, postprocessor);
+
   data_out.build_patches(mapping);
   std::stringstream ss;
   ss << "solution-";
   ss << timeStep;
+  if(linStep >= 0)
+    ss << "-" << linStep;
   ss << ".vtk";
   std::ofstream output(ss.str());
   data_out.write_vtk(output);
@@ -439,27 +446,27 @@ void MHDSolver::run()
   GridOut().write_vtk(triangulation, tria_out);
 
   Triangulation<DIM>::cell_iterator
-    cell = triangulation.begin(),
-    endc = triangulation.end();
+      cell = triangulation.begin(),
+      endc = triangulation.end();
   for (; cell != endc; ++cell)
   {
     this->add_markers(cell);
   }
 
   deallog << "Number of active cells:       "
-    << triangulation.n_active_cells()
-    << std::endl;
+          << triangulation.n_active_cells()
+          << std::endl;
 
   setup_system();
 
   deallog << "Number of degrees of freedom: "
-    << dofHandler.n_dofs()
-    << std::endl;
+          << dofHandler.n_dofs()
+          << std::endl;
 
   // Initial sln.
   VectorFunctionFromScalarFunctionObject<DIM> initialSlnRho(InitialSlnRho::value, 0, COMPONENT_COUNT);
   VectorTools::interpolate(this->dofHandler, initialSlnRho, this->slnPrev);
-   
+
   VectorFunctionFromScalarFunctionObject<DIM> InitialSlnMomentumX(InitialSlnMomentumX::value, 1, COMPONENT_COUNT);
   VectorTools::interpolate(this->dofHandler, InitialSlnMomentumX, this->slnUtil);
   this->slnPrev += this->slnUtil;
@@ -494,23 +501,19 @@ void MHDSolver::run()
   {
     Timer timer;
     timer.start();
-    for(ui l=0;l<8;l++){
+    for(ui linStep = 0;linStep < 8;linStep++)
+    {
       assemble_system(timeStep == 0);
       solve(solution);
       this->slnUtil= solution;
       this->slnUtil-=this->slnLin;
       this->slnLin = solution;
-      std::cout << "   ln: " << l << " er: " << this->slnUtil.linfty_norm() << std::endl; // debug only
-      if (this->slnUtil.linfty_norm()<1e-10) break;
+      outputResults(timeStep, currentTime, linStep);
+      std::cout << "\tLin step #" << linStep << ", error: " << this->slnUtil.linfty_norm() << std::endl; // debug only
+      if (this->slnUtil.linfty_norm()<1e-10)
+        break;
     }
-//    for(ui i=0;i<this->slnPrev.size();i+=COMPONENT_COUNT){ // display arrays
-//       for(ui k=0;k<COMPONENT_COUNT;k++)
-//         std::cout <<this->slnPrev[i+k]<<":"<<this->slnLin[i+k]<<" ";
-//       std::cout << std::endl;
-//     }
-    //break;
     this->slnPrev = this->slnLin;
-    outputResults(timeStep, currentTime);
     Eq::currentTime = currentTime;
     timer.stop();
     std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s." << std::endl;

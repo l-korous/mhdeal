@@ -35,7 +35,7 @@ private:
   void assemble_system(bool firstIteration);
   void solve(dealii::Vector<d> &solution);
   void solveOneStep(dealii::Vector<d> &solution);
-  void outputResults(ui timeStep, d currentTime) const;
+  void outputResults(ui timeStep, d currentTime, int linStep = -1) const;
   void add_markers(dealii::Triangulation<DIM>::cell_iterator cell);
   static void JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT], 
                dealii::Vector<double> lv);
