@@ -15,13 +15,13 @@ d DirichletBoundaryCondition::calculate(ui component, Point<DIM> point)
   case 3:
       return RHO_EXT * V3_EXT;
   case 4:
-    return E_EXT;
-  case 5:
     return B1_EXT;
-  case 6:
+  case 5:
     return B2_EXT;
-  case 7:
+  case 6:
     return B3_EXT;
+  case 7:
+    return E_EXT;
   case 8:
     return J1_EXT;
   case 9:
