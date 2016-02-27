@@ -3,17 +3,17 @@
 // Rad, 0 = konecne objemy
 const ui DG_ORDER = 0;
 // Zjemneni site
-const ui INIT_REF_NUM_X = 6;
-const ui INIT_REF_NUM_Y = 6;
-const ui INIT_REF_NUM_Z = 6;
+const ui INIT_REF_NUM_X = 300;
+const ui INIT_REF_NUM_Y = 300;
+const ui INIT_REF_NUM_Z = 1;
 
-const dealii::Point<DIM> p1(0., 0., 0.);
-const dealii::Point<DIM> p4(1., 1., 1.);
+const dealii::Point<DIM> p1(-0.5, -0.75, -.25);
+const dealii::Point<DIM> p4(0.5, .75, .25);
 
 const d T_FINAL = 100.0;
-const d DELTA_T = 0.001;
+const d DELTA_T = 0.0001;
 
-const bool PRINT_ALGEBRA = true;
+const bool PRINT_ALGEBRA = false;
 // Delete VTK on start
 const bool DELETE_VTK = true;
 
@@ -29,8 +29,8 @@ const double RHO_EXT = 1.0;
 const double V1_EXT = 0.;
 const double V2_EXT = 0.;
 const double V3_EXT = 0.;
-const double B1_EXT = 0.;
-const double B2_EXT = 0.;
+const double B1_EXT = std::sqrt(2. * M_PI);
+const double B2_EXT = std::sqrt(2. * M_PI);
 const double B3_EXT = 0.;
 const double P_EXT = 0.1;
 // External energy.

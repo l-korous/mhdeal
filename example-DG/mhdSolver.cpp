@@ -508,11 +508,13 @@ void MHDSolver::run()
       this->slnUtil= solution;
       this->slnUtil-=this->slnLin;
       this->slnLin = solution;
-      outputResults(timeStep, currentTime, linStep);
       std::cout << "\tLin step #" << linStep << ", error: " << this->slnUtil.linfty_norm() << std::endl; // debug only
-      if (this->slnUtil.linfty_norm()<1e-10)
+      if (this->slnUtil.linfty_norm()<1e-12)
         break;
     }
+
+    outputResults(timeStep, currentTime);
+
     this->slnPrev = this->slnLin;
     Eq::currentTime = currentTime;
     timer.stop();
