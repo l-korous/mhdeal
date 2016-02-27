@@ -1,0 +1,141 @@
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title> Blast Test Page </title>
+</head>
+<body bgcolor="#e8e8e8">
+
+<!-- ========================= Page Header ============================== -->
+<table width="850"> <tbody><tr>
+<td align="CENTER">
+<h1> Spherical Blast Waves Test </h1> <br><br>
+</td> </tr></tbody></table>
+<br>
+
+<hr>
+<dl>
+<h2>Reference:</h2>
+</dl>
+<p>
+Various papers have presented results from similar spherical blast wave tests,
+e.g. Zachary, Malagoli, A., &amp; Colella,P., SIAM J. Sci. Comp., 15, 263 (1994);
+Balsara, D., &amp; Spicer, D., JCP 149, 270 (1999); Londrillo, P. &amp; Del Zanna, L.,
+ApJ 530, 508 (2000).
+</p>
+
+<hr>
+<dl>
+<h2>Description:</h2>
+</dl>
+<p>
+Different authors set this problem up in different ways.  To test Athena,
+we used a rectangular domain, -0.5 ≤ x ≤ 0.5; -0.75 ≤ y ≤ 0.75.
+The boundary
+conditions are periodic everywhere.  This non-square domain and periodic
+boundary conditions produces complex shock-shock and shock-CD interactions
+at late times.
+</p>
+<p>
+The initial
+density is 1.0, the pressure is 0.1, and the gas constant
+is γ = 5/3.  Initial velocities are zero everywhere.  Within the
+region r &lt; 0.1, the pressure is set to 10.0 (that is, 100 times the ambient
+pressure).  For the MHD problem,
+the initial magnetic field is uniform everywhere with
+B<sub>x</sub> / (4π)<sup>1/2</sup> = B<sub>y</sub> / (4π)<sup>1/2</sup>
+= 1/√2.
+</p>
+
+<hr>
+<dl>
+<h2>What's important about this test?</h2>
+</dl>
+<p>
+To be honest, this test is not very quantitative, but makes great movies!
+</p>
+<p>
+At early times, it is important that the out-going blast wave is
+spherical and shows no grid alignment effects.
+</p>
+<p>
+At late times, the interaction of the blast wave with the CD at the
+edge of the evacuated bubble in the center produces filaments of dense
+gas by the Richtmyer-Meshkov instability.  It is important these fingers
+are sharp and not diffused away.  Moreover, for the hydrodynamical
+problem, the pattern of the fingers
+should be EXACTLY symmetric top-to-bottom and left-to-right.
+For the MHD problem, the Richtmyer-Meshkov instability is suppressed, and no
+fingers are evident.
+</p>
+<p>
+
+</p><hr>
+<dl>
+<h2>Results: 2D Hydrodynamical Blast</h2>
+</dl>
+
+<p>
+Results computed with Athena using the HLLC solver and the third
+order algorithm on a 400x600 grid are shown
+below.  The images show the density on a linear color map between 0.08
+and 6.5.  The image on the left is at t = 0.2, the image on the right
+is at t = 1.5
+</p>
+
+<p>
+Note the pattern of dense fingers in the interior produced by the
+Richtmyer-Meshkov instability is exactly symmetric.
+</p>
+
+<p>
+Click on the right image to download a .gif movie (39.5MB).
+</p>
+
+<p>
+<br><table width="800"> <tbody><tr>
+<td align="LEFT">
+<img src="Blast%20Test%20Page_files/hydro_002.gif" align="left"> <br>
+</td>
+<td align="LEFT">
+<a href="http://www.astro.princeton.edu/%7Ejstone/Athena/tests/blast/hydro-blast.gif">
+<img src="Blast%20Test%20Page_files/hydro.gif" align="right"> </a>
+</td>
+</tr></tbody></table><br>
+</p>
+
+<hr>
+<dl>
+<h2>Results: 2D MHD Blast</h2>
+</dl>
+
+<p>
+Results computed with Athena using the Roe solver and the third
+order algorithm on a 400x600 grid are shown
+below.  The images show the density on a linear color map between 0.08
+and 6.5.  The image on the left is at t = 0.2, the image on the right
+is at t = 1.0
+</p>
+
+<p>
+Note the Richtmyer-Meshkov instability is supressed by the magnetic
+field, and no fingers are evident in the interior of the bubble.  Also
+note the bubble is strongly aligned along the magnetic field.
+</p>
+
+<p>
+Click on the right image to download a .gif movie (32MB).
+</p>
+
+<p>
+<br><table width="800"> <tbody><tr>
+<td align="LEFT">
+<img src="Blast%20Test%20Page_files/mhd.gif" align="left"> <br>
+</td>
+<td align="LEFT">
+<a href="http://www.astro.princeton.edu/%7Ejstone/Athena/tests/blast/mhd-blast.gif">
+<img src="Blast%20Test%20Page_files/mhd_002.gif" align="right"> </a>
+</td>
+</tr></tbody></table><br>
+</p>
+
+
+</body></html>
