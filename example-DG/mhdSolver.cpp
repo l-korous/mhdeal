@@ -108,11 +108,7 @@ void MHDSolver::assemble_system(bool firstIteration)
   // \todo This comes from tutorial, it may need some adjustment.
   MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
       (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
-       &MHDSolver::saveInfoBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
-
-  MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
-      (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetricEmpty,
-       &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdgeEmpty, assembler);
+      &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
 
   periodicBdr.clear();
 }
@@ -231,13 +227,6 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
   {
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
-      {
-        local_matrix(i, j) += JxW[point] * Eq::matrixBoundaryEdgeValue(components[j], components[i],
-                                                                       fe_v.shape_value(j, point), fe_v.shape_value(i, point),
-                                                                       prev_values[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
-                                                                       vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
-      }
       local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
                                                                fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
                                                                vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
@@ -258,17 +247,6 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   // For additional shape functions, we have to ask the neighbors
   // FEValuesBase.
   const FEValuesBase<DIM> &fe_v_neighbor = info2.fe_values();
-
-  // Then we get references to the four local matrices. The letters u and v
-  // refer to trial and test functions, respectively. The %numbers indicate
-  // the cells provided by info1 and info2. By convention, the two matrices
-  // in each info object refer to the test functions on the respective
-  // cell. The first matrix contains the interior couplings of that cell,
-  // while the second contains the couplings between cells.
-  dealii::FullMatrix<d> &u1_v1_matrix = dinfo1.matrix(0, false).matrix;
-  dealii::FullMatrix<d> &u2_v1_matrix = dinfo1.matrix(0, true).matrix;
-  dealii::FullMatrix<d> &u1_v2_matrix = dinfo2.matrix(0, true).matrix;
-  dealii::FullMatrix<d> &u2_v2_matrix = dinfo2.matrix(0, false).matrix;
 
   Vector<d> &v1_vector = dinfo1.vector(0).block(0);
   Vector<d> &v2_vector = dinfo2.vector(0).block(0);
@@ -307,50 +285,6 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   {
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
-      {
-        u1_v1_matrix(i, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components1[i],
-                                                                       fe_v.shape_value(i, point), fe_v.shape_value(j, point),
-                                                                       prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v.shape_grad(i, point),
-                                                                       vecDimVec(), vecDimVec(), false, false, fe_v.quadrature_point(point), normals[point], numFlux);
-      }
-    }
-
-    for (ui k = 0; k < fe_v_neighbor.dofs_per_cell; ++k)
-    {
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j)
-      {
-        u1_v2_matrix(k, j) += JxW[point] * Eq::matrixInternalEdgeValue(components1[j], components2[k],
-                                                                       fe_v.shape_value(k, point), fe_v_neighbor.shape_value(j, point),
-                                                                       prev_values1[point], prev_values2[point], fe_v.shape_grad(j, point), fe_v_neighbor.shape_grad(k, point),
-                                                                       vecDimVec(), vecDimVec(), true, false, fe_v.quadrature_point(point), normals[point], numFlux);
-      }
-    }
-
-    for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-    {
-      for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
-      {
-        u2_v1_matrix(i, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components1[i],
-                                                                       fe_v_neighbor.shape_value(i, point), fe_v.shape_value(l, point),
-                                                                       prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v.shape_grad(i, point),
-                                                                       vecDimVec(), vecDimVec(), false, true, fe_v.quadrature_point(point), normals[point], numFlux);
-      }
-    }
-
-    for (ui k = 0; k < fe_v_neighbor.dofs_per_cell; ++k)
-    {
-      for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
-      {
-        u2_v2_matrix(k, l) += JxW[point] * Eq::matrixInternalEdgeValue(components2[l], components2[k],
-                                                                       fe_v_neighbor.shape_value(k, point), fe_v_neighbor.shape_value(l, point),
-                                                                       prev_values1[point], prev_values2[point], fe_v_neighbor.shape_grad(l, point), fe_v_neighbor.shape_grad(k, point),
-                                                                       vecDimVec(), vecDimVec(), true, true, fe_v.quadrature_point(point), normals[point], numFlux);
-      }
-    }
-
-    for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-    {
       v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point),
                                                             fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
                                                             vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
@@ -358,7 +292,6 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
 
     for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
     {
-      assert(fe_v.quadrature_point(point) == fe_v_neighbor.quadrature_point(point));
       v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point),
                                                             fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
                                                             vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);

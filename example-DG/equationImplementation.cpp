@@ -147,26 +147,6 @@ d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
   return result;
 }
 
-
-d EquationImplementation::matrixBoundaryEdgeValue(ui comp_i, ui comp_j,
-  d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
-{
-  d result = 0.;
-  return result;
-}
-
-
-d EquationImplementation::matrixInternalEdgeValue(ui comp_i, ui comp_j,
-  d u_val, d v_val, vec Un_val, vec Un_valN, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, vecDimVec Un_gradN, bool u_N, bool v_N,
-  Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
-{
-  d result = 0.;
-
-  return result;
-}
-
 d EquationImplementation::rhsVolValue(ui comp_i,
   d v_val, vec Un_val, dimVec v_grad,
   vecDimVec Un_grad, Point<DIM> quadPoint)
