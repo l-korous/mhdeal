@@ -1,5 +1,9 @@
 #include "definitions.h"
 
+#ifndef M_PI
+#define M_PI 3.141592654
+#endif
+
 // Rad, 0 = konecne objemy
 const ui DG_ORDER = 0;
 // Zjemneni site
