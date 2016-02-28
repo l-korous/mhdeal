@@ -372,10 +372,6 @@ void MHDSolver::run()
 {
   GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z}), p1, p4);
   
-  std::string tria_file = "Tria.vtk";
-  std::ofstream tria_out(tria_file);
-  GridOut().write_vtk(triangulation, tria_out);
-
   Triangulation<DIM>::cell_iterator
       cell = triangulation.begin(),
       endc = triangulation.end();
