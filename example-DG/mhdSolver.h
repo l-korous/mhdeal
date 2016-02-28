@@ -4,6 +4,7 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/meshworker/simple.h>
 #include <deal.II/meshworker/loop.h>
+#include <deal.II/lac/sparse_direct.h>
 
 
 #include "definitions.h"
@@ -33,7 +34,7 @@ public:
 private:
   void setup_system();
   void assemble_system(bool firstIteration);
-  void solve(dealii::Vector<d> &solution);
+  void solve(dealii::Vector<d> &solution, bool firstIteration);
   void solveOneStep(dealii::Vector<d> &solution);
   void outputResults(ui timeStep, d currentTime, int linStep = -1) const;
   void add_markers(dealii::Triangulation<DIM>::cell_iterator cell);
@@ -55,6 +56,7 @@ private:
   static dealii::Vector<d> slnPrev;
   static dealii::Vector<d> slnLin;
   static dealii::Vector<d> slnUtil;
+  dealii::SparseDirectUMFPACK solver;
 
   dealii::Vector<d>       rightHandSide;
   static d A[3][COMPONENT_COUNT][COMPONENT_COUNT];         // Jacobi matrixes of the fluxes

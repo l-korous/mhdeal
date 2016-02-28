@@ -6,7 +6,6 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/base/timer.h>
-#include <deal.II/lac/sparse_direct.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -299,7 +298,7 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   }
 }
 
-void MHDSolver::solve(Vector<d> &solution)
+void MHDSolver::solve(Vector<d> &solution, bool firstIteration)
 {
   if (PRINT_ALGEBRA)
   {
@@ -335,9 +334,8 @@ void MHDSolver::solve(Vector<d> &solution)
   solver.solve(systemMatrix, solution, rightHandSide, preconditioner);
   */
 
-  dealii::SparseDirectUMFPACK solver;
-
-  solver.initialize(systemMatrix);
+  if(firstIteration)
+    solver.initialize(systemMatrix);
 
   solver.Tvmult(solution, rightHandSide);
 }
@@ -436,8 +434,8 @@ void MHDSolver::run()
     timer.start();
     for(ui linStep = 0;linStep < 8;linStep++)
     {
-      assemble_system(timeStep == 0);
-      solve(solution);
+      assemble_system((timeStep == 0) && (linStep == 0));
+      solve(solution, (timeStep == 0) && (linStep == 0));
       this->slnUtil= solution;
       this->slnUtil-=this->slnLin;
       this->slnLin = solution;
