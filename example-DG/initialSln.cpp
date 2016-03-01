@@ -29,12 +29,12 @@ d InitialSlnMomentumZ::value(const Point<DIM> &p)
 
 d InitialSlnEnergy::value(const Point<DIM> &p)
 {
-  if(std::sqrt(p(0) * p(0) + p(1) * p(1)) <= .1)
+  if(p.norm()<0.1)
   {
-    return 10. / (GAMMA - 1.0) + B1_EXT*B1_EXT+B2_EXT*B2_EXT+B3_EXT*B3_EXT;
+    return 10. / (GAMMA - 1.0) + 1.0;
   }
   else
-    return E_EXT;
+    return 0.1/(GAMMA-1.0)+1.0;
 
 }
 

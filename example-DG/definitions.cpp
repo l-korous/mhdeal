@@ -33,8 +33,8 @@ const double RHO_EXT = 1.0;
 const double V1_EXT = 0.;
 const double V2_EXT = 0.;
 const double V3_EXT = 0.;
-const double B1_EXT = std::sqrt(2. * M_PI);
-const double B2_EXT = std::sqrt(2. * M_PI);
+const double B1_EXT = 1.0/std::sqrt(2.);
+const double B2_EXT = 1.0/std::sqrt(2.);
 const double B3_EXT = 0.;
 const double P_EXT = 0.1;
 // External energy.
