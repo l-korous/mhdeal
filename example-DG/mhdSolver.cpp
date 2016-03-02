@@ -440,7 +440,8 @@ void MHDSolver::run()
         break;
     }
 
-    outputResults(timeStep, currentTime);
+    if ((timeStep % ONLY_PRINT_EACH_N_TH_SOLUTION) == 0)
+      outputResults(timeStep, currentTime);
 
     this->slnPrev = this->slnLin;
     Eq::currentTime = currentTime;
