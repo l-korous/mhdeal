@@ -45,37 +45,37 @@ std::vector<std::string> Postprocessor::get_names() const
     switch(d)
     {
       case 0:
-      ss << "Density";
+      ss << "Rho";
       break;
     case 1:
-      ss << "X_momentum";
+      ss << "Pi_x";
       break;
     case 2:
-      ss << "Y_momentum";
+      ss << "Pi_Y";
       break;
     case 3:
-      ss << "Z_momentum";
+      ss << "Pi_z";
       break;
     case 4:
-      ss << "Energy";
+      ss << "B_x";
       break;
     case 5:
-      ss << "X_mag_field";
+      ss << "B_y";
       break;
     case 6:
-      ss << "Y_mag_field";
+      ss << "B_z";
       break;
     case 7:
-      ss << "Z_mag_field";
+      ss << "U";
       break;
     case 8:
-      ss << "X_current_density";
+      ss << "J_x";
       break;
     case 9:
-      ss << "Y_current_density";
+      ss << "J_y";
       break;
     case 10:
-      ss << "Z_current_density";
+      ss << "J_z";
       break;
     }
 
