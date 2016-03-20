@@ -11,30 +11,27 @@ d InitialSlnRho::value(const Point<DIM> &p)
 
 d InitialSlnMomentumX::value(const Point<DIM> &p)
 {
-  //return p[0] * RHO_EXT;
-  return 0.;
+  return V1_EXT * RHO_EXT;
 }
 
 d InitialSlnMomentumY::value(const Point<DIM> &p)
 {
-  return 0.;
-  //return V2_EXT * RHO_EXT;
+  return V2_EXT * RHO_EXT;
 }
 
 d InitialSlnMomentumZ::value(const Point<DIM> &p)
 {
-  return 0.;
-  //return V3_EXT * RHO_EXT;
+  return V3_EXT * RHO_EXT;
 }
 
 d InitialSlnEnergy::value(const Point<DIM> &p)
 {
-  if(p.norm()<0.1)
+  if (p.norm() < 0.1)
   {
     return 10. / (GAMMA - 1.0) + 1.0;
   }
   else
-    return 0.1/(GAMMA-1.0)+1.0;
+    return 0.1 / (GAMMA - 1.0) + 1.0;
 
 }
 

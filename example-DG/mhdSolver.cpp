@@ -35,17 +35,17 @@ DirichletBoundaryCondition bc;
 
 MHDSolver::MHDSolver()
   :
-    feSystem(dealii::FE_DGQ<DIM>(DG_ORDER), COMPONENT_COUNT),
-    dofHandler(triangulation),
-    mapping(),
-    quad(2 * DG_ORDER),
-    quadFace(2 * DG_ORDER)
+  feSystem(dealii::FE_DGQ<DIM>(DG_ORDER), COMPONENT_COUNT),
+  dofHandler(triangulation),
+  mapping(),
+  quad(2 * DG_ORDER),
+  quadFace(2 * DG_ORDER)
 {
   numFlux = new NumFluxHLLD();
-  
-  for(unsigned int i=0;i<COMPONENT_COUNT;i++){
-    for(unsigned int j=0;j<COMPONENT_COUNT;j++){
-      A[0][i][j]=A[1][i][j]=A[2][i][j]=0.0;
+
+  for (unsigned int i = 0; i < COMPONENT_COUNT; i++){
+    for (unsigned int j = 0; j < COMPONENT_COUNT; j++){
+      A[0][i][j] = A[1][i][j] = A[2][i][j] = 0.0;
     }
   }
 }
@@ -80,7 +80,7 @@ void MHDSolver::assemble_system(bool firstIteration)
   info_box.cell_selector.add("solution", true, true, false);
   info_box.boundary_selector.add("solution", true, false, false);
   info_box.face_selector.add("solution", true, false, false);
-  
+
   solution_data.add(&slnLin, "linearization");
   info_box.cell_selector.add("linearization", true, false, false);
   info_box.boundary_selector.add("linearization", true, false, false);
@@ -106,14 +106,14 @@ void MHDSolver::assemble_system(bool firstIteration)
 
   // \todo This comes from tutorial, it may need some adjustment.
   MeshWorker::loop<DIM, DIM, MeshWorker::DoFInfo<DIM>, MeshWorker::IntegrationInfoBox<DIM> >
-      (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
-      &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
+    (dofHandler.begin_active(), dofHandler.end(), dof_info, info_box, &MHDSolver::assembleVolumetric,
+    &MHDSolver::assembleBoundaryEdge, &MHDSolver::assembleInternalEdge, assembler);
 
   periodicBdr.clear();
 }
 
 void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
-                                   CellInfo &info)
+  CellInfo &info)
 {
   double rhs[COMPONENT_COUNT];
   const FEValuesBase<DIM> &fe_v = info.fe_values();
@@ -124,7 +124,7 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   const ui dofs_per_cell = info.finite_element().dofs_per_cell;
 
   std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
-  std::vector<std::vector<Tensor<1,DIM> > > prev_grads(fe_v.n_quadrature_points, std::vector<Tensor<1,DIM> >(COMPONENT_COUNT));
+  std::vector<std::vector<Tensor<1, DIM> > > prev_grads(fe_v.n_quadrature_points, std::vector<Tensor<1, DIM> >(COMPONENT_COUNT));
   std::vector<dealii::Vector<double> > lin_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   for (ui i = 0; i < COMPONENT_COUNT; i++)
     for (ui point = 0; point < fe_v.n_quadrature_points; ++point){
@@ -140,51 +140,58 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
   {
-    JacobiM(A,lin_values[point]);
+    JacobiM(A, lin_values[point]);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
-      for (ui j = 0; j < fe_v.dofs_per_cell; ++j){ // u.v + dt * sum_d A_d * u * dv/dx_d
-        if (components[i]<COMPONENT_COUNT_T){  // time dependent equations
-          if (components[i]==components[j])
-            local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
-          for(ui d=0;d<DIM;d++)
-            local_matrix(i, j) += JxW[point]* 0.5*DELTA_T*
-                A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
-        }else{                                  // time independent equations
-          if (components[i]==components[j])
-            local_matrix(i, j) = JxW[point]*fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
-          for(ui d=0;d<DIM;d++)
-            local_matrix(i, j) += JxW[point]*
-                A[d][components[i]][components[j]]*fe_v.shape_value(i, point)*fe_v.shape_grad(j, point)[d];
+    {
+      for (ui j = 0; j < fe_v.dofs_per_cell; ++j) // u.v + dt * sum_d A_d * u * dv/dx_d
+      {
+        if (components[i] < COMPONENT_COUNT_T)  // time dependent equations
+        {
+          if (components[i] == components[j])
+            local_matrix(i, j) = JxW[point] * fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
+          for (ui d = 0; d < DIM; d++)
+            local_matrix(i, j) += JxW[point] * 0.5 * DELTA_T * A[d][components[i]][components[j]] * fe_v.shape_value(i, point) * fe_v.shape_grad(j, point)[d];
+        }
+        else // time independent equations
+        {
+          if (components[i] == components[j])
+            local_matrix(i, j) = JxW[point] * fe_v.shape_value(i, point) * fe_v.shape_value(j, point);
+          for (ui d = 0; d < DIM; d++)
+            local_matrix(i, j) += JxW[point] * A[d][components[i]][components[j]] * fe_v.shape_value(i, point) * fe_v.shape_grad(j, point)[d];
         }
       }
-
-    JacobiM(A,prev_values[point]);
-    for(ui i=0;i<COMPONENT_COUNT_T;i++){  //  sum_d dF_d(u_old)/dx_d
-      rhs[i]=A[0][i][0]*prev_grads[point][0][0];
-      for(ui d=1;d<DIM;d++)
-        rhs[i]+=A[d][i][0]*prev_grads[point][0][d];
-      for(ui d=0;d<DIM;d++)
-        for(ui j=1;j<COMPONENT_COUNT;j++)
-          rhs[i]+=A[d][i][j]*prev_grads[point][j][d];
     }
-    for (ui i = 0; i < fe_v.dofs_per_cell; ++i){  // u_old - dt * sum_d dF_d(u_old)/dx_d
-      if (components[i]<COMPONENT_COUNT_T)
-        local_vector(i) += JxW[point] * (prev_values[point][components[i]] - 0.5*DELTA_T*
-            rhs[components[i]] );
+
+    JacobiM(A, prev_values[point]);
+    for (ui i = 0; i < COMPONENT_COUNT_T; i++) //  sum_d dF_d(u_old)/dx_d
+    {
+      rhs[i] = A[0][i][0] * prev_grads[point][0][0];
+      for (ui d = 1; d < DIM; d++)
+        rhs[i] += A[d][i][0] * prev_grads[point][0][d];
+      for (ui d = 0; d < DIM; d++)
+      {
+        for (ui j = 1; j < COMPONENT_COUNT; j++)
+          rhs[i] += A[d][i][j] * prev_grads[point][j][d];
+      }
+    }
+    for (ui i = 0; i < fe_v.dofs_per_cell; ++i)// u_old - dt * sum_d dF_d(u_old)/dx_d
+    {
+      if (components[i] < COMPONENT_COUNT_T)
+        local_vector(i) += JxW[point] * (prev_values[point][components[i]] - 0.5*DELTA_T*rhs[components[i]]);
     }
   }
 }
 
 bool eqiv(double a, double b)
 {
-  return fabs(a-b) < 1e-10;
+  return fabs(a - b) < 1e-10;
 }
 
 std::vector<dealii::Vector<double> > MHDSolver::findCorrespondingInfo(dealii::Point<DIM> myCenter)
 {
-  for(PeriodicBdrInfo info : periodicBdr)
+  for (PeriodicBdrInfo info : periodicBdr)
   {
-    if(myCenter[0] != info.center[0] && myCenter[1] == info.center[1] && myCenter[2] == info.center[2])
+    if (myCenter[0] != info.center[0] && myCenter[1] == info.center[1] && myCenter[2] == info.center[2])
     {
       //      cout << "for " << myCenter << " found " << info.center << endl;
       return info.prev_values;
@@ -227,17 +234,17 @@ void MHDSolver::assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info)
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
       local_vector(i) += JxW[point] * Eq::rhsBoundaryEdgeValue(components[i],
-                                                               fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
-                                                               vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
+        fe_v.shape_value(i, point), prev_values[point], fe_v.shape_grad(i, point),
+        vecDimVec(), vec(), fe_v.quadrature_point(point), normals[point], numFlux, &bc, dinfo.face->boundary_id());
     }
   }
 }
 
 
 void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
-                                     DoFInfo &dinfo2,
-                                     CellInfo &info1,
-                                     CellInfo &info2)
+  DoFInfo &dinfo2,
+  CellInfo &info1,
+  CellInfo &info2)
 {
   // For quadrature points, weights, etc., we use the FEValuesBase object of
   // the first argument.
@@ -285,15 +292,15 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
       v1_vector(i) += JxW[point] * Eq::rhsInternalEdgeValue(components1[i], fe_v.shape_value(i, point),
-                                                            fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
-                                                            vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+        fe_v.shape_grad(i, point), false, prev_values1[point], vecDimVec(), prev_values2[point],
+        vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
 
     for (ui l = 0; l < fe_v_neighbor.dofs_per_cell; ++l)
     {
       v2_vector(l) += JxW[point] * Eq::rhsInternalEdgeValue(components2[l], fe_v_neighbor.shape_value(l, point),
-                                                            fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
-                                                            vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
+        fe_v_neighbor.shape_grad(l, point), true, prev_values1[point], vecDimVec(), prev_values2[point],
+        vecDimVec(), fe_v.quadrature_point(point), normals[point], numFlux);
     }
   }
 }
@@ -334,7 +341,7 @@ void MHDSolver::solve(Vector<d> &solution, bool firstIteration)
   solver.solve(systemMatrix, solution, rightHandSide, preconditioner);
   */
 
-  if(firstIteration)
+  if (firstIteration)
     solver.initialize(systemMatrix);
 
   solver.Tvmult(solution, rightHandSide);
@@ -348,7 +355,7 @@ void MHDSolver::outputResults(ui timeStep, d currentTime, int linStep) const
   data_out.attach_dof_handler(dofHandler);
   const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
 
-  if(linStep >= 0)
+  if (linStep >= 0)
     data_out.add_data_vector(slnLin, postprocessor);
   else
     data_out.add_data_vector(slnPrev, postprocessor);
@@ -357,7 +364,7 @@ void MHDSolver::outputResults(ui timeStep, d currentTime, int linStep) const
   std::stringstream ss;
   ss << "solution-";
   ss << timeStep;
-  if(linStep >= 0)
+  if (linStep >= 0)
     ss << "-" << linStep;
   ss << ".vtk";
   std::ofstream output(ss.str());
@@ -370,25 +377,25 @@ void MHDSolver::add_markers(Triangulation<DIM>::cell_iterator cell)
 
 void MHDSolver::run()
 {
-  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z}), p1, p4);
-  
+  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<ui>({ INIT_REF_NUM_X, INIT_REF_NUM_Y, INIT_REF_NUM_Z }), p1, p4);
+
   Triangulation<DIM>::cell_iterator
-      cell = triangulation.begin(),
-      endc = triangulation.end();
+    cell = triangulation.begin(),
+    endc = triangulation.end();
   for (; cell != endc; ++cell)
   {
     this->add_markers(cell);
   }
 
   deallog << "Number of active cells:       "
-          << triangulation.n_active_cells()
-          << std::endl;
+    << triangulation.n_active_cells()
+    << std::endl;
 
   setup_system();
 
   deallog << "Number of degrees of freedom: "
-          << dofHandler.n_dofs()
-          << std::endl;
+    << dofHandler.n_dofs()
+    << std::endl;
 
   // Initial sln.
   VectorFunctionFromScalarFunctionObject<DIM> initialSlnRho(InitialSlnRho::value, 0, COMPONENT_COUNT);
@@ -405,7 +412,7 @@ void MHDSolver::run()
   VectorFunctionFromScalarFunctionObject<DIM> InitialSlnMomentumZ(InitialSlnMomentumZ::value, 3, COMPONENT_COUNT);
   VectorTools::interpolate(this->dofHandler, InitialSlnMomentumZ, this->slnUtil);
   this->slnPrev += this->slnUtil;
-  
+
   VectorFunctionFromScalarFunctionObject<DIM> InitialSlnB1(InitialSlnB1::value, 4, COMPONENT_COUNT);
   VectorTools::interpolate(this->dofHandler, InitialSlnB1, this->slnUtil);
   this->slnPrev += this->slnUtil;
@@ -428,15 +435,15 @@ void MHDSolver::run()
   {
     Timer timer;
     timer.start();
-    for(ui linStep = 0;linStep < 8;linStep++)
+    for (ui linStep = 0; linStep < 8; linStep++)
     {
       assemble_system((timeStep == 0) && (linStep == 0));
       solve(solution, (timeStep == 0) && (linStep == 0));
-      this->slnUtil= solution;
-      this->slnUtil-=this->slnLin;
+      this->slnUtil = solution;
+      this->slnUtil -= this->slnLin;
       this->slnLin = solution;
       std::cout << "\tLin step #" << linStep << ", error: " << this->slnUtil.linfty_norm() << std::endl; // debug only
-      if (this->slnUtil.linfty_norm()<1e-12)
+      if (this->slnUtil.linfty_norm() < 1e-12)
         break;
     }
 
@@ -452,8 +459,8 @@ void MHDSolver::run()
 
 std::vector<PeriodicBdrInfo> MHDSolver::periodicBdr;
 
-void MHDSolver::JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT], 
-Vector<double> lv)
+void MHDSolver::JacobiM(double A[3][COMPONENT_COUNT][COMPONENT_COUNT],
+  Vector<double> lv)
 {
   double v[COMPONENT_COUNT], iRh, iRh2, Uk, p, gmmo, Ec1, Ec2, Ec3, E1, E2, E3;
 
@@ -487,9 +494,9 @@ Vector<double> lv)
   //A[0][0][10] = 0;
 
   A[0][1][0] = -(v[1] * v[1] * iRh2) + gmmo*Uk*.5*iRh;
-  A[0][1][1] = (2  - gmmo)*v[1]*iRh;
-  A[0][1][2] = -gmmo*v[2]*iRh;
-  A[0][1][3] = -gmmo*v[3]*iRh;
+  A[0][1][1] = (2 - gmmo)*v[1] * iRh;
+  A[0][1][2] = -gmmo*v[2] * iRh;
+  A[0][1][3] = -gmmo*v[3] * iRh;
   A[0][1][4] = -GAMMA*v[4];
   A[0][1][5] = (1 - gmmo)*v[5];
   A[0][1][6] = (1 - gmmo)*v[6];
@@ -498,7 +505,7 @@ Vector<double> lv)
   //A[0][1][9] = 0;
   //A[0][1][10] = 0;
 
-  A[0][2][0] = -v[1] * v[2]*iRh2;
+  A[0][2][0] = -v[1] * v[2] * iRh2;
   A[0][2][1] = v[2] * iRh;
   A[0][2][2] = v[1] * iRh;
   //A[0][2][3] = 0;
@@ -510,7 +517,7 @@ Vector<double> lv)
   //A[0][2][9] = 0;
   //A[0][2][10] = 0;
 
-  A[0][3][0] = -v[1] * v[3]*iRh2;
+  A[0][3][0] = -v[1] * v[3] * iRh2;
   A[0][3][1] = v[3] * iRh;
   //A[0][3][2] = 0;
   A[0][3][3] = v[1] * iRh;
@@ -536,9 +543,9 @@ Vector<double> lv)
 
   A[0][5][0] = Ec3*iRh;
   A[0][5][1] = v[5] * iRh;
-  A[0][5][2] =-v[4] * iRh;
+  A[0][5][2] = -v[4] * iRh;
   //A[0][5][3] = 0;
-  A[0][5][4] =-v[2] * iRh;
+  A[0][5][4] = -v[2] * iRh;
   A[0][5][5] = v[1] * iRh;
   //A[0][5][6] = 0;
   //A[0][5][7] = 0;
@@ -558,14 +565,14 @@ Vector<double> lv)
   A[0][6][9] = ETA;
   //A[0][6][10] = 0;
 
-  A[0][7][0] = 2 * iRh*(v[5]*Ec3 - v[6]*Ec2) + v[1] * gmmo*Uk*iRh2 - v[1]*(Uk + p)*iRh2;
-  A[0][7][1] = 2 * (v[5] * v[5] + v[6] * v[6])*iRh - 2*v[1] * gmmo*v[1]*iRh2 + (Uk + p)*iRh;
-  A[0][7][2] = -2 * v[4] * v[5] * iRh - v[1] * 2 * gmmo*v[2]*iRh2;
-  A[0][7][3] = -2 * v[4] * v[6] * iRh - v[1] * 2 * gmmo*v[3]*iRh2;
+  A[0][7][0] = 2 * iRh*(v[5] * Ec3 - v[6] * Ec2) + v[1] * gmmo*Uk*iRh2 - v[1] * (Uk + p)*iRh2;
+  A[0][7][1] = 2 * (v[5] * v[5] + v[6] * v[6])*iRh - 2 * v[1] * gmmo*v[1] * iRh2 + (Uk + p)*iRh;
+  A[0][7][2] = -2 * v[4] * v[5] * iRh - v[1] * 2 * gmmo*v[2] * iRh2;
+  A[0][7][3] = -2 * v[4] * v[6] * iRh - v[1] * 2 * gmmo*v[3] * iRh2;
   A[0][7][4] = -2 * GAMMA*v[4] * v[1] * iRh + 2 * (-v[5] * v[2] - v[6] * v[3])*iRh;
-  A[0][7][5] = -2 * GAMMA*v[5] * v[1] * iRh + 2 * (v[5] * v[1]*iRh - E3);
-  A[0][7][6] = -2 * GAMMA*v[6] * v[1] * iRh + 2 * (v[6] * v[1]*iRh + E2);
-  A[0][7][7] = GAMMA*v[1]*iRh;
+  A[0][7][5] = -2 * GAMMA*v[5] * v[1] * iRh + 2 * (v[5] * v[1] * iRh - E3);
+  A[0][7][6] = -2 * GAMMA*v[6] * v[1] * iRh + 2 * (v[6] * v[1] * iRh + E2);
+  A[0][7][7] = GAMMA*v[1] * iRh;
   //A[0][7][8] = 0;
   A[0][7][9] = 2 * ETA*v[6];
   A[0][7][10] = -2 * ETA*v[5];
@@ -606,7 +613,7 @@ Vector<double> lv)
   //A[0][10][9] = 0;
   //A[0][10][10] = 0;
 
-  if (DIM>1){
+  if (DIM > 1){
     //A[1][0][0] = 0;
     //A[1][0][1] = 0;
     A[1][0][2] = 1;
@@ -619,7 +626,7 @@ Vector<double> lv)
     //A[1][0][9] = 0;
     //A[1][0][10] = 0;
 
-    A[1][1][0] = -v[1] * v[2]*iRh2;
+    A[1][1][0] = -v[1] * v[2] * iRh2;
     A[1][1][1] = v[2] * iRh;
     A[1][1][2] = v[1] * iRh;
     //A[1][1][3] = 0;
@@ -632,9 +639,9 @@ Vector<double> lv)
     //A[1][1][10] = 0;
 
     A[1][2][0] = -v[2] * v[2] * iRh2 + gmmo*Uk*.5*iRh;
-    A[1][2][1] = -gmmo*v[1]*iRh;
-    A[1][2][2] = (2 - gmmo)*v[2]*iRh;
-    A[1][2][3] = -gmmo*v[3]*iRh;
+    A[1][2][1] = -gmmo*v[1] * iRh;
+    A[1][2][2] = (2 - gmmo)*v[2] * iRh;
+    A[1][2][3] = -gmmo*v[3] * iRh;
     A[1][2][4] = (1 - gmmo)*v[4];
     A[1][2][5] = -GAMMA*v[5];
     A[1][2][6] = (1 - gmmo)*v[6];
@@ -643,7 +650,7 @@ Vector<double> lv)
     //A[1][2][9] = 0;
     //A[1][2][10] = 0;
 
-    A[1][3][0] = -v[2] * v[3]*iRh2;
+    A[1][3][0] = -v[2] * v[3] * iRh2;
     //A[1][3][1] = 0;
     A[1][3][2] = v[3] * iRh;
     A[1][3][3] = v[2] * iRh;
@@ -656,11 +663,11 @@ Vector<double> lv)
     //A[1][3][10] = 0;
 
     A[1][4][0] = -Ec3*iRh;
-    A[1][4][1] =-v[5] * iRh;
+    A[1][4][1] = -v[5] * iRh;
     A[1][4][2] = v[4] * iRh;
     //A[1][4][3] = 0;
     A[1][4][4] = v[2] * iRh;
-    A[1][4][5] =-v[1] * iRh;
+    A[1][4][5] = -v[1] * iRh;
     //A[1][4][6] = 0;
     //A[1][4][7] = 0;
     //A[1][4][8] = 0;
@@ -682,23 +689,23 @@ Vector<double> lv)
     A[1][6][0] = Ec1*iRh;
     //A[1][6][1] = 0;
     A[1][6][2] = v[6] * iRh;
-    A[1][6][3] =-v[5] * iRh;
+    A[1][6][3] = -v[5] * iRh;
     //A[1][6][4] = 0;
-    A[1][6][5] =-v[3] * iRh;
+    A[1][6][5] = -v[3] * iRh;
     A[1][6][6] = v[2] * iRh;
     //A[1][6][7] = 0;
     A[1][6][8] = -ETA;
     //A[1][6][9] = 0;
     //A[1][6][10] = 0;
 
-    A[1][7][0] = 2 * iRh*(-v[4]*Ec3 + v[6]*Ec1) + v[2] * gmmo*Uk*iRh2 - v[2]*(Uk + p)*iRh2;
+    A[1][7][0] = 2 * iRh*(-v[4] * Ec3 + v[6] * Ec1) + v[2] * gmmo*Uk*iRh2 - v[2] * (Uk + p)*iRh2;
     A[1][7][1] = -2 * v[4] * v[5] * iRh - 2 * gmmo*v[1] * v[2] * iRh2;
-    A[1][7][2] = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2*v[2] * gmmo*v[2]*iRh2 + (Uk + p)*iRh;
+    A[1][7][2] = 2 * (v[4] * v[4] + v[6] * v[6])*iRh - 2 * v[2] * gmmo*v[2] * iRh2 + (Uk + p)*iRh;
     A[1][7][3] = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
-    A[1][7][4] = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2]*iRh + E3);
+    A[1][7][4] = -2 * GAMMA*v[4] * v[2] * iRh + 2 * (v[4] * v[2] * iRh + E3);
     A[1][7][5] = -2 * GAMMA*v[5] * v[2] * iRh + 2 * (-v[4] * v[1] - v[6] * v[3])*iRh;
-    A[1][7][6] = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2]*iRh - E1);
-    A[1][7][7] = GAMMA*v[2]*iRh;
+    A[1][7][6] = -2 * GAMMA*v[6] * v[2] * iRh + 2 * (v[6] * v[2] * iRh - E1);
+    A[1][7][7] = GAMMA*v[2] * iRh;
     A[1][7][8] = -2 * ETA*v[6];
     //A[1][7][9] = 0;
     A[1][7][10] = 2 * ETA*v[4];
@@ -740,7 +747,7 @@ Vector<double> lv)
     //A[1][10][10] - 0;
   }
 
-  if (DIM>2){
+  if (DIM > 2){
     //A[2][0][0] = 0;
     //A[2][0][1] = 0;
     //A[2][0][2] = 0;
@@ -753,7 +760,7 @@ Vector<double> lv)
     //A[2][0][9] = 0;
     //A[2][0][10] = 0;
 
-    A[2][1][0] = -v[1] * v[3]*iRh2;
+    A[2][1][0] = -v[1] * v[3] * iRh2;
     A[2][1][1] = v[3] * iRh;
     //A[2][1][2] = 0;
     A[2][1][3] = v[1] * iRh;
@@ -765,7 +772,7 @@ Vector<double> lv)
     //A[2][1][9] = 0;
     //A[2][1][10] = 0;
 
-    A[2][2][0] = -v[2] * v[3]*iRh2;
+    A[2][2][0] = -v[2] * v[3] * iRh2;
     //A[2][2][1] = 0;
     A[2][2][2] = v[3] * iRh;
     A[2][2][3] = v[2] * iRh;
@@ -778,9 +785,9 @@ Vector<double> lv)
     //A[2][2][10] = 0;
 
     A[2][3][0] = -v[3] * v[3] * iRh2 + (gmmo*Uk)*.5*iRh;
-    A[2][3][1] = -gmmo*v[1]*iRh;
-    A[2][3][2] = -gmmo*v[2]*iRh;
-    A[2][3][3] = (2 - gmmo)*v[3]*iRh;
+    A[2][3][1] = -gmmo*v[1] * iRh;
+    A[2][3][2] = -gmmo*v[2] * iRh;
+    A[2][3][3] = (2 - gmmo)*v[3] * iRh;
     A[2][3][4] = (1 - gmmo)*v[4];
     A[2][3][5] = (1 - gmmo)*v[5];
     A[2][3][6] = -GAMMA*v[6];
@@ -790,12 +797,12 @@ Vector<double> lv)
     //A[2][3][10] = 0;
 
     A[2][4][0] = Ec2*iRh;
-    A[2][4][1] =-v[6] * iRh;
+    A[2][4][1] = -v[6] * iRh;
     //A[2][4][2] = 0;
     A[2][4][3] = v[4] * iRh;
     A[2][4][4] = v[3] * iRh;
     //A[2][4][5] = 0;
-    A[2][4][6] =-v[1] * iRh;
+    A[2][4][6] = -v[1] * iRh;
     //A[2][4][7] = 0;
     //A[2][4][8] = 0;
     A[2][4][9] = -ETA;
@@ -803,11 +810,11 @@ Vector<double> lv)
 
     A[2][5][0] = -Ec1*iRh;
     //A[2][5][1] = 0;
-    A[2][5][2] =-v[6] * iRh;
+    A[2][5][2] = -v[6] * iRh;
     A[2][5][3] = v[5] * iRh;
     //A[2][5][4] = 0;
     A[2][5][5] = v[3] * iRh;
-    A[2][5][6] =-v[2] * iRh;
+    A[2][5][6] = -v[2] * iRh;
     //A[2][5][7] = 0;
     A[2][5][8] = ETA;
     //A[2][5][9] = 0;
@@ -825,14 +832,14 @@ Vector<double> lv)
     //A[2][6][9] = 0;
     //A[2][6][10] = 0;
 
-    A[2][7][0] = 2 * iRh*(v[4]*Ec2 - v[5]*Ec1) + v[3] * gmmo*Uk*iRh2 - v[3]*(Uk + p)*iRh2;
-    A[2][7][1] = -2*v[4]*v[6]*iRh - 2*gmmo*v[1]*v[3]*iRh2;
-    A[2][7][2] = -2*v[5]*v[6]*iRh - 2*gmmo*v[2]*v[3]*iRh2;
-    A[2][7][3] = 2 * (v[4] * v[4] + v[5] * v[5])*iRh + 2*v[3] * gmmo*v[3]*iRh2 + (Uk + p)*iRh;
-    A[2][7][4] = -2 * GAMMA*v[4] * v[3] * iRh + 2 * (v[4] * v[3]*iRh - E2);
-    A[2][7][5] = -2 * GAMMA*v[5] * v[3] * iRh + 2 * (v[5] * v[3]*iRh + E1);
+    A[2][7][0] = 2 * iRh*(v[4] * Ec2 - v[5] * Ec1) + v[3] * gmmo*Uk*iRh2 - v[3] * (Uk + p)*iRh2;
+    A[2][7][1] = -2 * v[4] * v[6] * iRh - 2 * gmmo*v[1] * v[3] * iRh2;
+    A[2][7][2] = -2 * v[5] * v[6] * iRh - 2 * gmmo*v[2] * v[3] * iRh2;
+    A[2][7][3] = 2 * (v[4] * v[4] + v[5] * v[5])*iRh + 2 * v[3] * gmmo*v[3] * iRh2 + (Uk + p)*iRh;
+    A[2][7][4] = -2 * GAMMA*v[4] * v[3] * iRh + 2 * (v[4] * v[3] * iRh - E2);
+    A[2][7][5] = -2 * GAMMA*v[5] * v[3] * iRh + 2 * (v[5] * v[3] * iRh + E1);
     A[2][7][6] = -2 * GAMMA*v[6] * v[3] * iRh + 2 * (-v[4] * v[1] - v[5] * v[2])*iRh;
-    A[2][7][7] = GAMMA*v[3]*iRh;
+    A[2][7][7] = GAMMA*v[3] * iRh;
     A[2][7][8] = 2 * ETA*v[5];
     A[2][7][9] = -2 * ETA*v[4];
     //A[2][7][10] = 0;
