@@ -30,7 +30,6 @@ class NumFluxHLLD : public NumFlux
 {
 public:
   void calculate(vec U_L, vec U_R, dealii::Point<DIM> quadPoint, dealii::Point<DIM> normal, vec& result, ui only_part = 0);
-  void hlld(double *ul, double *ur, double *F);
 };
 
 class NumFluxUpwind : public NumFlux
