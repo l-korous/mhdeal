@@ -6,11 +6,6 @@
 
 using namespace dealii;
 
-d calculate_flux(double x, double y, double nx, double ny)
-{
-  return nx + ny;
-}
-
 EquationImplementation::EquationImplementation()
 {
   //   for(int i=0;i<Ne;i++){
@@ -180,7 +175,7 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 
   num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
 
-  result -= 0.5*DELTA_T*numFlux[comp_i] * v_val;
+  result -= DELTA_T*numFlux[comp_i] * v_val;
 
   return result;
 }
@@ -200,7 +195,7 @@ d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
 
   num_flux->calculate(Un_val, Un_valN, quadPoint, normal, numFlux);
 
-  result -= 0.5*DELTA_T*numFlux[comp_i] * jump_v;
+  result -= DELTA_T*numFlux[comp_i] * jump_v;
 
   return result;
 }

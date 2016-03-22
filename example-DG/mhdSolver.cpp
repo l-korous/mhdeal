@@ -27,7 +27,6 @@ typedef EquationImplementation Eq;
 
 d MHDSolver::A[3][COMPONENT_COUNT][COMPONENT_COUNT];
 Vector<d> MHDSolver::slnPrev;
-Vector<d> MHDSolver::slnLin;
 // For initial conditions.
 Vector<d> MHDSolver::slnUtil;
 NumFlux* numFlux;
@@ -64,7 +63,6 @@ void MHDSolver::setup_system()
   rightHandSide.reinit(dofHandler.n_dofs());
   solution.reinit(dofHandler.n_dofs());
   slnPrev.reinit(dofHandler.n_dofs());
-  slnLin.reinit(dofHandler.n_dofs());
   slnUtil.reinit(dofHandler.n_dofs());
 }
 
@@ -81,11 +79,6 @@ void MHDSolver::assemble_system(bool firstIteration)
   info_box.boundary_selector.add("solution", true, false, false);
   info_box.face_selector.add("solution", true, false, false);
 
-  solution_data.add(&slnLin, "linearization");
-  info_box.cell_selector.add("linearization", true, false, false);
-  info_box.boundary_selector.add("linearization", true, false, false);
-  info_box.face_selector.add("linearization", true, false, false);
-
   info_box.initialize_update_flags();
   UpdateFlags update_flags = update_quadrature_points | update_values | update_gradients;
   info_box.add_update_flags(update_flags, true, true, true, true);
@@ -98,8 +91,8 @@ void MHDSolver::assemble_system(bool firstIteration)
 
   if (!firstIteration)
   {
-    systemMatrix.reinit(sparsityPattern);
-    rightHandSide.reinit(dofHandler.n_dofs());
+    systemMatrix = 0;
+    rightHandSide = 0;
   }
   MeshWorker::Assembler::SystemSimple < SparseMatrix<d>, Vector<d> > assembler;
   assembler.initialize(systemMatrix, rightHandSide);
@@ -115,7 +108,6 @@ void MHDSolver::assemble_system(bool firstIteration)
 void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   CellInfo &info)
 {
-  double rhs[COMPONENT_COUNT];
   const FEValuesBase<DIM> &fe_v = info.fe_values();
   dealii::FullMatrix<d> &local_matrix = dinfo.matrix(0).matrix;
   Vector<d> &local_vector = dinfo.vector(0).block(0);
@@ -125,12 +117,10 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
 
   std::vector<dealii::Vector<double> > prev_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   std::vector<std::vector<Tensor<1, DIM> > > prev_grads(fe_v.n_quadrature_points, std::vector<Tensor<1, DIM> >(COMPONENT_COUNT));
-  std::vector<dealii::Vector<double> > lin_values(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   for (ui i = 0; i < COMPONENT_COUNT; i++)
     for (ui point = 0; point < fe_v.n_quadrature_points; ++point){
       prev_values[point][i] = info.values[0][i][point];
       prev_grads[point][i] = info.gradients[0][i][point];
-      lin_values[point][i] = info.values[1][i][point];
     }
 
   // Components
@@ -138,46 +128,27 @@ void MHDSolver::assembleVolumetric(DoFInfo &dinfo,
   for (ui i = 0; i < dofs_per_cell; ++i)
     components[i] = info.finite_element().system_to_component_index(i).first;
 
+  // Here we want to define a constant by which we multiply the "flux" term
+  // - for time-dependent this will be DELTA_T, since we multiplied the equation by this, for time-independent, this is just 1
+  d multiplier[COMPONENT_COUNT] = {DELTA_T, DELTA_T, DELTA_T, DELTA_T, DELTA_T, DELTA_T, DELTA_T, DELTA_T, 1., 1., 1.};
+
   for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
   {
-    JacobiM(A, lin_values[point]);
+    JacobiM(A, prev_values[point]);
     for (ui i = 0; i < fe_v.dofs_per_cell; ++i)
     {
       for (ui j = 0; j < fe_v.dofs_per_cell; ++j) // u.v + dt * sum_d A_d * u * dv/dx_d
       {
-        if (components[i] < COMPONENT_COUNT_T)  // time dependent equations
-        {
+        // This is for all components, for the time-dependent it comes from the time-derivative, for current density it comes from the definition of J
           if (components[i] == components[j])
-            local_matrix(i, j) = JxW[point] * fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
-          for (ui d = 0; d < DIM; d++)
-            local_matrix(i, j) += JxW[point] * 0.5 * DELTA_T * A[d][components[i]][components[j]] * fe_v.shape_value(i, point) * fe_v.shape_grad(j, point)[d];
-        }
-        else // time independent equations
-        {
-          if (components[i] == components[j])
-            local_matrix(i, j) = JxW[point] * fe_v.shape_value(i, point) * fe_v.shape_value(j, point);
-          for (ui d = 0; d < DIM; d++)
-            local_matrix(i, j) += JxW[point] * A[d][components[i]][components[j]] * fe_v.shape_value(i, point) * fe_v.shape_grad(j, point)[d];
-        }
-      }
-    }
+            local_matrix(i, j) += JxW[point] * fe_v.shape_value(i, point)*fe_v.shape_value(j, point);
 
-    JacobiM(A, prev_values[point]);
-    for (ui i = 0; i < COMPONENT_COUNT_T; i++) //  sum_d dF_d(u_old)/dx_d
-    {
-      rhs[i] = A[0][i][0] * prev_grads[point][0][0];
-      for (ui d = 1; d < DIM; d++)
-        rhs[i] += A[d][i][0] * prev_grads[point][0][d];
-      for (ui d = 0; d < DIM; d++)
-      {
-        for (ui j = 1; j < COMPONENT_COUNT; j++)
-          rhs[i] += A[d][i][j] * prev_grads[point][j][d];
+          for (ui d = 0; d < DIM; d++)
+            local_matrix(i, j) += JxW[point] * multiplier[components[i]] * A[d][components[i]][components[j]] * fe_v.shape_value(j, point) * fe_v.shape_grad(i, point)[d];
       }
-    }
-    for (ui i = 0; i < fe_v.dofs_per_cell; ++i)// u_old - dt * sum_d dF_d(u_old)/dx_d
-    {
+
       if (components[i] < COMPONENT_COUNT_T)
-        local_vector(i) += JxW[point] * (prev_values[point][components[i]] - 0.5*DELTA_T*rhs[components[i]]);
+        local_vector(i) += JxW[point] * prev_values[point][components[i]] * fe_v.shape_value(i, point);
     }
   }
 }
@@ -271,12 +242,12 @@ void MHDSolver::assembleInternalEdge(DoFInfo &dinfo1,
   std::vector<dealii::Vector<double> > prev_values1(fe_v.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   for (ui i = 0; i < COMPONENT_COUNT; i++)
     for (ui point = 0; point < fe_v.n_quadrature_points; ++point)
-      prev_values1[point][i] = info1.values[1][i][point];
+      prev_values1[point][i] = info1.values[0][i][point];
 
   std::vector<dealii::Vector<double> > prev_values2(fe_v_neighbor.n_quadrature_points, dealii::Vector<double>(COMPONENT_COUNT));
   for (ui i = 0; i < COMPONENT_COUNT; i++)
     for (ui point = 0; point < fe_v_neighbor.n_quadrature_points; ++point)
-      prev_values2[point][i] = info2.values[1][i][point];
+      prev_values2[point][i] = info2.values[0][i][point];
 
   // Components.
   std::vector<int> components1(dofs_per_cell1);
@@ -343,11 +314,13 @@ void MHDSolver::solve(Vector<d> &solution, bool firstIteration)
 
   if (firstIteration)
     solver.initialize(systemMatrix);
+  else
+    solver.factorize(systemMatrix);
 
-  solver.Tvmult(solution, rightHandSide);
+  solver.vmult(solution, rightHandSide);
 }
 
-void MHDSolver::outputResults(ui timeStep, d currentTime, int linStep) const
+void MHDSolver::outputResults(ui timeStep, d currentTime) const
 {
   Postprocessor postprocessor;
   DataOut<DIM, DoFHandler<DIM> > data_out;
@@ -355,17 +328,12 @@ void MHDSolver::outputResults(ui timeStep, d currentTime, int linStep) const
   data_out.attach_dof_handler(dofHandler);
   const DataOut<DIM, DoFHandler<DIM> >::DataVectorType data_vector_type = DataOut<DIM, DoFHandler<DIM> >::type_dof_data;
 
-  if (linStep >= 0)
-    data_out.add_data_vector(slnLin, postprocessor);
-  else
-    data_out.add_data_vector(slnPrev, postprocessor);
+  data_out.add_data_vector(this->solution, postprocessor);
 
   data_out.build_patches(mapping);
   std::stringstream ss;
   ss << "solution-";
   ss << timeStep;
-  if (linStep >= 0)
-    ss << "-" << linStep;
   ss << ".vtk";
   std::ofstream output(ss.str());
   data_out.write_vtk(output);
@@ -429,28 +397,19 @@ void MHDSolver::run()
   VectorTools::interpolate(this->dofHandler, initialSlnEnergy, this->slnUtil);
   this->slnPrev += this->slnUtil;
 
-  this->slnLin = this->slnPrev;
   d currentTime = 0.;
   for (ui timeStep = 0; currentTime < T_FINAL; timeStep++, currentTime += DELTA_T)
   {
     Timer timer;
     timer.start();
-    for (ui linStep = 0; linStep < 8; linStep++)
-    {
-      assemble_system((timeStep == 0) && (linStep == 0));
-      solve(solution, (timeStep == 0) && (linStep == 0));
-      this->slnUtil = solution;
-      this->slnUtil -= this->slnLin;
-      this->slnLin = solution;
-      std::cout << "\tLin step #" << linStep << ", error: " << this->slnUtil.linfty_norm() << std::endl; // debug only
-      if (this->slnUtil.linfty_norm() < 1e-12)
-        break;
-    }
+
+    assemble_system(timeStep == 0);
+      solve(solution, (timeStep == 0));
 
     if ((timeStep % ONLY_PRINT_EACH_N_TH_SOLUTION) == 0)
       outputResults(timeStep, currentTime);
 
-    this->slnPrev = this->slnLin;
+    this->slnPrev = this->solution;
     Eq::currentTime = currentTime;
     timer.stop();
     std::cout << "Time step #" << timeStep << " : " << timer.wall_time() << " s." << std::endl;
