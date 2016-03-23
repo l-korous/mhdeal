@@ -8,6 +8,9 @@
 #include <deal.II/base/timer.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/lac/full_matrix.h>
+#include <deal.II/lac/precondition_block.h>
+#include <deal.II/lac/solver_control.h>
+#include <deal.II/lac/solver_richardson.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/solution_transfer.h>
 
@@ -298,7 +301,7 @@ void MHDSolver::solve(Vector<d> &solution, bool firstIteration)
     matrix_out.close();
     rhs_out.close();
   }
-  /*
+
   SolverControl           solver_control(1000, 1e-12);
   SolverRichardson<>      solver(solver_control);
 
@@ -310,14 +313,15 @@ void MHDSolver::solve(Vector<d> &solution, bool firstIteration)
 
   // After these preparations we are ready to start the linear solver.
   solver.solve(systemMatrix, solution, rightHandSide, preconditioner);
-  */
 
+  /*
   if (firstIteration)
     solver.initialize(systemMatrix);
   else
     solver.factorize(systemMatrix);
 
   solver.vmult(solution, rightHandSide);
+  */
 }
 
 void MHDSolver::outputResults(ui timeStep, d currentTime) const
