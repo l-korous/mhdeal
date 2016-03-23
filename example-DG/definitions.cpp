@@ -7,16 +7,15 @@
 // Rad, 0 = konecne objemy
 const ui DG_ORDER = 0;
 // Zjemneni site
-const ui INIT_REF_NUM_X = 200;
-const ui INIT_REF_NUM_Y = 300;
+const ui INIT_REF_NUM_X = 400;
+const ui INIT_REF_NUM_Y = 400;
 const ui INIT_REF_NUM_Z = 1;
 
-const dealii::Point<DIM> p1(-0.5, -0.75, -.25);
-const dealii::Point<DIM> p4(0.5, .75, .25);
+const dealii::Point<DIM> p1(-0.25, -0.25, -.25);
+const dealii::Point<DIM> p4(0.25, .25, .25);
 
-const d T_FINAL = 100.0;
+const d T_FINAL = 100.;
 const d DELTA_T = 1e-5;
-
 const bool PRINT_ALGEBRA = false;
 // Delete VTK on start
 const bool DELETE_VTK = true;
