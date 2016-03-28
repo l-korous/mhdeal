@@ -26,6 +26,7 @@ extern const dealii::Point<DIM> p4;
 extern const d T_FINAL;
 extern const d DELTA_T;
 extern const bool PRINT_ALGEBRA;
+extern const bool USE_DIRECT;
 extern const bool DELETE_VTK;
 extern const ui ONLY_PRINT_EACH_N_TH_SOLUTION;
 

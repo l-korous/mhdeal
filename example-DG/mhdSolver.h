@@ -55,7 +55,6 @@ private:
   dealii::Vector<d>       solution;
   static dealii::Vector<d> slnPrev;
   static dealii::Vector<d> slnUtil;
-  dealii::SparseDirectUMFPACK solver;
 
   dealii::Vector<d>       rightHandSide;
   static d A[3][COMPONENT_COUNT][COMPONENT_COUNT];         // Jacobi matrixes of the fluxes
@@ -68,6 +67,7 @@ private:
   static std::vector<dealii::Vector<double> > findCorrespondingInfo(dealii::Point<DIM> myCenter);
 
   static void assembleVolumetric(DoFInfo &dinfo, CellInfo &info);
+  static void assembleVolumetricOnlyRhs(DoFInfo &dinfo, CellInfo &info);
   static void assembleVolumetricEmpty(DoFInfo &dinfo, CellInfo &info) {}
   static void saveInfoBoundaryEdge(DoFInfo &dinfo, CellInfo &info);
   static void assembleBoundaryEdge(DoFInfo &dinfo, CellInfo &info);

@@ -19,8 +19,8 @@ EquationImplementation::EquationImplementation()
 }
 
 d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
-  d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
-  vecDimVec Un_grad, Point<DIM> quadPoint)
+                                         d u_val, d v_val, vec Un_val, dimVec u_grad, dimVec v_grad,
+                                         vecDimVec Un_grad, Point<DIM> quadPoint)
 {
   d result = 0.;
 
@@ -143,8 +143,8 @@ d EquationImplementation::matrixVolValue(ui comp_i, ui comp_j,
 }
 
 d EquationImplementation::rhsVolValue(ui comp_i,
-  d v_val, vec Un_val, dimVec v_grad,
-  vecDimVec Un_grad, Point<DIM> quadPoint)
+                                      d v_val, vec Un_val, dimVec v_grad,
+                                      vecDimVec Un_grad, Point<DIM> quadPoint)
 {
   d result = 0.;
 
@@ -156,11 +156,14 @@ d EquationImplementation::rhsVolValue(ui comp_i,
 
 
 d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
-  d v_val, vec Un_val, dimVec v_grad,
-  vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal,
-  NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
+                                               d v_val, vec Un_val, dimVec v_grad,
+                                               vecDimVec Un_grad, vec U_bnd_val, Point<DIM> quadPoint, Point<DIM> normal,
+                                               NumFlux* num_flux, DirichletBoundaryCondition* bc, dealii::types::boundary_id bnd_id)
 {
   d result = 0.;
+
+  if(std::abs(normal(2))>1e-6)
+    return 0.;
 
   // Pro proudovou hustotu se nic na hranicich nedela.
   if (comp_i >= COMPONENT_COUNT_T)
@@ -173,6 +176,7 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 
   vec numFlux(COMPONENT_COUNT_T);
 
+
   num_flux->calculate(Un_val, bc_state, quadPoint, normal, numFlux);
 
   result -= DELTA_T*numFlux[comp_i] * v_val;
@@ -181,8 +185,8 @@ d EquationImplementation::rhsBoundaryEdgeValue(ui comp_i,
 }
 
 d EquationImplementation::rhsInternalEdgeValue(ui comp_i,
-  d v_val, dimVec v_grad, bool v_N, vec Un_val,
-  vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
+                                               d v_val, dimVec v_grad, bool v_N, vec Un_val,
+                                               vecDimVec Un_grad, vec Un_valN, vecDimVec Un_gradN, Point<DIM> quadPoint, Point<DIM> normal, NumFlux* num_flux)
 {
   // Pro proudovou hustotu se nic na hranicich nedela.
   d result = 0.;
