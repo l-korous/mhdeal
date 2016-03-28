@@ -8,18 +8,19 @@
 const ui DG_ORDER = 0;
 // Zjemneni site
 const ui INIT_REF_NUM_X = 400;
-const ui INIT_REF_NUM_Y = 400;
+const ui INIT_REF_NUM_Y = 600;
 const ui INIT_REF_NUM_Z = 1;
 
-const dealii::Point<DIM> p1(-0.25, -0.25, -.25);
-const dealii::Point<DIM> p4(0.25, .25, .25);
+const dealii::Point<DIM> p1(-0.5, -0.75, -.01);
+const dealii::Point<DIM> p4(0.5, .75, .01);
 
 const d T_FINAL = 100.;
-const d DELTA_T = 1e-5;
+const d DELTA_T = 1e-7;
 const bool PRINT_ALGEBRA = false;
+const bool USE_DIRECT = true;
 // Delete VTK on start
 const bool DELETE_VTK = true;
-const ui ONLY_PRINT_EACH_N_TH_SOLUTION = 100;
+const ui ONLY_PRINT_EACH_N_TH_SOLUTION = 100000;
 
 const d GAMMA = 5.0 / 3.0;  // monoatomic gas in 3D
 const d ETA = 1.0e-8;
