@@ -1,23 +1,26 @@
-#include "definitions.h"
-#include "mhdSolver.h"
+#include "util.h"
+#include "equations.h"
+#include "flux.h"
+#include "parameters.h"
+#include "problem.h"
 
-using namespace dealii;
-
-int main()
+int main(int argc, char *argv[])
 {
-  if (DELETE_VTK)
-  {
-#ifdef _MSC_VER
-    system("del *.vtk");
-#else
-    system("rm *.vtk");
-#endif
-  }
-
   try
   {
-    MHDSolver feProblem;
-    feProblem.run();
+    using namespace dealii;
+
+    if (argc != 2)
+    {
+      std::cout << "Usage:" << argv[0] << " input_file" << std::endl;
+      std::exit(1);
+    }
+
+    Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, dealii::numbers::invalid_unsigned_int);
+
+    Parameters<2> parameters;
+    Problem<2> problem(parameters);
+    problem.run();
   }
   catch (std::exception &exc)
   {

@@ -1,0 +1,1 @@
+extern const double gas_gamma = 1.4;
