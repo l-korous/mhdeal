@@ -19,8 +19,11 @@ SET(TARGET_SRC
   main.cpp
   util.cpp
   util.h
-  equations.cpp
   equations.h
+  equationsEuler.cpp
+  equationsEuler.h
+  equationsMhd.cpp
+  equationsMhd.h
   parameters.cpp
   parameters.h
   problem.cpp

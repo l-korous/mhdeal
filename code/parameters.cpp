@@ -1,12 +1,12 @@
 #include "parameters.h"
 
-template<int dim>
-Parameters<dim>::InitialCondition::InitialCondition() : Function<dim>(Equations<dim>::n_components)
+template <EquationsType equationsType, int dim>
+InitialCondition<equationsType, dim>::InitialCondition() : Function<dim>(Equations<equationsType, dim>::n_components)
 {
 };
 
-template<int dim>
-double Parameters<dim>::InitialCondition::value(const Point<dim> &p, const unsigned int  component = 0) const
+template <EquationsType equationsType, int dim>
+double InitialCondition<equationsType, dim>::value(const Point<dim> &p, const unsigned int  component = 0) const
 {
   double x = p(0);
   double y = p(1);
@@ -26,14 +26,38 @@ double Parameters<dim>::InitialCondition::value(const Point<dim> &p, const unsig
   }
 };
 
-template <int dim>
-Parameters<dim>::BoundaryConditions::BoundaryConditions()
-{}
-
-template <int dim>
-void Parameters<dim>::bc_vector_value(int boundary_id, const std::vector<Point<dim> > &points, std::vector<Vector<double> > & result)
+template <EquationsType equationsType, int dim>
+BoundaryConditions<equationsType, dim>::BoundaryConditions()
 {
-  for (int j = 0; j < Equations<dim>::n_components; j++)
+  for (unsigned int di = 0; di < Equations<equationsType, dim>::n_components; ++di)
+    kind[0][di] = Equations<equationsType, dim>::outflow_boundary;
+
+  for (unsigned int di = 0; di < dim; ++di)
+    kind[1][di] = Equations<equationsType, dim>::no_penetration_boundary;
+
+  for (unsigned int di = dim; di < Equations<equationsType, dim>::n_components; ++di)
+    kind[1][di] = Equations<equationsType, dim>::outflow_boundary;
+
+  for (unsigned int di = 0; di < Equations<equationsType, dim>::n_components; ++di)
+    kind[2][di] = Equations<equationsType, dim>::outflow_boundary;
+
+  for (unsigned int di = 0; di < dim; ++di)
+    kind[3][di] = Equations<equationsType, dim>::no_penetration_boundary;
+
+  for (unsigned int di = dim; di < Equations<equationsType, dim>::n_components; ++di)
+    kind[3][di] = Equations<equationsType, dim>::outflow_boundary;
+
+  for (unsigned int di = 0; di < dim; ++di)
+    kind[4][di] = Equations<equationsType, dim>::no_penetration_boundary;
+
+  for (unsigned int di = dim; di < Equations<equationsType, dim>::n_components; ++di)
+    kind[4][di] = Equations<equationsType, dim>::outflow_boundary;
+};
+
+template <EquationsType equationsType, int dim>
+void BoundaryConditions<equationsType, dim>::bc_vector_value(int boundary_id, const std::vector<Point<dim> > &points, std::vector<Vector<double> > & result) const
+{
+  for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
   {
     for (int i = 0; i < points.size(); i++)
       result[i][j] = 0.;
@@ -43,30 +67,6 @@ void Parameters<dim>::bc_vector_value(int boundary_id, const std::vector<Point<d
 template <int dim>
 Parameters<dim>::Parameters()
 {
-  for (unsigned int di = 0; di < Equations<dim>::n_components; ++di)
-    boundary_conditions[0].kind[di] = Equations<dim>::outflow_boundary;
-
-  for (unsigned int di = 0; di < dim; ++di)
-    boundary_conditions[1].kind[di] = Equations<dim>::no_penetration_boundary;
-
-  for (unsigned int di = dim; di < Equations<dim>::n_components; ++di)
-    boundary_conditions[1].kind[di] = Equations<dim>::outflow_boundary;
-
-  for (unsigned int di = 0; di < Equations<dim>::n_components; ++di)
-    boundary_conditions[2].kind[di] = Equations<dim>::outflow_boundary;
-
-  for (unsigned int di = 0; di < dim; ++di)
-    boundary_conditions[3].kind[di] = Equations<dim>::no_penetration_boundary;
-
-  for (unsigned int di = dim; di < Equations<dim>::n_components; ++di)
-    boundary_conditions[3].kind[di] = Equations<dim>::outflow_boundary;
-
-  for (unsigned int di = 0; di < dim; ++di)
-    boundary_conditions[4].kind[di] = Equations<dim>::no_penetration_boundary;
-
-  for (unsigned int di = dim; di < Equations<dim>::n_components; ++di)
-    boundary_conditions[4].kind[di] = Equations<dim>::outflow_boundary;
-
   this->mesh_filename = "slide.inp";
   this->final_time = 10.;
   this->time_step = .01;
@@ -81,7 +81,7 @@ Parameters<dim>::Parameters()
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
 
-  this->polynomial_order = 1;
+  this->polynomial_order = 0;
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-8;
 
@@ -96,3 +96,9 @@ Parameters<dim>::Parameters()
 
 template class Parameters<2>;
 template class Parameters<3>;
+
+template class BoundaryConditions<EquationsTypeEuler, 2>;
+template class BoundaryConditions<EquationsTypeEuler, 3>;
+
+template class InitialCondition<EquationsTypeEuler, 2>;
+template class InitialCondition<EquationsTypeEuler, 3>;

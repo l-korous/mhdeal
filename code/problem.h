@@ -1,13 +1,13 @@
 #include "util.h"
-#include "equations.h"
-#include "flux.h"
+#include "equationsEuler.h"
+#include "equationsMhd.h"
 #include "parameters.h"
 
-template <int dim>
+template <EquationsType equationsType, int dim>
 class Problem
 {
 public:
-  Problem(Parameters<dim>& parameters);
+  Problem(Parameters<dim>& parameters, Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
   void run();
 
 private:
@@ -27,7 +27,7 @@ private:
 
   void output_results() const;
 
-  Triangulation<dim> triangulation;
+  Triangulation<dim>& triangulation;
 
   const MappingQ1<dim> mapping;
 
@@ -50,6 +50,8 @@ private:
   TrilinosWrappers::SparseMatrix system_matrix;
 
   Parameters<dim>& parameters;
+  InitialCondition<equationsType, dim>& initial_condition;
+  BoundaryConditions<equationsType, dim>& boundary_conditions;
 
   ConditionalOStream              verbose_cout;
 };

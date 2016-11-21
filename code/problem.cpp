@@ -1,13 +1,13 @@
 #include "problem.h"
 
-template <int dim>
-Problem<dim>::Problem(Parameters<dim>& parameters) : parameters(parameters), mapping(), fe(FE_DGQ<dim>(parameters.polynomial_order), Equations<dim>::n_components),
+template <EquationsType equationsType, int dim>
+Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) : parameters(parameters), triangulation(triangulation), initial_condition(initial_condition), boundary_conditions(boundary_conditions), mapping(), fe(FE_DGQ<dim>(parameters.polynomial_order), Equations<equationsType, dim>::n_components),
 dof_handler(triangulation), quadrature(2 * parameters.polynomial_order + 1), face_quadrature(2 * parameters.polynomial_order + 1), verbose_cout(std::cout, false)
 {
 }
 
-template <int dim>
-void Problem<dim>::setup_system()
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::setup_system()
 {
   DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp);
@@ -15,8 +15,8 @@ void Problem<dim>::setup_system()
   system_matrix.reinit(dsp);
 }
 
-template <int dim>
-void Problem<dim>::assemble_system()
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::assemble_system()
 {
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
@@ -111,20 +111,20 @@ void Problem<dim>::assemble_system()
   }
 }
 
-template <int dim>
+template <EquationsType equationsType, int dim>
 void
-Problem<dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index> &dof_indices)
+Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index> &dof_indices)
 {
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
 
-  Table<2, Sacado::Fad::DFad<double> > W(n_q_points, Equations<dim>::n_components);
+  Table<2, Sacado::Fad::DFad<double> > W(n_q_points, Equations<equationsType, dim>::n_components);
 
-  Table<2, double> W_old(n_q_points, Equations<dim>::n_components);
+  Table<2, double> W_old(n_q_points, Equations<equationsType, dim>::n_components);
 
-  Table<3, Sacado::Fad::DFad<double> > grad_W(n_q_points, Equations<dim>::n_components, dim);
+  Table<3, Sacado::Fad::DFad<double> > grad_W(n_q_points, Equations<equationsType, dim>::n_components, dim);
 
-  Table<3, double> grad_W_old(n_q_points, Equations<dim>::n_components, dim);
+  Table<3, double> grad_W_old(n_q_points, Equations<equationsType, dim>::n_components, dim);
 
   std::vector<double> residual_derivatives(dofs_per_cell);
 
@@ -166,7 +166,7 @@ Problem<dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<ty
   // above. Before this, we add another loop that initializes all the fad
   // variables to zero:
   for (unsigned int q = 0; q < n_q_points; ++q)
-    for (unsigned int c = 0; c < Equations<dim>::n_components; ++c)
+    for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
     {
       W[q][c] = 0;
       W_old[q][c] = 0;
@@ -200,20 +200,20 @@ Problem<dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<ty
   // autodifferentiation variables, so that the Jacobian contributions can
   // later easily be computed from it:
 
-  std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<dim>::n_components > > flux(n_q_points);
+  std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > flux(n_q_points);
 
-  std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<dim>::n_components > > flux_old(n_q_points);
+  std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > flux_old(n_q_points);
 
-  std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<dim>::n_components> > forcing(n_q_points);
+  std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > forcing(n_q_points);
 
-  std::vector < std_cxx11::array< double, Equations<dim>::n_components> > forcing_old(n_q_points);
+  std::vector < std_cxx11::array< double, Equations<equationsType, dim>::n_components> > forcing_old(n_q_points);
 
   for (unsigned int q = 0; q < n_q_points; ++q)
   {
-    Equations<dim>::compute_flux_matrix(W_old[q], flux_old[q]);
-    Equations<dim>::compute_forcing_vector(W_old[q], forcing_old[q]);
-    Equations<dim>::compute_flux_matrix(W[q], flux[q]);
-    Equations<dim>::compute_forcing_vector(W[q], forcing[q]);
+    Equations<equationsType, dim>::compute_flux_matrix(W_old[q], flux_old[q]);
+    Equations<equationsType, dim>::compute_forcing_vector(W_old[q], forcing_old[q]);
+    Equations<equationsType, dim>::compute_flux_matrix(W[q], flux[q]);
+    Equations<equationsType, dim>::compute_forcing_vector(W[q], forcing[q]);
   }
 
   // We now have all of the pieces in place, so perform the assembly.  We
@@ -271,10 +271,13 @@ Problem<dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<ty
         R_i -= (parameters.theta * flux[point][component_i][d] + (1.0 - parameters.theta) * flux_old[point][component_i][d])
         * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
 
-      for (unsigned int d = 0; d<dim; d++)
-        R_i += std::pow(fe_v.get_cell()->diameter(), 2.0)
-        * (parameters.theta * grad_W[point][component_i][d] + (1.0 - parameters.theta) * grad_W_old[point][component_i][d])
-        * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+      if (this->parameters.polynomial_order)
+      {
+        for (unsigned int d = 0; d < dim; d++)
+          R_i += std::pow(fe_v.get_cell()->diameter(), 2.0)
+          * (parameters.theta * grad_W[point][component_i][d] + (1.0 - parameters.theta) * grad_W_old[point][component_i][d])
+          * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+      }
 
       R_i -= (parameters.theta  * forcing[point][component_i] + (1.0 - parameters.theta) * forcing_old[point][component_i])
         * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
@@ -295,9 +298,9 @@ Problem<dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<ty
   }
 }
 
-template <int dim>
+template <EquationsType equationsType, int dim>
 void
-Problem<dim>::assemble_face_term(const unsigned int           face_no,
+Problem<equationsType, dim>::assemble_face_term(const unsigned int           face_no,
   const FEFaceValuesBase<dim> &fe_v,
   const FEFaceValuesBase<dim> &fe_v_neighbor,
   const std::vector<types::global_dof_index> &dof_indices,
@@ -328,8 +331,8 @@ Problem<dim>::assemble_face_term(const unsigned int           face_no,
     }
   }
 
-  Table<2, Sacado::Fad::DFad<double> > Wplus(n_q_points, Equations<dim>::n_components), Wminus(n_q_points, Equations<dim>::n_components);
-  Table<2, double> Wplus_old(n_q_points, Equations<dim>::n_components), Wminus_old(n_q_points, Equations<dim>::n_components);
+  Table<2, Sacado::Fad::DFad<double> > Wplus(n_q_points, Equations<equationsType, dim>::n_components), Wminus(n_q_points, Equations<equationsType, dim>::n_components);
+  Table<2, double> Wplus_old(n_q_points, Equations<equationsType, dim>::n_components), Wminus_old(n_q_points, Equations<equationsType, dim>::n_components);
 
   for (unsigned int q = 0; q < n_q_points; ++q)
   {
@@ -370,20 +373,18 @@ Problem<dim>::assemble_face_term(const unsigned int           face_no,
   // that would otherwise be tremendously complicated.
   else
   {
-    Assert(boundary_id < Parameters<dim>::max_n_boundaries, ExcIndexRange(boundary_id, 0, Parameters<dim>::max_n_boundaries));
-
-    std::vector<Vector<double> > boundary_values(n_q_points, Vector<double>(Equations<dim>::n_components));
-    Parameters<dim>::bc_vector_value(boundary_id, fe_v.get_quadrature_points(), boundary_values);
+    std::vector<Vector<double> > boundary_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
+    boundary_conditions.bc_vector_value(boundary_id, fe_v.get_quadrature_points(), boundary_values);
 
     for (unsigned int q = 0; q < n_q_points; q++)
     {
-      Equations<dim>::compute_Wminus(parameters.boundary_conditions[boundary_id].kind, fe_v.normal_vector(q), Wplus[q], boundary_values[q], Wminus[q]);
-      Equations<dim>::compute_Wminus(parameters.boundary_conditions[boundary_id].kind, fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
+      Equations<equationsType, dim>::compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus[q], boundary_values[q], Wminus[q]);
+      Equations<equationsType, dim>::compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
     }
   }
 
-  std::vector< std_cxx11::array < Sacado::Fad::DFad<double>, Equations<dim>::n_components> > normal_fluxes(n_q_points);
-  std::vector< std_cxx11::array < double, Equations<dim>::n_components> > normal_fluxes_old(n_q_points);
+  std::vector< std_cxx11::array < Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > normal_fluxes(n_q_points);
+  std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
 
   double alpha;
 
@@ -402,8 +403,8 @@ Problem<dim>::assemble_face_term(const unsigned int           face_no,
 
   for (unsigned int q = 0; q < n_q_points; ++q)
   {
-    Equations<dim>::numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], alpha, normal_fluxes[q]);
-    Equations<dim>::numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], alpha, normal_fluxes_old[q]);
+    Equations<equationsType, dim>::numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], alpha, normal_fluxes[q]);
+    Equations<equationsType, dim>::numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], alpha, normal_fluxes_old[q]);
   }
 
   std::vector<double> residual_derivatives(dofs_per_cell);
@@ -438,9 +439,9 @@ Problem<dim>::assemble_face_term(const unsigned int           face_no,
   }
 }
 
-template <int dim>
+template <EquationsType equationsType, int dim>
 std::pair<unsigned int, double>
-Problem<dim>::solve(Vector<double> &newton_update)
+Problem<equationsType, dim>::solve(Vector<double> &newton_update)
 {
   if (parameters.solver == Parameters<dim>::direct)
   {
@@ -512,15 +513,17 @@ Problem<dim>::solve(Vector<double> &newton_update)
   }
 }
 
-template <int dim>
-void Problem<dim>::output_results() const
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::output_results() const
 {
-  typename Equations<dim>::Postprocessor postprocessor(parameters.schlieren_plot);
+  typename Equations<equationsType, dim>::Postprocessor postprocessor;
 
   DataOut<dim> data_out;
   data_out.attach_dof_handler(dof_handler);
 
-  data_out.add_data_vector(current_solution, Equations<dim>::component_names(), DataOut<dim>::type_dof_data, Equations<dim>::component_interpretation());
+  data_out.add_data_vector(current_solution, Equations<equationsType, dim>::component_names(),
+    DataOut<dim>::type_dof_data, Equations<equationsType, dim>::component_interpretation());
+
   data_out.add_data_vector(current_solution, postprocessor);
 
   data_out.build_patches();
@@ -533,19 +536,9 @@ void Problem<dim>::output_results() const
   ++output_file_number;
 }
 
-template <int dim>
-void Problem<dim>::run()
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::run()
 {
-  {
-    GridIn<dim> grid_in;
-    grid_in.attach_triangulation(triangulation);
-
-    std::ifstream input_file(parameters.mesh_filename.c_str());
-    Assert(input_file, ExcFileNotOpen(parameters.mesh_filename.c_str()));
-
-    grid_in.read_ucd(input_file);
-  }
-
   dof_handler.clear();
   dof_handler.distribute_dofs(fe);
 
@@ -557,7 +550,7 @@ void Problem<dim>::run()
 
   setup_system();
 
-  VectorTools::interpolate(dof_handler, parameters.initial_condition, old_solution);
+  VectorTools::interpolate(dof_handler, initial_condition, old_solution);
   current_solution = old_solution;
   newton_initial_guess = old_solution;
 
@@ -624,5 +617,5 @@ void Problem<dim>::run()
   }
 }
 
-template class Problem<2>;
-template class Problem<3>;
+template class Problem<EquationsTypeEuler, 2>;
+template class Problem<EquationsTypeEuler, 3>;

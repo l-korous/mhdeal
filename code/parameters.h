@@ -3,6 +3,8 @@
 
 #include "util.h"
 #include "equations.h"
+#include "equationsEuler.h"
+#include "equationsMhd.h"
 
 template <int dim>
 class Parameters
@@ -41,28 +43,26 @@ public:
 
   // Mesh
   std::string mesh_filename;
+};
 
-  // Initial condition
-  class InitialCondition : public Function<dim>
-  {
-  public:
-    InitialCondition();
+// Initial condition
+template <EquationsType equationsType, int dim>
+class InitialCondition : public Function<dim>
+{
+public:
+  InitialCondition();
+  double value(const Point<dim> &p, const unsigned int  component = 0) const;
+};
 
-    double value(const Point<dim> &p, const unsigned int  component = 0) const;
-  };
-  InitialCondition initial_condition;
-
-  // Boundary conditions
-  static const unsigned int max_n_boundaries = 10;
-  class BoundaryConditions
-  {
-  public:
-    typename Equations<dim>::BoundaryKind kind[Equations<dim>::n_components];
-
-    BoundaryConditions();
-  };
-  BoundaryConditions  boundary_conditions[max_n_boundaries];
-  static void bc_vector_value(int boundary_no, const std::vector<Point<dim> > &points, std::vector<Vector<double> >&);
+// Boundary conditions
+template <EquationsType equationsType, int dim>
+class BoundaryConditions
+{
+public:
+  BoundaryConditions();
+  static const int max_n_boundaries = 10;
+  typename Equations<equationsType, dim>::BoundaryKind kind[max_n_boundaries][Equations<equationsType, dim>::n_components];
+  void bc_vector_value(int boundary_no, const std::vector<Point<dim> > &points, std::vector<Vector<double> >&) const;
 };
 
 #endif
