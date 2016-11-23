@@ -2,6 +2,11 @@
 #include "equationsEuler.h"
 
 template <int dim>
+Equations<EquationsTypeEuler, dim>::Equations(Parameters<dim>& parameters) : parameters(parameters)
+{
+}
+
+template <int dim>
 std::vector<std::string> Equations<EquationsTypeEuler, dim>::component_names()
 {
   std::vector<std::string> names(dim, "momentum");
@@ -14,25 +19,22 @@ std::vector<std::string> Equations<EquationsTypeEuler, dim>::component_names()
 template <int dim>
 std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<EquationsTypeEuler, dim>::component_interpretation()
 {
-  std::vector<DataComponentInterpretation::DataComponentInterpretation>
-    data_component_interpretation
-    (dim, DataComponentInterpretation::component_is_part_of_vector);
-  data_component_interpretation
-    .push_back(DataComponentInterpretation::component_is_scalar);
-  data_component_interpretation
-    .push_back(DataComponentInterpretation::component_is_scalar);
+  std::vector<DataComponentInterpretation::DataComponentInterpretation> data_component_interpretation(dim, DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
 
   return data_component_interpretation;
 }
 
 template <int dim>
 template <typename InputVector>
-typename InputVector::value_type Equations<EquationsTypeEuler, dim>::compute_kinetic_energy(const InputVector &W)
+typename InputVector::value_type Equations<EquationsTypeEuler, dim>::compute_kinetic_energy(const InputVector &W) const
 {
   typename InputVector::value_type kinetic_energy = 0;
+  
   for (unsigned int d = 0; d < dim; ++d)
-    kinetic_energy += W[first_momentum_component + d] *
-    W[first_momentum_component + d];
+    kinetic_energy += W[first_momentum_component + d] * W[first_momentum_component + d];
+
   kinetic_energy *= 1. / (2 * W[density_component]);
 
   return kinetic_energy;
@@ -40,15 +42,14 @@ typename InputVector::value_type Equations<EquationsTypeEuler, dim>::compute_kin
 
 template <int dim>
 template <typename InputVector>
-typename InputVector::value_type Equations<EquationsTypeEuler, dim>::compute_pressure(const InputVector &W)
+typename InputVector::value_type Equations<EquationsTypeEuler, dim>::compute_pressure(const InputVector &W) const
 {
-  return ((gas_gamma - 1.0) *
-    (W[energy_component] - compute_kinetic_energy(W)));
+  return ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W)));
 }
 
 template <int dim>
 template <typename InputVector>
-void Equations<EquationsTypeEuler, dim>::compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, Equations<EquationsTypeEuler, dim>::n_components > &flux)
+void Equations<EquationsTypeEuler, dim>::compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const
 {
   const typename InputVector::value_type pressure = compute_pressure(W);
 
@@ -68,11 +69,20 @@ void Equations<EquationsTypeEuler, dim>::compute_flux_matrix(const InputVector &
 }
 
 template <int dim>
+template <typename InputVector, typename ValueType>
+void Equations<EquationsTypeEuler, dim>::compute_jacobian_addition(double cell_diameter, const InputVector& grad_W, std_cxx11::array <std_cxx11::array <ValueType, dim>, n_components > &jacobian_addition) const
+{
+  for (unsigned int i = 0; i < n_components; ++i)
+    for (unsigned int d = 0; d < dim; ++d)
+      jacobian_addition[i][d] = std::pow(cell_diameter, 2.0) *  grad_W[i][d];
+}
+
+template <int dim>
 template <typename InputVector>
 void Equations<EquationsTypeEuler, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
-  const double alpha, std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux)
+  std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const
 {
-  std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, Equations<EquationsTypeEuler, dim>::n_components > iflux, oflux;
+  std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
 
   compute_flux_matrix(Wplus, iflux);
   compute_flux_matrix(Wminus, oflux);
@@ -83,13 +93,13 @@ void Equations<EquationsTypeEuler, dim>::numerical_normal_flux(const Tensor<1, d
     for (unsigned int d = 0; d < dim; ++d)
       normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
    
-    normal_flux[di] += 0.5*alpha*(Wplus[di] - Wminus[di]);
+    normal_flux[di] += 0.5*this->parameters.stabilization_value*(Wplus[di] - Wminus[di]);
   }
 }
 
 template <int dim>
 template <typename InputVector>
-void Equations<EquationsTypeEuler, dim>::compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing)
+void Equations<EquationsTypeEuler, dim>::compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const
 {
   // LK: Tohle u me budou samy nuly
   const double gravity = -1.0;
@@ -114,7 +124,7 @@ void Equations<EquationsTypeEuler, dim>::compute_Wminus(const BoundaryKind(&boun
   const Tensor<1, dim> &normal_vector,
   const DataVector     &Wplus,
   const Vector<double> &boundary_values,
-  const DataVector     &Wminus)
+  const DataVector     &Wminus) const
 {
   for (unsigned int c = 0; c < n_components; c++)
   {
@@ -151,7 +161,7 @@ void Equations<EquationsTypeEuler, dim>::compute_Wminus(const BoundaryKind(&boun
 }
 
 template <int dim>
-Equations<EquationsTypeEuler, dim>::Postprocessor::Postprocessor()
+Equations<EquationsTypeEuler, dim>::Postprocessor::Postprocessor(Equations<EquationsTypeEuler, dim>& equations) : equations(equations)
 {}
 
 template <int dim>
@@ -182,7 +192,7 @@ Equations<EquationsTypeEuler, dim>::Postprocessor::compute_derived_quantities_ve
       computed_quantities[q](d)
       = uh[q](first_momentum_component + d) / density;
 
-    computed_quantities[q](dim) = compute_pressure(uh[q]);
+    computed_quantities[q](dim) = equations.compute_pressure(uh[q]);
   }
 }
 

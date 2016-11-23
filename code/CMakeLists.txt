@@ -17,7 +17,6 @@ SET(TARGET "mhdeal")
 # page of the documentation.
 SET(TARGET_SRC
   main.cpp
-  util.cpp
   util.h
   equations.h
   equationsEuler.cpp
@@ -26,6 +25,10 @@ SET(TARGET_SRC
   equationsMhd.h
   parameters.cpp
   parameters.h
+  boundaryConditions.cpp
+  boundaryConditions.h
+  initialCondition.cpp
+  initialCondition.h
   problem.cpp
   problem.h
   )

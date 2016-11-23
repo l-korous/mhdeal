@@ -2,12 +2,14 @@
 #include "equationsEuler.h"
 #include "equationsMhd.h"
 #include "parameters.h"
+#include "initialCondition.h"
+#include "boundaryConditions.h"
 
 template <EquationsType equationsType, int dim>
 class Problem
 {
 public:
-  Problem(Parameters<dim>& parameters, Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
+  Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations, Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
   void run();
 
 private:
@@ -45,12 +47,16 @@ private:
 
   Vector<double> newton_initial_guess;
 
+  Equations<equationsType, dim>& equations;
+
   Vector<double> right_hand_side;
 
   TrilinosWrappers::SparseMatrix system_matrix;
 
   Parameters<dim>& parameters;
+
   InitialCondition<equationsType, dim>& initial_condition;
+
   BoundaryConditions<equationsType, dim>& boundary_conditions;
 
   ConditionalOStream              verbose_cout;

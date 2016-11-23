@@ -3,7 +3,7 @@
 
 enum EquationsType {
   EquationsTypeEuler,
-  equationsTypeMhd
+  EquationsTypeMhd
 };
 
 template <EquationsType equationsType, int dim>

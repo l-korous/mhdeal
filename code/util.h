@@ -46,6 +46,4 @@
 #include <Sacado.hpp>
 
 using namespace dealii;
-extern const double gas_gamma;
-
 #endif

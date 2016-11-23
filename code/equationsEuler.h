@@ -2,11 +2,14 @@
 #define _EQUATIONS_EULER_H
 
 #include "equations.h"
+#include "parameters.h"
 
 template <int dim>
 class Equations<EquationsTypeEuler, dim>
 {
 public:
+  Equations(Parameters<dim>& parameters);
+
   static const unsigned int n_components = dim + 2;
   static const unsigned int first_momentum_component = 0;
   static const unsigned int density_component = dim;
@@ -17,20 +20,23 @@ public:
   static std::vector<DataComponentInterpretation::DataComponentInterpretation> component_interpretation();
 
   template <typename InputVector>
-  static typename InputVector::value_type compute_kinetic_energy(const InputVector &W);
+  typename InputVector::value_type compute_kinetic_energy(const InputVector &W) const;
 
   template <typename InputVector>
-  static typename InputVector::value_type compute_pressure(const InputVector &W);
+  typename InputVector::value_type compute_pressure(const InputVector &W) const;
 
   template <typename InputVector>
-  static void compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, Equations<EquationsTypeEuler, dim>::n_components > &flux);
+  void compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const;
+
+  template <typename InputVector, typename ValueType>
+  void compute_jacobian_addition(double cell_diameter, const InputVector& grad_W, std_cxx11::array <std_cxx11::array <ValueType, dim>, n_components > &jacobian_addition) const;
 
   template <typename InputVector>
-  static void numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
-    const double alpha, std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux);
+  void numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
+    std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const;
 
   template <typename InputVector>
-  static void compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing);
+  void compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const;
 
   enum BoundaryKind
   {
@@ -39,14 +45,16 @@ public:
     no_penetration_boundary
   };
 
+  Parameters<dim>& parameters;
+
   template <typename DataVector>
-  static void compute_Wminus(const BoundaryKind(&boundary_kind)[n_components], const Tensor<1, dim> &normal_vector, const DataVector &Wplus, const Vector<double> &boundary_values,
-    const DataVector &Wminus);
+  void compute_Wminus(const BoundaryKind(&boundary_kind)[n_components], const Tensor<1, dim> &normal_vector, const DataVector &Wplus, const Vector<double> &boundary_values,
+    const DataVector &Wminus) const;
 
   class Postprocessor : public DataPostprocessor<dim>
   {
   public:
-    Postprocessor();
+    Postprocessor(Equations<EquationsTypeEuler, dim>& equations);
 
     virtual void compute_derived_quantities_vector(
       const std::vector<Vector<double> > &uh,
@@ -61,6 +69,8 @@ public:
     virtual std::vector<DataComponentInterpretation::DataComponentInterpretation> get_data_component_interpretation() const;
 
     virtual UpdateFlags get_needed_update_flags() const;
+  private:
+    Equations<EquationsTypeEuler, dim>& equations;
   };
 };
 

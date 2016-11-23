@@ -1,6 +1,4 @@
 #include "util.h"
-#include "equations.h"
-#include "parameters.h"
 #include "problem.h"
 
 #define DIMENSION 2
@@ -33,7 +31,11 @@ void load_mesh<3>(Triangulation<3>& triangulation, std::string mesh_filename)
 
   grid_in.read_ucd(input_file);
 
-  GridGenerator::extrude_triangulation(tempTriangulation, 3, 2.0, triangulation);
+  GridGenerator::extrude_triangulation(tempTriangulation, 2, 0.5, triangulation);
+
+  GridOut grid_out;
+  std::ofstream output_file("extrudedMesh.vtk");
+  grid_out.write_vtk(triangulation, output_file);
 }
 
 int main(int argc, char *argv[])
@@ -54,9 +56,10 @@ int main(int argc, char *argv[])
 
     Parameters<DIMENSION> parameters;
     load_mesh<DIMENSION>(triangulation, parameters.mesh_filename);
+    Equations<EquationsTypeEuler, DIMENSION> equations(parameters);
     InitialCondition<EquationsTypeEuler, DIMENSION> initial_condition;
     BoundaryConditions<EquationsTypeEuler, DIMENSION> boundary_conditions;
-    Problem<EquationsTypeEuler, DIMENSION> problem(parameters, triangulation, initial_condition, boundary_conditions);
+    Problem<EquationsTypeEuler, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     problem.run();
   }
   catch (std::exception &exc)

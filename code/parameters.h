@@ -3,8 +3,6 @@
 
 #include "util.h"
 #include "equations.h"
-#include "equationsEuler.h"
-#include "equationsMhd.h"
 
 template <int dim>
 class Parameters
@@ -18,8 +16,9 @@ public:
   double stabilization_value;
 
   // Output
-  bool schlieren_plot;
   double output_step;
+
+  double gas_gamma;
 
   // Linear solver
   enum SolverType { gmres, direct };
@@ -43,26 +42,6 @@ public:
 
   // Mesh
   std::string mesh_filename;
-};
-
-// Initial condition
-template <EquationsType equationsType, int dim>
-class InitialCondition : public Function<dim>
-{
-public:
-  InitialCondition();
-  double value(const Point<dim> &p, const unsigned int  component = 0) const;
-};
-
-// Boundary conditions
-template <EquationsType equationsType, int dim>
-class BoundaryConditions
-{
-public:
-  BoundaryConditions();
-  static const int max_n_boundaries = 10;
-  typename Equations<equationsType, dim>::BoundaryKind kind[max_n_boundaries][Equations<equationsType, dim>::n_components];
-  void bc_vector_value(int boundary_no, const std::vector<Point<dim> > &points, std::vector<Vector<double> >&) const;
 };
 
 #endif
