@@ -7,6 +7,7 @@ InitialCondition<equationsType, dim>::InitialCondition() : Function<dim>(Equatio
 {
 };
 
+template<>
 double InitialCondition<EquationsTypeEuler, 2>::value(const Point<2> &p, const unsigned int component) const
 {
   double x = p(0);
@@ -27,6 +28,7 @@ double InitialCondition<EquationsTypeEuler, 2>::value(const Point<2> &p, const u
   }
 };
 
+template<>
 double InitialCondition<EquationsTypeEuler, 3>::value(const Point<3> &p, const unsigned int component) const
 {
   double x = p(0);
@@ -50,6 +52,7 @@ double InitialCondition<EquationsTypeEuler, 3>::value(const Point<3> &p, const u
   }
 };
 
+template<>
 double InitialCondition<EquationsTypeMhd, 2>::value(const Point<2> &p, const unsigned int component) const
 {
   double x = p(0);
@@ -70,6 +73,7 @@ double InitialCondition<EquationsTypeMhd, 2>::value(const Point<2> &p, const uns
   }
 };
 
+template<>
 double InitialCondition<EquationsTypeMhd, 3>::value(const Point<3> &p, const unsigned int component) const
 {
   double x = p(0);

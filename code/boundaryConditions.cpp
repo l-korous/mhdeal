@@ -2,6 +2,7 @@
 #include "equationsEuler.h"
 #include "equationsMhd.h"
 
+template<>
 BoundaryConditions<EquationsTypeEuler, 2>::BoundaryConditions()
 {
   for (unsigned int di = 0; di < Equations<EquationsTypeEuler, 2>::n_components; ++di)
@@ -29,6 +30,7 @@ BoundaryConditions<EquationsTypeEuler, 2>::BoundaryConditions()
     kind[4][di] = Equations<EquationsTypeEuler, 2>::outflow_boundary;
 };
 
+template<>
 BoundaryConditions<EquationsTypeEuler, 3>::BoundaryConditions()
 {
   for (unsigned int di = 0; di < Equations<EquationsTypeEuler, 3>::n_components; ++di)
@@ -56,6 +58,7 @@ BoundaryConditions<EquationsTypeEuler, 3>::BoundaryConditions()
     kind[4][di] = Equations<EquationsTypeEuler, 3>::outflow_boundary;
 };
 
+template<>
 BoundaryConditions<EquationsTypeMhd, 2>::BoundaryConditions()
 {
   for (unsigned int i = 0; i < max_n_boundaries; ++i)
@@ -63,6 +66,7 @@ BoundaryConditions<EquationsTypeMhd, 2>::BoundaryConditions()
       kind[i][di] = Equations<EquationsTypeMhd, 2>::outflow_boundary;
 };
 
+template<>
 BoundaryConditions<EquationsTypeMhd, 3>::BoundaryConditions()
 {
   for (unsigned int i = 0; i < max_n_boundaries; ++i)
