@@ -1,37 +1,38 @@
 #include "util.h"
 #include "problem.h"
 
-#define DIMENSION 2
+#define DIMENSION 3
+#define EQUATIONS EquationsTypeEuler
 
 template<int dim>
-void load_mesh(Triangulation<dim>& triangulation, std::string mesh_filename);
+void load_mesh(Triangulation<dim>& triangulation, Parameters<DIMENSION>& parameters);
 
 template<>
-void load_mesh<2>(Triangulation<2>& triangulation, std::string mesh_filename)
+void load_mesh<2>(Triangulation<2>& triangulation, Parameters<DIMENSION>& parameters)
 {
   GridIn<2> grid_in;
   grid_in.attach_triangulation(triangulation);
 
-  std::ifstream input_file(mesh_filename.c_str());
-  Assert(input_file, ExcFileNotOpen(mesh_filename.c_str()));
+  std::ifstream input_file(parameters.mesh_filename.c_str());
+  Assert(input_file, ExcFileNotOpen(parameters.mesh_filename.c_str()));
 
   grid_in.read_ucd(input_file);
 }
 
 template<>
-void load_mesh<3>(Triangulation<3>& triangulation, std::string mesh_filename)
+void load_mesh<3>(Triangulation<3>& triangulation, Parameters<DIMENSION>& parameters)
 {
   Triangulation<2> tempTriangulation;
   GridIn<2> grid_in;
 
   grid_in.attach_triangulation(tempTriangulation);
 
-  std::ifstream input_file(mesh_filename.c_str());
-  Assert(input_file, ExcFileNotOpen(mesh_filename.c_str()));
+  std::ifstream input_file(parameters.mesh_filename.c_str());
+  Assert(input_file, ExcFileNotOpen(parameters.mesh_filename.c_str()));
 
   grid_in.read_ucd(input_file);
 
-  GridGenerator::extrude_triangulation(tempTriangulation, 2, 0.5, triangulation);
+  GridGenerator::extrude_triangulation(tempTriangulation, parameters.MeshSlicesInZDirection, 0.5, triangulation);
 
   GridOut grid_out;
   std::ofstream output_file("extrudedMesh.vtk");
@@ -55,11 +56,11 @@ int main(int argc, char *argv[])
     Triangulation<DIMENSION> triangulation;
 
     Parameters<DIMENSION> parameters;
-    load_mesh<DIMENSION>(triangulation, parameters.mesh_filename);
-    Equations<EquationsTypeEuler, DIMENSION> equations(parameters);
-    InitialCondition<EquationsTypeEuler, DIMENSION> initial_condition;
-    BoundaryConditions<EquationsTypeEuler, DIMENSION> boundary_conditions;
-    Problem<EquationsTypeEuler, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+    load_mesh<DIMENSION>(triangulation, parameters);
+    Equations<EQUATIONS, DIMENSION> equations(parameters);
+    InitialCondition<EQUATIONS, DIMENSION> initial_condition;
+    BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     problem.run();
   }
   catch (std::exception &exc)

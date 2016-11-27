@@ -89,9 +89,18 @@ double InitialCondition<EquationsTypeMhd, 3>::value(const Point<3> &p, const uns
     return 0.;
     break;
   case 3:
-    return 10. * (x < -0.7)*(y > 0.3)*(y < 0.45) + (1 - (x < -0.7)*(y > 0.3)*(y < 0.45));
+    return 0.;
     break;
   case 4:
+    return 0.;
+    break;
+  case 5:
+    return 0.;
+    break;
+  case 6:
+    return 10. * (x < -0.7)*(y > 0.3)*(y < 0.45) + (1 - (x < -0.7)*(y > 0.3)*(y < 0.45));
+    break;
+  case 7:
     return 2.5 * (1.5 - y);
     break;
   }

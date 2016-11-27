@@ -485,3 +485,6 @@ void Problem<equationsType, dim>::run()
 
 template class Problem<EquationsTypeEuler, 2>;
 template class Problem<EquationsTypeEuler, 3>;
+
+template class Problem<EquationsTypeMhd, 2>;
+template class Problem<EquationsTypeMhd, 3>;

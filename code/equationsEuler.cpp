@@ -107,11 +107,11 @@ void Equations<EquationsTypeEuler, dim>::compute_forcing_vector(const InputVecto
   for (unsigned int c = 0; c < n_components; ++c)
     switch (c)
     {
-    case first_momentum_component + dim - 1:
+    case first_momentum_component + 1:
       forcing[c] = gravity * W[density_component];
       break;
     case energy_component:
-      forcing[c] = gravity * W[first_momentum_component + dim - 1];
+      forcing[c] = gravity * W[first_momentum_component + 1];
       break;
     default:
       forcing[c] = 0;
@@ -189,8 +189,7 @@ Equations<EquationsTypeEuler, dim>::Postprocessor::compute_derived_quantities_ve
     const double density = uh[q](density_component);
 
     for (unsigned int d = 0; d < dim; ++d)
-      computed_quantities[q](d)
-      = uh[q](first_momentum_component + d) / density;
+      computed_quantities[q](d) = uh[q](first_momentum_component + d) / density;
 
     computed_quantities[q](dim) = equations.compute_pressure(uh[q]);
   }

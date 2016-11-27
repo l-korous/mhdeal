@@ -12,8 +12,9 @@ public:
 
   static const unsigned int n_components = 2 * dim + 2;
   static const unsigned int first_momentum_component = 0;
-  static const unsigned int density_component = dim;
-  static const unsigned int energy_component = dim + 1;
+  static const unsigned int first_magnetic_flux_component = dim;
+  static const unsigned int density_component = 2 * dim;
+  static const unsigned int energy_component = 2 * dim + 1;
 
   static std::vector<std::string> component_names();
 
@@ -37,6 +38,12 @@ public:
 
   template <typename InputVector>
   void compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const;
+
+  template <typename InputVector>
+  void Q(std_cxx11::array<typename InputVector::value_type, n_components> &result, const InputVector &W, const Tensor<1, dim> &normal) const;
+
+  template <typename InputVector>
+  void Q_inv(std_cxx11::array<typename InputVector::value_type, n_components> &result, std_cxx11::array<typename InputVector::value_type, n_components> &F, const Tensor<1, dim> &normal) const;
 
   enum BoundaryKind
   {

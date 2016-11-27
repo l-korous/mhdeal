@@ -56,6 +56,18 @@ BoundaryConditions<EquationsTypeEuler, 3>::BoundaryConditions()
 
   for (unsigned int di = 3; di < Equations<EquationsTypeEuler, 3>::n_components; ++di)
     kind[4][di] = Equations<EquationsTypeEuler, 3>::outflow_boundary;
+
+  for (unsigned int di = 0; di < 3; ++di)
+    kind[5][di] = Equations<EquationsTypeEuler, 3>::no_penetration_boundary;
+
+  for (unsigned int di = 3; di < Equations<EquationsTypeEuler, 3>::n_components; ++di)
+    kind[5][di] = Equations<EquationsTypeEuler, 3>::outflow_boundary;
+
+  for (unsigned int di = 0; di < 3; ++di)
+    kind[6][di] = Equations<EquationsTypeEuler, 3>::no_penetration_boundary;
+
+  for (unsigned int di = 3; di < Equations<EquationsTypeEuler, 3>::n_components; ++di)
+    kind[6][di] = Equations<EquationsTypeEuler, 3>::outflow_boundary;
 };
 
 template<>

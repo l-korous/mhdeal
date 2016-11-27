@@ -42,6 +42,7 @@ public:
 
   // Mesh
   std::string mesh_filename;
+  int MeshSlicesInZDirection;
 };
 
 #endif

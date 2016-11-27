@@ -6,6 +6,7 @@ template <int dim>
 Parameters<dim>::Parameters()
 {
   this->mesh_filename = "slide.inp";
+  this->MeshSlicesInZDirection = 2;
   this->final_time = 10.;
   this->time_step = .01;
   this->theta = 0.5;
