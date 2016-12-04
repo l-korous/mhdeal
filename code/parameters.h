@@ -8,12 +8,12 @@ template <int dim>
 class Parameters
 {
 public:
-  Parameters();
+  Parameters(Triangulation<dim> &triangulation);
 
   // Flux
-  enum StabilizationKind { constant_stabilization, mesh_dependent_stabilization, no_stabilization };
-  StabilizationKind stabilization_kind;
-  double stabilization_value;
+  enum NumFluxType { hlld, lax_friedrich };
+  NumFluxType num_flux_type;
+  double lax_friedrich_stabilization_value;
 
   // Output
   double output_step;
@@ -33,8 +33,8 @@ public:
   double ilut_drop;
 
   // Global
-  double time_step, final_time;
-  double theta;
+  double time_step, final_time, theta;
+  double time_step_after_initialization, initialization_time, theta_after_initialization;
   bool is_stationary;
   int polynomial_order;
   int max_nonlinear_iterations;
@@ -43,6 +43,8 @@ public:
   // Mesh
   std::string mesh_filename;
   int MeshSlicesInZDirection;
+  double cube_left, cube_right;
+  unsigned int uniform_refinements;
 };
 
 #endif

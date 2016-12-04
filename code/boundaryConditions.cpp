@@ -71,14 +71,6 @@ BoundaryConditions<EquationsTypeEuler, 3>::BoundaryConditions()
 };
 
 template<>
-BoundaryConditions<EquationsTypeMhd, 2>::BoundaryConditions()
-{
-  for (unsigned int i = 0; i < max_n_boundaries; ++i)
-    for (unsigned int di = 0; di < Equations<EquationsTypeMhd, 2>::n_components; ++di)
-      kind[i][di] = Equations<EquationsTypeMhd, 2>::outflow_boundary;
-};
-
-template<>
 BoundaryConditions<EquationsTypeMhd, 3>::BoundaryConditions()
 {
   for (unsigned int i = 0; i < max_n_boundaries; ++i)
@@ -98,5 +90,4 @@ void BoundaryConditions<equationsType, dim>::bc_vector_value(int boundary_id, co
 
 template class BoundaryConditions<EquationsTypeEuler, 2>;
 template class BoundaryConditions<EquationsTypeEuler, 3>;
-template class BoundaryConditions<EquationsTypeMhd, 2>;
 template class BoundaryConditions<EquationsTypeMhd, 3>;

@@ -93,7 +93,7 @@ void Equations<EquationsTypeEuler, dim>::numerical_normal_flux(const Tensor<1, d
     for (unsigned int d = 0; d < dim; ++d)
       normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
    
-    normal_flux[di] += 0.5*this->parameters.stabilization_value*(Wplus[di] - Wminus[di]);
+    normal_flux[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
   }
 }
 

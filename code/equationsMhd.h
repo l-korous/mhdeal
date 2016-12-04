@@ -11,9 +11,9 @@ public:
   Equations(Parameters<dim>& parameters);
 
   static const unsigned int n_components = 2 * dim + 2;
-  static const unsigned int first_momentum_component = 0;
-  static const unsigned int first_magnetic_flux_component = dim;
-  static const unsigned int density_component = 2 * dim;
+  static const unsigned int first_momentum_component = 1;
+  static const unsigned int first_magnetic_flux_component = dim + 1;
+  static const unsigned int density_component = 0;
   static const unsigned int energy_component = 2 * dim + 1;
 
   static std::vector<std::string> component_names();
@@ -22,6 +22,9 @@ public:
 
   template <typename InputVector>
   typename InputVector::value_type compute_kinetic_energy(const InputVector &W) const;
+
+  template <typename InputVector>
+  typename InputVector::value_type compute_magnetic_energy(const InputVector &W) const;
 
   template <typename InputVector>
   typename InputVector::value_type compute_pressure(const InputVector &W) const;

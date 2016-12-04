@@ -9,18 +9,21 @@ Equations<EquationsTypeMhd, dim>::Equations(Parameters<dim>& parameters) : param
 template <int dim>
 std::vector<std::string> Equations<EquationsTypeMhd, dim>::component_names()
 {
-  return{ "momentum", "momentum", "momentum", "density", "energy", "magnetic_field", "magnetic_field", "magnetic_field" };
+  return{ "density", "momentum", "momentum", "momentum", "magnetic_field", "magnetic_field", "magnetic_field", "energy" };
 }
 
 template <int dim>
 std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<EquationsTypeMhd, dim>::component_interpretation()
 {
-  std::vector<DataComponentInterpretation::DataComponentInterpretation> data_component_interpretation(dim, DataComponentInterpretation::component_is_part_of_vector);
+  std::vector<DataComponentInterpretation::DataComponentInterpretation> data_component_interpretation;
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
-  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
 
   return data_component_interpretation;
 }
@@ -39,11 +42,20 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinet
   return kinetic_energy;
 }
 
+template <>
+template <typename InputVector>
+typename InputVector::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W) const
+{
+  return 0.5 * ( W[first_magnetic_flux_component] * W[first_magnetic_flux_component]
+    + W[first_magnetic_flux_component + 1] * W[first_magnetic_flux_component + 1]
+    + W[first_magnetic_flux_component + 2] * W[first_magnetic_flux_component + 2]);
+}
+
 template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
 {
-  return ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W)));
+  return ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
@@ -51,20 +63,49 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const
 {
   const typename InputVector::value_type pressure = compute_pressure(W);
+  typename InputVector::value_type kinetic_energy = compute_kinetic_energy(W);
+  typename InputVector::value_type magnetic_energy = compute_magnetic_energy(W);
+  typename InputVector::value_type energy_item[dim];
+    
+  for (unsigned int d = 0; d<dim; ++d)
+    flux[density_component][d] = W[first_momentum_component + d];
+
+  for (unsigned int d = 0; d<dim; ++d)
+  {
+    for (unsigned int e = 0; e < dim; ++e)
+    {
+      flux[first_momentum_component + d][e] = W[first_momentum_component + d] * W[first_momentum_component + e] / W[density_component];
+      flux[first_momentum_component + d][e] -= W[first_magnetic_flux_component + d] * W[first_magnetic_flux_component + e];
+    }
+
+    flux[first_momentum_component + d][d] += pressure;
+    flux[first_momentum_component + d][d] += magnetic_energy;
+  }
+
+  for (unsigned int d = 0; d<dim; ++d)
+  {
+    for (unsigned int e = 0; e < dim; ++e)
+    {
+      flux[first_magnetic_flux_component + d][e] = W[first_momentum_component + d] * W[first_magnetic_flux_component + e] / W[density_component];
+      flux[first_magnetic_flux_component + d][e] -= W[first_magnetic_flux_component + d] * W[first_momentum_component + e] / W[density_component];
+    }
+  }
+
+  energy_item[0]
+    = (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component + 2])
+    + (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component + 1]);
+  energy_item[1]
+    = (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component])
+    + (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 2]);
+  energy_item[2] 
+    = (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 1])
+    + (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component]);
 
   for (unsigned int d = 0; d < dim; ++d)
   {
-    for (unsigned int e = 0; e < dim; ++e)
-      flux[first_momentum_component + d][e] = W[first_momentum_component + d] * W[first_momentum_component + e] / W[density_component];
-
-    flux[first_momentum_component + d][d] += pressure;
+    flux[energy_component][d] = (W[first_momentum_component + d] / W[density_component]) * ((parameters.gas_gamma * pressure / (parameters.gas_gamma - 1.0)) + kinetic_energy);
+    flux[energy_component][d] += energy_item[d];
   }
-
-  for (unsigned int d = 0; d < dim; ++d)
-    flux[density_component][d] = W[first_momentum_component + d];
-
-  for (unsigned int d = 0; d < dim; ++d)
-    flux[energy_component][d] = W[first_momentum_component + d] / W[density_component] * (W[energy_component] + pressure);
 }
 
 template <int dim>
@@ -76,39 +117,52 @@ void Equations<EquationsTypeMhd, dim>::compute_jacobian_addition(double cell_dia
       jacobian_addition[i][d] = 0;
 }
 
-
-template <int dim>
+template <>
 template <typename InputVector>
-void Equations<EquationsTypeMhd, dim>::Q(std_cxx11::array<typename InputVector::value_type, n_components> &result, const InputVector &W, const Tensor<1, dim> &normal) const
+void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::value_type, n_components> &result, const InputVector &W, const Tensor<1, 3> &normal) const
 {
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
-  for (unsigned int d = 0; d < n_components; d++)
-    forResult[d] = 0;
-  for (unsigned int d = 0; d < dim; d++)
-  {
-    forResult[first_momentum_component] += normal[d] * W[first_momentum_component + d];
-    if (d > 0)
-    {
-      forResult[first_momentum_component + d] -= normal[d] * W[first_momentum_component];
-      forResult[first_momentum_component + d] += normal[0] * W[first_momentum_component + d];
-    }
+  typename InputVector::value_type b = asin(normal[2]);
+  typename InputVector::value_type a = asin(normal[1] / cos(b));
+  typename InputVector::value_type sa = normal[1] / cos(b);
+  typename InputVector::value_type sb = normal[2];
+  typename InputVector::value_type ca = cos(a);
+  typename InputVector::value_type cb = cos(b);
 
-    forResult[first_magnetic_flux_component] += normal[d] * W[first_magnetic_flux_component + d];
-    if (d > 0)
-    {
-      forResult[first_magnetic_flux_component + d] -= normal[d] * W[first_magnetic_flux_component];
-      forResult[first_magnetic_flux_component + d] += normal[0] * W[first_magnetic_flux_component + d];
-    }
-  }
   forResult[density_component] = W[density_component];
+
+  forResult[first_momentum_component]
+    = (ca * cb * W[first_momentum_component])
+    + (sa * cb * W[first_momentum_component + 1])
+    + (sb * W[first_momentum_component + 2]);
+
+  forResult[first_momentum_component + 1]
+    = (-sa * W[first_momentum_component])
+    + (ca * W[first_momentum_component + 1]);
+
+  forResult[first_momentum_component + 2]
+    = (-ca * sb * W[first_momentum_component])
+    - (sa * sb * W[first_momentum_component + 1])
+    + (cb * W[first_momentum_component + 2]);
+
+  forResult[first_magnetic_flux_component]
+    = (ca * cb * W[first_magnetic_flux_component])
+    + (sa * cb * W[first_magnetic_flux_component + 1])
+    + (sb * W[first_magnetic_flux_component + 2]);
+
+  forResult[first_magnetic_flux_component + 1]
+    = (-sa * W[first_magnetic_flux_component])
+    + (ca * W[first_magnetic_flux_component + 1]);
+
+  forResult[first_magnetic_flux_component + 2]
+    = (-ca * sb * W[first_magnetic_flux_component])
+    - (sa * sb * W[first_magnetic_flux_component + 1])
+    + (cb * W[first_magnetic_flux_component + 2]);
+  
   forResult[energy_component] = W[energy_component];
 
-  result[0] = W[density_component];
-  for (unsigned int d = 0; d < dim; d++)
-    result[d + 1] = forResult[d];
-  for (unsigned int d = 0; d < dim; d++)
-    result[d + first_momentum_component + dim + 1] = forResult[d];
-  result[n_components - 1] = W[energy_component];
+  for (unsigned int d = 0; d < n_components; d++)
+    result[d] = forResult[d];
 }
 
 template <int dim>
@@ -116,30 +170,44 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVector::value_type, n_components> &result, std_cxx11::array<typename InputVector::value_type, n_components> &F, const Tensor<1, dim> &normal) const
 {
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
-  for (unsigned int d = 0; d < n_components; d++)
-    forResult[d] = 0;
-  for (unsigned int d = 0; d < dim; d++)
-  {
-    if (d == 0)
-      forResult[first_momentum_component] += normal[d] * F[d + 1];
-    else
-    {
-      forResult[first_momentum_component] -= normal[d] * F[d + 1];
-      forResult[first_momentum_component + d] -= normal[d] * F[1];
-      forResult[first_momentum_component + d] += normal[0] * F[d + 1];
-    }
+  typename InputVector::value_type b = asin(normal[2]);
+  typename InputVector::value_type a = asin(normal[1] / cos(b));
+  typename InputVector::value_type sa = normal[1] / cos(b);
+  typename InputVector::value_type sb = normal[2];
+  typename InputVector::value_type ca = cos(a);
+  typename InputVector::value_type cb = cos(b);
 
-    if (d == 0)
-      forResult[first_magnetic_flux_component] += normal[d] * F[dim + d + 1];
-    else
-    {
-      forResult[first_magnetic_flux_component] -= normal[d] * F[dim + d + 1];
-      forResult[first_magnetic_flux_component + d] -= normal[d] * F[dim + 1];
-      forResult[first_magnetic_flux_component + d] += normal[0] * F[dim + d + 1];
-    }
-  }
-  forResult[density_component] = F[0];
-  forResult[energy_component] = F[n_components - 1];
+  forResult[density_component] = F[density_component];
+
+  forResult[first_momentum_component]
+    = (ca * cb * F[first_momentum_component])
+    - (sa * F[first_momentum_component + 1])
+    - (ca * sb * F[first_momentum_component + 2]);
+
+  forResult[first_momentum_component + 1]
+    = (sa * cb * F[first_momentum_component])
+    + (ca * F[first_momentum_component + 1])
+  - (sa * sb * F[first_momentum_component + 2]);
+
+  forResult[first_momentum_component + 2]
+    = sb * F[first_momentum_component]
+    + cb * F[first_momentum_component + 2];
+
+  forResult[first_magnetic_flux_component]
+    = (ca * cb * F[first_magnetic_flux_component])
+    - (sa * F[first_magnetic_flux_component + 1])
+    - (ca * sb * F[first_magnetic_flux_component + 2]);
+
+  forResult[first_magnetic_flux_component + 1]
+    = (sa * cb * F[first_magnetic_flux_component])
+    + (ca * F[first_magnetic_flux_component + 1])
+    - (sa * sb * F[first_magnetic_flux_component + 2]);
+
+  forResult[first_magnetic_flux_component + 2]
+    = sb * F[first_magnetic_flux_component]
+    + cb * F[first_magnetic_flux_component + 2];
+
+  forResult[energy_component] = F[energy_component];
 
   for (unsigned int d = 0; d < n_components; d++)
     result[d] = forResult[d];
@@ -150,6 +218,32 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const
 {
+  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  {
+    const InputVector &Wtest(Wplus);
+    std_cxx11::array<typename InputVector::value_type, n_components> Qtest1;
+    std_cxx11::array<typename InputVector::value_type, n_components> Qtest2;
+    Q(Qtest1, Wtest, normal);
+    Q_inv<InputVector>(Qtest2, Qtest1, normal);
+    for (unsigned int di = 0; di < n_components; ++di)
+      if (std::abs(Wtest[di] - Qtest2[di]) > 1e-12)
+        exit(1);
+    std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
+
+    compute_flux_matrix(Wplus, iflux);
+    compute_flux_matrix(Wminus, oflux);
+
+    for (unsigned int di = 0; di < n_components; ++di)
+    {
+      normal_flux[di] = 0;
+      for (unsigned int d = 0; d < dim; ++d)
+        normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
+
+      normal_flux[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
+    }
+    return;
+  }
+
   typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, Um, E2, E3, Sl, Sr, pml, pmr, B, B2, cl, cm, cr, ptl, ptr;
   typename InputVector::value_type sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
 
@@ -398,23 +492,8 @@ template <int dim>
 template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const
 {
-  // LK: Tohle u me budou samy nuly
-  const double gravity = -1.0;
-
   for (unsigned int c = 0; c < n_components; ++c)
-  {
-    switch (c)
-    {
-    case first_momentum_component + 1:
-      forcing[c] = gravity * W[density_component];
-      break;
-    case energy_component:
-      forcing[c] = gravity * W[first_momentum_component + 1];
-      break;
-    default:
-      forcing[c] = 0;
-    }
-  }
+    forcing[c] = 0;
 }
 
 template <int dim>
@@ -502,7 +581,6 @@ UpdateFlags Equations<EquationsTypeMhd, dim>::Postprocessor::get_needed_update_f
   return update_values;
 }
 
-template class Equations<EquationsTypeMhd, 2>;
 template class Equations<EquationsTypeMhd, 3>;
 
 #include "equationsMhd_inst.cpp"

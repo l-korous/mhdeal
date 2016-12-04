@@ -376,8 +376,7 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
 
     solver.Iterate(parameters.max_iterations, parameters.linear_residual);
 
-    return std::pair<unsigned int, double>(solver.NumIters(),
-      solver.TrueResidual());
+    return std::pair<unsigned int, double>(solver.NumIters(), solver.TrueResidual());
   }
 }
 
@@ -433,6 +432,11 @@ void Problem<equationsType, dim>::run()
   newton_initial_guess = old_solution;
   while (time < parameters.final_time)
   {
+    if (time > this->parameters.initialization_time) {
+      this->parameters.time_step = this->parameters.time_step_after_initialization;
+      this->parameters.theta = this->parameters.theta_after_initialization;
+    }
+
     std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
       << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
     std::cout << "   NonLin Res     Lin Iter       Lin Res" << std::endl << "   _____________________________________" << std::endl;
@@ -486,5 +490,4 @@ void Problem<equationsType, dim>::run()
 template class Problem<EquationsTypeEuler, 2>;
 template class Problem<EquationsTypeEuler, 3>;
 
-template class Problem<EquationsTypeMhd, 2>;
 template class Problem<EquationsTypeMhd, 3>;
