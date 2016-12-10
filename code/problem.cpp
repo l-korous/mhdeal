@@ -55,8 +55,7 @@ void Problem<equationsType, dim>::assemble_system()
       if (cell->at_boundary(face_no))
       {
         fe_v_face.reinit(cell, face_no);
-        assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true,
-          cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter());
+        assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter());
       }
       else
       {
@@ -76,8 +75,7 @@ void Problem<equationsType, dim>::assemble_system()
 
             neighbor_child->get_dof_indices(dof_indices_neighbor);
 
-            assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false,
-              numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter());
+            assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter());
           }
         }
         else if (cell->neighbor(face_no)->level() != cell->level())
@@ -95,8 +93,7 @@ void Problem<equationsType, dim>::assemble_system()
           fe_v_face.reinit(cell, face_no);
           fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
 
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false,
-            numbers::invalid_unsigned_int, cell->face(face_no)->diameter());
+          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter());
         }
         else
         {
@@ -106,8 +103,7 @@ void Problem<equationsType, dim>::assemble_system()
           fe_v_face.reinit(cell, face_no);
           fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
 
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false,
-            numbers::invalid_unsigned_int, cell->face(face_no)->diameter());
+          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter());
         }
       }
     }
@@ -312,8 +308,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       {
         const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
 
-        R_i += (parameters.theta * normal_fluxes[point][component_i] + (1.0 - parameters.theta) * normal_fluxes_old[point][component_i])
-          * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        R_i += (parameters.theta * normal_fluxes[point][component_i] + (1.0 - parameters.theta) * normal_fluxes_old[point][component_i]) * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
       }
 
       for (unsigned int k = 0; k < dofs_per_cell; ++k)

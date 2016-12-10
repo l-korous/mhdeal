@@ -57,14 +57,14 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->MeshSlicesInZDirection = 2;
   this->cube_left = -.5;
   this->cube_right = .5;
-  this->uniform_refinements = 100;
+  this->uniform_refinements = 50;
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
-  this->time_step = .001;
+  this->time_step = .0001;
   this->theta = 0.0;
-  this->time_step_after_initialization = .001;
-  this->theta_after_initialization = .0;
+  this->time_step_after_initialization = .0001;
+  this->theta_after_initialization = .5;
   this->initialization_time = 0.;
 
   this->output = OutputType::quiet_solver;
@@ -84,7 +84,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->output_step = this->time_step;
 
-  this->num_flux_type = lax_friedrich;
+  this->num_flux_type = hlld;
   this->lax_friedrich_stabilization_value = 1.;
 
   this->is_stationary = false;

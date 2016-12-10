@@ -46,7 +46,7 @@ template <>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W) const
 {
-  return 0.5 * ( W[first_magnetic_flux_component] * W[first_magnetic_flux_component]
+  return 0.5 * (W[first_magnetic_flux_component] * W[first_magnetic_flux_component]
     + W[first_magnetic_flux_component + 1] * W[first_magnetic_flux_component + 1]
     + W[first_magnetic_flux_component + 2] * W[first_magnetic_flux_component + 2]);
 }
@@ -66,11 +66,11 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
   typename InputVector::value_type kinetic_energy = compute_kinetic_energy(W);
   typename InputVector::value_type magnetic_energy = compute_magnetic_energy(W);
   typename InputVector::value_type energy_item[dim];
-    
-  for (unsigned int d = 0; d<dim; ++d)
+
+  for (unsigned int d = 0; d < dim; ++d)
     flux[density_component][d] = W[first_momentum_component + d];
 
-  for (unsigned int d = 0; d<dim; ++d)
+  for (unsigned int d = 0; d < dim; ++d)
   {
     for (unsigned int e = 0; e < dim; ++e)
     {
@@ -82,24 +82,29 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
     flux[first_momentum_component + d][d] += magnetic_energy;
   }
 
-  for (unsigned int d = 0; d<dim; ++d)
+  for (unsigned int d = 0; d < dim; ++d)
   {
     for (unsigned int e = 0; e < dim; ++e)
     {
-      flux[first_magnetic_flux_component + d][e] = W[first_momentum_component + d] * W[first_magnetic_flux_component + e] / W[density_component];
-      flux[first_magnetic_flux_component + d][e] -= W[first_magnetic_flux_component + d] * W[first_momentum_component + e] / W[density_component];
+      if (d == e)
+        flux[first_magnetic_flux_component + d][e] = 0.;
+      else
+      {
+        flux[first_magnetic_flux_component + d][e] = W[first_momentum_component + e] * W[first_magnetic_flux_component + d] / W[density_component];
+        flux[first_magnetic_flux_component + d][e] -= W[first_magnetic_flux_component + e] * W[first_momentum_component + d] / W[density_component];
+      }
     }
   }
 
   energy_item[0]
     = (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component + 2])
-    + (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component + 1]);
+    - (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component + 1]);
   energy_item[1]
     = (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component])
-    + (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 2]);
-  energy_item[2] 
+    - (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 2]);
+  energy_item[2]
     = (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 1])
-    + (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component]);
+    - (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component]);
 
   for (unsigned int d = 0; d < dim; ++d)
   {
@@ -123,7 +128,11 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
 {
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
-  typename InputVector::value_type a = asin(normal[1] / cos(b));
+  typename InputVector::value_type a;
+  if(normal[1] == 0)
+    a = acos(normal[0] / cos(b));
+  else
+    a = asin(normal[1] / cos(b));
   typename InputVector::value_type sa = normal[1] / cos(b);
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
@@ -158,7 +167,7 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
     = (-ca * sb * W[first_magnetic_flux_component])
     - (sa * sb * W[first_magnetic_flux_component + 1])
     + (cb * W[first_magnetic_flux_component + 2]);
-  
+
   forResult[energy_component] = W[energy_component];
 
   for (unsigned int d = 0; d < n_components; d++)
@@ -171,7 +180,11 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
 {
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
-  typename InputVector::value_type a = asin(normal[1] / cos(b));
+  typename InputVector::value_type a;
+  if (normal[1] == 0)
+    a = acos(normal[0] / cos(b));
+  else
+    a = asin(normal[1] / cos(b));
   typename InputVector::value_type sa = normal[1] / cos(b);
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
@@ -187,7 +200,7 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
   forResult[first_momentum_component + 1]
     = (sa * cb * F[first_momentum_component])
     + (ca * F[first_momentum_component + 1])
-  - (sa * sb * F[first_momentum_component + 2]);
+    - (sa * sb * F[first_momentum_component + 2]);
 
   forResult[first_momentum_component + 2]
     = sb * F[first_momentum_component]
@@ -218,16 +231,13 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const
 {
-  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  std_cxx11::array<typename InputVector::value_type, n_components> normal_flux_test;
+
+  if (Wminus[7] > 25)
+    normal_flux_test[0] = 1.;
+  
+  //if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
   {
-    const InputVector &Wtest(Wplus);
-    std_cxx11::array<typename InputVector::value_type, n_components> Qtest1;
-    std_cxx11::array<typename InputVector::value_type, n_components> Qtest2;
-    Q(Qtest1, Wtest, normal);
-    Q_inv<InputVector>(Qtest2, Qtest1, normal);
-    for (unsigned int di = 0; di < n_components; ++di)
-      if (std::abs(Wtest[di] - Qtest2[di]) > 1e-12)
-        exit(1);
     std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
 
     compute_flux_matrix(Wplus, iflux);
@@ -235,13 +245,12 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
     for (unsigned int di = 0; di < n_components; ++di)
     {
-      normal_flux[di] = 0;
+      normal_flux_test[di] = 0;
       for (unsigned int d = 0; d < dim; ++d)
-        normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
+        normal_flux_test[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
 
-      normal_flux[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
+      normal_flux_test[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
     }
-    return;
   }
 
   typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, Um, E2, E3, Sl, Sr, pml, pmr, B, B2, cl, cm, cr, ptl, ptr;
@@ -254,57 +263,58 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   std_cxx11::array<typename InputVector::value_type, n_components> Ul;
   std_cxx11::array<typename InputVector::value_type, n_components> Ur;
 
-  std_cxx11::array<typename InputVector::value_type, n_components> QedWplus;
-  std_cxx11::array<typename InputVector::value_type, n_components> QedWminus;
+  std_cxx11::array<typename InputVector::value_type, n_components> QedMinus;
+  std_cxx11::array<typename InputVector::value_type, n_components> QedPlus;
 
-  Q(QedWplus, Wplus, normal);
-  Q(QedWminus, Wminus, normal);
+  Q(QedPlus, Wplus, normal);
+  Q(QedMinus, Wminus, normal);
 
   // Simple average of mag. field in direction of normal vector
-  B = 0.5*(QedWplus[4] + QedWminus[4]);
+  B = 0.5*(QedMinus[4] + QedPlus[4]);
   B2 = B*B;
 
   // Calculate left flux
-  hl[0] = 1.0 / QedWminus[0];
-  Uk = 0.5*hl[0] * (QedWminus[1] * QedWminus[1] + QedWminus[2] * QedWminus[2] + QedWminus[3] * QedWminus[3]);
-  Um = 0.5*(B2 + QedWminus[5] * QedWminus[5] + QedWminus[6] * QedWminus[6]);
-  hl[1] = (parameters.gas_gamma - 1)*(QedWminus[7] - Uk - Um);
-  E2 = hl[0] * (QedWminus[1] * QedWminus[6] - QedWminus[3] * QedWminus[4]);
-  E3 = hl[0] * (QedWminus[2] * QedWminus[4] - QedWminus[1] * QedWminus[5]);
+  hl[0] = 1.0 / QedPlus[0];
+  Uk = 0.5*hl[0] * (QedPlus[1] * QedPlus[1] + QedPlus[2] * QedPlus[2] + QedPlus[3] * QedPlus[3]);
+  Um = 0.5*(QedPlus[4] * QedPlus[4] + QedPlus[5] * QedPlus[5] + QedPlus[6] * QedPlus[6]);
+  hl[1] = (parameters.gas_gamma - 1)*(QedPlus[7] - Uk - Um);
+  E2 = hl[0] * (QedPlus[1] * QedPlus[6] - QedPlus[3] * QedPlus[4]);
+  E3 = hl[0] * (QedPlus[2] * QedPlus[4] - QedPlus[1] * QedPlus[5]);
 
-  Fl[0] = QedWminus[1];
-  Fl[1] = hl[0] * QedWminus[1] * QedWminus[1] - QedWminus[4] * QedWminus[4] + Um + hl[1];
-  Fl[2] = hl[0] * QedWminus[1] * QedWminus[2] - QedWminus[4] * QedWminus[5];
-  Fl[3] = hl[0] * QedWminus[1] * QedWminus[3] - QedWminus[4] * QedWminus[6];
+  Fl[0] = QedPlus[1];
+  Fl[1] = hl[0] * QedPlus[1] * QedPlus[1] - QedPlus[4] * QedPlus[4] + Um + hl[1];
+  Fl[2] = hl[0] * QedPlus[1] * QedPlus[2] - QedPlus[4] * QedPlus[5];
+  Fl[3] = hl[0] * QedPlus[1] * QedPlus[3] - QedPlus[4] * QedPlus[6];
   Fl[4] = 0.0;
   Fl[5] = -E3;
   Fl[6] = E2;
-  Fl[7] = hl[0] * QedWminus[1] * (hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedWminus[6] - E3*QedWminus[5]);
+  Fl[7] = hl[0] * QedPlus[1] * (hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedPlus[6] - E3*QedPlus[5]);
 
   // Calculate right flux
-  hr[0] = 1.0 / QedWplus[0];
-  Uk = 0.5*hr[0] * (QedWplus[1] * QedWplus[1] + QedWplus[2] * QedWplus[2] + QedWplus[3] * QedWplus[3]);
-  Um = 0.5*(B2 + QedWplus[5] * QedWplus[5] + QedWplus[6] * QedWplus[6]);
-  hr[1] = (parameters.gas_gamma - 1)*(QedWplus[7] - Uk - Um);
-  E2 = hr[0] * (QedWplus[1] * QedWplus[6] - QedWplus[3] * QedWplus[4]);
-  E3 = hr[0] * (QedWplus[2] * QedWplus[4] - QedWplus[1] * QedWplus[5]);
+  hr[0] = 1.0 / QedMinus[0];
+  Uk = 0.5*hr[0] * (QedMinus[1] * QedMinus[1] + QedMinus[2] * QedMinus[2] + QedMinus[3] * QedMinus[3]);
+  Um = 0.5*(QedMinus[4] * QedMinus[4] + QedMinus[5] * QedMinus[5] + QedMinus[6] * QedMinus[6]);
+  hr[1] = (parameters.gas_gamma - 1)*(QedMinus[7] - Uk - Um);
+  E2 = hr[0] * (QedMinus[1] * QedMinus[6] - QedMinus[3] * QedMinus[4]);
+  E3 = hr[0] * (QedMinus[2] * QedMinus[4] - QedMinus[1] * QedMinus[5]);
 
-  Fr[0] = QedWplus[1];
-  Fr[1] = hr[0] * QedWplus[1] * QedWplus[1] - QedWplus[4] * QedWplus[4] + Um + hr[1];
-  Fr[2] = hr[0] * QedWplus[1] * QedWplus[2] - QedWplus[4] * QedWplus[5];
-  Fr[3] = hr[0] * QedWplus[1] * QedWplus[3] - QedWplus[4] * QedWplus[6];
+  Fr[0] = QedMinus[1];
+  Fr[1] = hr[0] * QedMinus[1] * QedMinus[1] - QedMinus[4] * QedMinus[4] + Um + hr[1];
+  Fr[2] = hr[0] * QedMinus[1] * QedMinus[2] - QedMinus[4] * QedMinus[5];
+  Fr[3] = hr[0] * QedMinus[1] * QedMinus[3] - QedMinus[4] * QedMinus[6];
   Fr[4] = 0.0;
   Fr[5] = -E3;
   Fr[6] = E2;
-  Fr[7] = hr[0] * QedWplus[1] * (hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedWplus[6] - E3*QedWplus[5]);
+  Fr[7] = hr[0] * QedMinus[1] * (hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedMinus[6] - E3*QedMinus[5]);
 
-  pml = 0.5*(QedWminus[4] * QedWminus[4] + QedWminus[5] * QedWminus[5] + QedWminus[6] * QedWminus[6]);
-  pmr = 0.5*(QedWplus[4] * QedWplus[4] + QedWplus[5] * QedWplus[5] + QedWplus[6] * QedWplus[6]);
+  pml = 0.5*(QedPlus[4] * QedPlus[4] + QedPlus[5] * QedPlus[5] + QedPlus[6] * QedPlus[6]);
+  pmr = 0.5*(QedMinus[4] * QedMinus[4] + QedMinus[5] * QedMinus[5] + QedMinus[6] * QedMinus[6]);
+
   // fast magnetoacoustic speed
   cl = parameters.gas_gamma*hl[1] + 2.0*pml;
-  cl = sqrt(0.5*hl[0] * (cl + sqrt(cl*cl - 4.0*parameters.gas_gamma*hl[1] * QedWminus[4] * QedWminus[4])));
+  cl = sqrt(0.5*hl[0] * (cl + sqrt(cl*cl - 4.0*parameters.gas_gamma*hl[1] * QedPlus[4] * QedPlus[4])));
   cr = parameters.gas_gamma*hr[1] + 2.0*pmr;
-  cr = sqrt(0.5*hr[0] * (cr + sqrt(cr*cr - 4.0*parameters.gas_gamma*hr[1] * QedWplus[4] * QedWplus[4])));
+  cr = sqrt(0.5*hr[0] * (cr + sqrt(cr*cr - 4.0*parameters.gas_gamma*hr[1] * QedMinus[4] * QedMinus[4])));
 
   // total pressure
   ptl = hl[1] + pml;
@@ -312,15 +322,15 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
   // maximum of fast magnetoacoustic speeds L/R
   cm = (cl > cr) ? cl : cr;
-  if (QedWminus[1] * hl[0] <= QedWplus[1] * hr[0])
+  if (QedPlus[1] * hl[0] <= QedMinus[1] * hr[0])
   {
-    sp[0] = QedWminus[1] * hl[0] - cm;
-    sp[4] = QedWplus[1] * hr[0] + cm;
+    sp[0] = QedPlus[1] * hl[0] - cm;
+    sp[4] = QedMinus[1] * hr[0] + cm;
   }
   else
   {
-    sp[0] = QedWplus[1] * hr[0] - cm;
-    sp[4] = QedWminus[1] * hl[0] + cm;
+    sp[0] = QedMinus[1] * hr[0] - cm;
+    sp[4] = QedPlus[1] * hl[0] + cm;
   }
 
   // Upwind flux in the case of supersonic flow
@@ -338,18 +348,18 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
 
   // Determine Alfven and middle speeds
-  Sl = sp[0] - QedWminus[1] * hl[0];
-  Sr = sp[4] - QedWplus[1] * hr[0];
-  sp[2] = (QedWminus[1] * Sl - QedWplus[1] * Sr - ptl + ptr) / (QedWminus[0] * Sl - QedWplus[0] * Sr);
+  Sl = sp[0] - QedPlus[1] * hl[0];
+  Sr = sp[4] - QedMinus[1] * hr[0];
+  sp[2] = (QedPlus[1] * Sl - QedMinus[1] * Sr - ptl + ptr) / (QedPlus[0] * Sl - QedMinus[0] * Sr);
   sml = sp[0] - sp[2];
   smr = sp[4] - sp[2];
 
   // Density
-  Ul[0] = QedWminus[0] * Sl / sml;
-  Ur[0] = QedWplus[0] * Sr / smr;
+  Ul[0] = QedPlus[0] * Sl / sml;
+  Ur[0] = QedMinus[0] * Sr / smr;
 
-  Ul[4] = Udl[4] = QedWminus[4];
-  Ur[4] = Udr[4] = QedWplus[4];
+  Ul[4] = Udl[4] = QedPlus[4];
+  Ur[4] = Udr[4] = QedMinus[4];
 
   srdl = sqrt(Ul[0]);
   srdr = sqrt(Ur[0]);
@@ -359,71 +369,71 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // Sr*
   sp[3] = sp[2] + fabs(Ur[4]) / srdr;
 
-  ptst = ptl + QedWminus[0] * Sl*(Sl - sml);
-  ptstr = ptr + QedWplus[0] * Sr*(Sr - smr);
+  ptst = ptl + QedPlus[0] * Sl*(Sl - sml);
+  ptstr = ptr + QedMinus[0] * Sr*(Sr - smr);
 
   // F*_L
   Ul[1] = Ul[0] * sp[2];
 
-  cl = QedWminus[0] * Sl*sml - Ul[4] * Ul[4];
+  cl = QedPlus[0] * Sl*sml - Ul[4] * Ul[4];
   if (fabs(cl) < 1e-8 * ptst)
   {
-    Ul[2] = Ul[0] * QedWminus[2] * hl[0];
-    Ul[3] = Ul[0] * QedWminus[3] * hl[0];
-    Ul[5] = QedWminus[5];
-    Ul[6] = QedWminus[6];
+    Ul[2] = Ul[0] * QedPlus[2] * hl[0];
+    Ul[3] = Ul[0] * QedPlus[3] * hl[0];
+    Ul[5] = QedPlus[5];
+    Ul[6] = QedPlus[6];
   }
   else
   {
     cl = 1.0 / cl;
     cm = Ul[4] * (Sl - sml)*cl;
-    Ul[2] = Ul[0] * (QedWminus[2] * hl[0] - QedWminus[5] * cm);
-    Ul[3] = Ul[0] * (QedWminus[3] * hl[0] - QedWminus[6] * cm);
-    cm = (QedWminus[0] * Sl*Sl - Ul[4] * Ul[4])*cl;
-    Ul[5] = QedWminus[5] * cm;
-    Ul[6] = QedWminus[6] * cm;
+    Ul[2] = Ul[0] * (QedPlus[2] * hl[0] - QedPlus[5] * cm);
+    Ul[3] = Ul[0] * (QedPlus[3] * hl[0] - QedPlus[6] * cm);
+    cm = (QedPlus[0] * Sl*Sl - Ul[4] * Ul[4])*cl;
+    Ul[5] = QedPlus[5] * cm;
+    Ul[6] = QedPlus[6] * cm;
   }
   vbstl = (Ul[1] * Ul[4] + Ul[2] * Ul[5] + Ul[3] * Ul[6]) / Ul[0];
 
-  Ul[7] = (Sl*QedWminus[7] - ptl*QedWminus[1] * hl[0] + ptst*sp[2] + Ul[4] *
-    ((QedWminus[1] * QedWminus[4] + QedWminus[2] * QedWminus[5] + QedWminus[3] * QedWminus[6])*hl[0] - vbstl)) / sml;
+  Ul[7] = (Sl*QedPlus[7] - ptl*QedPlus[1] * hl[0] + ptst*sp[2] + Ul[4] *
+    ((QedPlus[1] * QedPlus[4] + QedPlus[2] * QedPlus[5] + QedPlus[3] * QedPlus[6])*hl[0] - vbstl)) / sml;
 
   // F*_R
   Ur[1] = Ur[0] * sp[2];
-  cl = QedWplus[0] * Sr*smr - Ur[4] * Ur[4];
+  cl = QedMinus[0] * Sr*smr - Ur[4] * Ur[4];
   if (fabs(cl) < 1e-8*ptstr)
   {
-    Ur[2] = Ur[0] * QedWplus[2] * hr[0];
-    Ur[3] = Ur[0] * QedWplus[3] * hr[0];
-    Ur[5] = QedWplus[5];
-    Ur[6] = QedWplus[6];
+    Ur[2] = Ur[0] * QedMinus[2] * hr[0];
+    Ur[3] = Ur[0] * QedMinus[3] * hr[0];
+    Ur[5] = QedMinus[5];
+    Ur[6] = QedMinus[6];
   }
   else
   {
     cl = 1.0 / cl;
     cm = Ur[4] * (Sr - smr)*cl;
-    Ur[2] = Ur[0] * (QedWplus[2] * hr[0] - QedWplus[5] * cm);
-    Ur[3] = Ur[0] * (QedWplus[3] * hr[0] - QedWplus[6] * cm);
-    cm = (QedWplus[0] * Sr*Sr - Ur[4] * Ur[4])*cl;
-    Ur[5] = QedWplus[5] * cm;
-    Ur[6] = QedWplus[6] * cm;
+    Ur[2] = Ur[0] * (QedMinus[2] * hr[0] - QedMinus[5] * cm);
+    Ur[3] = Ur[0] * (QedMinus[3] * hr[0] - QedMinus[6] * cm);
+    cm = (QedMinus[0] * Sr*Sr - Ur[4] * Ur[4])*cl;
+    Ur[5] = QedMinus[5] * cm;
+    Ur[6] = QedMinus[6] * cm;
   }
   vbstr = (Ur[1] * Ur[4] + Ur[2] * Ur[5] + Ur[3] * Ur[6]) / Ur[0];
 
-  Ur[7] = (Sr*QedWplus[7] - ptr*QedWplus[1] * hr[0] + ptstr*sp[2] + Ur[4] *
-    ((QedWplus[1] * Ur[4] + QedWplus[2] * QedWplus[5] + QedWplus[3] * QedWplus[6])*hr[0] - vbstr)) / smr;
+  Ur[7] = (Sr*QedMinus[7] - ptr*QedMinus[1] * hr[0] + ptstr*sp[2] + Ur[4] *
+    ((QedMinus[1] * Ur[4] + QedMinus[2] * QedMinus[5] + QedMinus[3] * QedMinus[6])*hr[0] - vbstr)) / smr;
 
   if (sp[1] >= 0.0)
   {
     for (register int j = 0; j < n_components; j++)
-      normal_flux[j] = Fl[j] + sp[0] * (Ul[j] - QedWminus[j]);
+      normal_flux[j] = Fl[j] + sp[0] * (Ul[j] - QedPlus[j]);
     Q_inv<InputVector>(normal_flux, normal_flux, normal);
     return;
   }
   if (sp[3] <= 0.0 && sp[2] < 0.0)
   {
     for (register int j = 0; j < n_components; j++)
-      normal_flux[j] = Fr[j] + sp[4] * (Ur[j] - QedWplus[j]);
+      normal_flux[j] = Fr[j] + sp[4] * (Ur[j] - QedMinus[j]);
     Q_inv<InputVector>(normal_flux, normal_flux, normal);
     return;
   }
@@ -477,13 +487,13 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   {
     cm = sp[1] - sp[0];
     for (register int j = 0; j < n_components; j++)
-      normal_flux[j] = Fl[j] + sp[1] * Udl[j] - sp[0] * QedWminus[j] - cm*Ul[j];
+      normal_flux[j] = Fl[j] + sp[1] * Udl[j] - sp[0] * QedPlus[j] - cm*Ul[j];
     Q_inv<InputVector>(normal_flux, normal_flux, normal);
     return;
   }
   cm = sp[3] - sp[4];
   for (register int j = 0; j < n_components; j++)
-    normal_flux[j] = Fr[j] + sp[3] * Udr[j] - sp[4] * QedWplus[j] - cm*Ur[j];
+    normal_flux[j] = Fr[j] + sp[3] * Udr[j] - sp[4] * QedMinus[j] - cm*Ur[j];
   Q_inv<InputVector>(normal_flux, normal_flux, normal);
   return;
 }
