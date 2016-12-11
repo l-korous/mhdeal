@@ -10,8 +10,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   mapping(),
   fe(FE_DGQ<dim>(parameters.polynomial_order), Equations<equationsType, dim>::n_components),
   dof_handler(triangulation),
-  quadrature(2 * parameters.polynomial_order + 1),
-  face_quadrature(2 * parameters.polynomial_order + 1),
+  quadrature(parameters.polynomial_order + 1),
+  face_quadrature(parameters.polynomial_order + 1),
   verbose_cout(std::cout, false)
 {
 }
@@ -117,103 +117,168 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
 
-  Table<2, Sacado::Fad::DFad<double> > W(n_q_points, Equations<equationsType, dim>::n_components);
-
-  Table<2, double> W_old(n_q_points, Equations<equationsType, dim>::n_components);
-
-  Table<3, Sacado::Fad::DFad<double> > grad_W(n_q_points, Equations<equationsType, dim>::n_components, dim);
-
-  Table<3, double> grad_W_old(n_q_points, Equations<equationsType, dim>::n_components, dim);
-
-  std::vector<double> residual_derivatives(dofs_per_cell);
-
-  std::vector<Sacado::Fad::DFad<double> > independent_local_dof_values(dofs_per_cell);
-  for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    independent_local_dof_values[i] = current_solution(dof_indices[i]);
-
-  for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    independent_local_dof_values[i].diff(i, dofs_per_cell);
-
-  for (unsigned int q = 0; q < n_q_points; ++q)
+  // This is for the explicit case.
+  if (parameters.theta < 1.)
   {
-    for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
+    Table<2, double> W_old(n_q_points, Equations<equationsType, dim>::n_components);
+    Table<3, double> grad_W_old(n_q_points, Equations<equationsType, dim>::n_components, dim);
+
+    for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      W[q][c] = 0;
-      W_old[q][c] = 0;
-      for (unsigned int d = 0; d < dim; ++d)
+      for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
-        grad_W[q][c][d] = 0;
-        grad_W_old[q][c][d] = 0;
+        W_old[q][c] = 0;
+        if (this->parameters.needs_gradients)
+        {
+          for (unsigned int d = 0; d < dim; ++d)
+            grad_W_old[q][c][d] = 0;
+        }
       }
+    }
+
+    for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        const unsigned int c = fe_v.get_fe().system_to_component_index(i).first;
+
+        W_old[q][c] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, c);
+
+        if (this->parameters.needs_gradients)
+        {
+          for (unsigned int d = 0; d < dim; d++)
+            grad_W_old[q][c][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, c)[d];
+        }
+      }
+    }
+
+    std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > flux_old(n_q_points);
+    std::vector < std_cxx11::array< double, Equations<equationsType, dim>::n_components> > forcing_old(n_q_points);
+    // LK: This is for e.g. stabilization for Euler
+    std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition_old(n_q_points);
+
+    for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      equations.compute_flux_matrix(W_old[q], flux_old[q]);
+      equations.compute_forcing_vector(W_old[q], forcing_old[q]);
+      if (this->parameters.needs_gradients)
+        equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
+    }
+
+    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    {
+      const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+      double val = 0;
+
+      for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
+      {
+        if (parameters.is_stationary == false)
+          val -= 1.0 / parameters.time_step * W_old[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+
+        for (unsigned int d = 0; d < dim; d++)
+          val -= (1.0 - parameters.theta) * flux_old[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+
+        if (this->parameters.needs_gradients)
+        {
+          for (unsigned int d = 0; d < dim; d++)
+            val += (1.0 - parameters.theta) * jacobian_addition_old[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+        }
+
+        val -= (1.0 - parameters.theta) * forcing_old[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+      }
+
+      right_hand_side(dof_indices[i]) -= val;
     }
   }
 
-  for (unsigned int q = 0; q < n_q_points; ++q)
+  // Now this is for the implicit case. This is different from the face term, as the time derivative needs to be there in both explicit and implicit cases.
   {
+    Table<2, Sacado::Fad::DFad<double> > W(n_q_points, Equations<equationsType, dim>::n_components);
+    Table<3, Sacado::Fad::DFad<double> > grad_W(n_q_points, Equations<equationsType, dim>::n_components, dim);
+    std::vector<double> residual_derivatives(dofs_per_cell);
+
+    std::vector<Sacado::Fad::DFad<double> > independent_local_dof_values(dofs_per_cell);
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      independent_local_dof_values[i] = current_solution(dof_indices[i]);
+
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      independent_local_dof_values[i].diff(i, dofs_per_cell);
+
+    for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      const unsigned int c = fe_v.get_fe().system_to_component_index(i).first;
-
-      W[q][c] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, c);
-      W_old[q][c] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, c);
-
-      for (unsigned int d = 0; d < dim; d++)
+      for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
-        grad_W[q][c][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, c)[d];
-        grad_W_old[q][c][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, c)[d];
+        W[q][c] = 0;
+        if (this->parameters.needs_gradients)
+        {
+          for (unsigned int d = 0; d < dim; ++d)
+            grad_W[q][c][d] = 0;
+        }
       }
     }
-  }
 
-  std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > flux(n_q_points);
-  std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > forcing(n_q_points);
-
-  std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > flux_old(n_q_points);
-  std::vector < std_cxx11::array< double, Equations<equationsType, dim>::n_components> > forcing_old(n_q_points);
-
-  // LK: This is for e.g. stabilization for Euler
-  std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
-  std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition_old(n_q_points);
-
-  for (unsigned int q = 0; q < n_q_points; ++q)
-  {
-    equations.compute_flux_matrix(W[q], flux[q]);
-    equations.compute_forcing_vector(W[q], forcing[q]);
-    equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W[q], jacobian_addition[q]);
-
-    equations.compute_flux_matrix(W_old[q], flux_old[q]);
-    equations.compute_forcing_vector(W_old[q], forcing_old[q]);
-    equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
-  }
-
-  for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
-  {
-    Sacado::Fad::DFad<double> R_i = 0;
-
-    const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
-
-    for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
+    for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      if (parameters.is_stationary == false)
-        R_i += 1.0 / parameters.time_step * (W[point][component_i] - W_old[point][component_i]) * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        const unsigned int c = fe_v.get_fe().system_to_component_index(i).first;
 
-      for (unsigned int d = 0; d < dim; d++)
-        R_i -= (parameters.theta * flux[point][component_i][d] + (1.0 - parameters.theta) * flux_old[point][component_i][d])
-        * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+        W[q][c] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, c);
 
-      for (unsigned int d = 0; d < dim; d++)
-        R_i += (parameters.theta * jacobian_addition[point][component_i][d] + (1.0 - parameters.theta) * jacobian_addition_old[point][component_i][d])
-        * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
-
-      R_i -= (parameters.theta  * forcing[point][component_i] + (1.0 - parameters.theta) * forcing_old[point][component_i])
-        * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        if (parameters.theta > 0. && this->parameters.needs_gradients)
+        {
+          for (unsigned int d = 0; d < dim; d++)
+            grad_W[q][c][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, c)[d];
+        }
+      }
     }
 
-    for (unsigned int k = 0; k < dofs_per_cell; ++k)
-      residual_derivatives[k] = R_i.fastAccessDx(k);
+    std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > flux(n_q_points);
+    std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > forcing(n_q_points);
+    // LK: This is for e.g. stabilization for Euler
+    std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
 
-    system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
-    right_hand_side(dof_indices[i]) -= R_i.val();
+    if (this->parameters.theta > 0.)
+    {
+      for (unsigned int q = 0; q < n_q_points; ++q)
+      {
+        equations.compute_flux_matrix(W[q], flux[q]);
+        equations.compute_forcing_vector(W[q], forcing[q]);
+        if (this->parameters.needs_gradients)
+          equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W[q], jacobian_addition[q]);
+      }
+    }
+
+    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    {
+      const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+      Sacado::Fad::DFad<double> R_i = 0;
+
+      for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
+      {
+        if (parameters.is_stationary == false)
+          R_i += 1.0 / parameters.time_step * W[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+
+        if (this->parameters.theta > 0.) {
+          for (unsigned int d = 0; d < dim; d++)
+            R_i -= parameters.theta * flux[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+
+          if (this->parameters.needs_gradients)
+          {
+            for (unsigned int d = 0; d < dim; d++)
+              R_i += parameters.theta * jacobian_addition[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+          }
+
+          R_i -= parameters.theta * forcing[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        }
+      }
+
+      for (unsigned int k = 0; k < dofs_per_cell; ++k)
+        residual_derivatives[k] = R_i.fastAccessDx(k);
+
+      system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
+      right_hand_side(dof_indices[i]) -= R_i.val();
+    }
   }
 }
 
@@ -231,98 +296,119 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
   const unsigned int n_q_points = fe_v.n_quadrature_points;
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
 
-  std::vector<Sacado::Fad::DFad<double> > independent_local_dof_values(dofs_per_cell), independent_neighbor_dof_values(external_face == false ? dofs_per_cell : 0);
+  // Boundary values handling.
+  std::vector<Vector<double> > boundary_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
+  if (external_face)
+    boundary_conditions.bc_vector_value(boundary_id, fe_v.get_quadrature_points(), boundary_values);
 
-  const unsigned int n_independent_variables = (external_face == false ? 2 * dofs_per_cell : dofs_per_cell);
-
-  for (unsigned int i = 0; i < dofs_per_cell; i++)
+  // This is for the explicit case.
+  if (parameters.theta < 1.)
   {
-    independent_local_dof_values[i] = current_solution(dof_indices[i]);
-    independent_local_dof_values[i].diff(i, n_independent_variables);
-  }
+    Table<2, double> Wplus_old(n_q_points, Equations<equationsType, dim>::n_components), Wminus_old(n_q_points, Equations<equationsType, dim>::n_components);
 
-  if (external_face == false)
-  {
-    for (unsigned int i = 0; i < dofs_per_cell; i++)
-    {
-      independent_neighbor_dof_values[i] = current_solution(dof_indices_neighbor[i]);
-      independent_neighbor_dof_values[i].diff(i + dofs_per_cell, n_independent_variables);
-    }
-  }
+    std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
 
-  Table<2, Sacado::Fad::DFad<double> > Wplus(n_q_points, Equations<equationsType, dim>::n_components), Wminus(n_q_points, Equations<equationsType, dim>::n_components);
-  Table<2, double> Wplus_old(n_q_points, Equations<equationsType, dim>::n_components), Wminus_old(n_q_points, Equations<equationsType, dim>::n_components);
-
-  for (unsigned int q = 0; q < n_q_points; ++q)
-  {
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    {
-      const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
-      Wplus[q][component_i] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_i);
-      Wplus_old[q][component_i] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_i);
-    }
-  }
-
-  if (external_face == false)
-  {
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int component_i = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-        Wminus[q][component_i] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_i);
-        Wminus_old[q][component_i] += old_solution(dof_indices_neighbor[i])* fe_v_neighbor.shape_value_component(i, q, component_i);
+        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+        Wplus_old[q][component_i] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_i);
+        if (!external_face)
+        {
+          const unsigned int component_i = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+          Wminus_old[q][component_i] += old_solution(dof_indices_neighbor[i])* fe_v_neighbor.shape_value_component(i, q, component_i);
+        }
       }
+      if (external_face)
+        equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
+
+      equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
     }
-  }
-  else
-  {
-    std::vector<Vector<double> > boundary_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
-    boundary_conditions.bc_vector_value(boundary_id, fe_v.get_quadrature_points(), boundary_values);
 
-    for (unsigned int q = 0; q < n_q_points; q++)
+    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus[q], boundary_values[q], Wminus[q]);
-      equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
-    }
-  }
-
-  std::vector< std_cxx11::array < Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > normal_fluxes(n_q_points);
-  std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
-
-  for (unsigned int q = 0; q < n_q_points; ++q)
-  {
-    equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
-    equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
-  }
-
-  std::vector<double> residual_derivatives(dofs_per_cell);
-
-  for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
-  {
-    if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
-    {
-      Sacado::Fad::DFad<double> R_i = 0;
-
-      for (unsigned int point = 0; point < n_q_points; ++point)
+      if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
       {
         const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+        double val = 0.;
 
-        R_i += (parameters.theta * normal_fluxes[point][component_i] + (1.0 - parameters.theta) * normal_fluxes_old[point][component_i]) * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        for (unsigned int point = 0; point < n_q_points; ++point)
+          val += (1.0 - parameters.theta) * normal_fluxes_old[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+
+        right_hand_side(dof_indices[i]) -= val;
       }
+    }
+  }
 
-      for (unsigned int k = 0; k < dofs_per_cell; ++k)
-        residual_derivatives[k] = R_i.fastAccessDx(k);
-      system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
+  // Now this is for the implicit case.
+  if (parameters.theta > 0.)
+  {
+    std::vector<Sacado::Fad::DFad<double> > independent_local_dof_values(dofs_per_cell), independent_neighbor_dof_values(external_face == false ? dofs_per_cell : 0);
+    const unsigned int n_independent_variables = (external_face == false ? 2 * dofs_per_cell : dofs_per_cell);
 
-      if (external_face == false)
+    Table<2, Sacado::Fad::DFad<double> > Wplus(n_q_points, Equations<equationsType, dim>::n_components), Wminus(n_q_points, Equations<equationsType, dim>::n_components);
+
+    std::vector< std_cxx11::array < Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > normal_fluxes(n_q_points);
+
+    for (unsigned int i = 0; i < dofs_per_cell; i++)
+    {
+      independent_local_dof_values[i] = current_solution(dof_indices[i]);
+      independent_local_dof_values[i].diff(i, n_independent_variables);
+    }
+
+    if (external_face == false)
+    {
+      for (unsigned int i = 0; i < dofs_per_cell; i++)
       {
-        for (unsigned int k = 0; k < dofs_per_cell; ++k)
-          residual_derivatives[k] = R_i.fastAccessDx(dofs_per_cell + k);
-        system_matrix.add(dof_indices[i], dof_indices_neighbor, residual_derivatives);
+        independent_neighbor_dof_values[i] = current_solution(dof_indices_neighbor[i]);
+        independent_neighbor_dof_values[i].diff(i + dofs_per_cell, n_independent_variables);
       }
+    }
 
-      right_hand_side(dof_indices[i]) -= R_i.val();
+    for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+        Wplus[q][component_i] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_i);
+        if (!external_face)
+        {
+          const unsigned int component_i = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+          Wminus[q][component_i] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_i);
+        }
+      }
+      if (external_face)
+        equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus[q], boundary_values[q], Wminus[q]);
+
+      equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
+    }
+
+    std::vector<double> residual_derivatives(dofs_per_cell);
+
+    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    {
+      if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
+      {
+        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+        Sacado::Fad::DFad<double> R_i = 0;
+
+        for (unsigned int point = 0; point < n_q_points; ++point)
+          R_i += parameters.theta * normal_fluxes[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+
+        for (unsigned int k = 0; k < dofs_per_cell; ++k)
+          residual_derivatives[k] = R_i.fastAccessDx(k);
+        system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
+
+        if (external_face == false)
+        {
+          for (unsigned int k = 0; k < dofs_per_cell; ++k)
+            residual_derivatives[k] = R_i.fastAccessDx(dofs_per_cell + k);
+          system_matrix.add(dof_indices[i], dof_indices_neighbor, residual_derivatives);
+        }
+
+        right_hand_side(dof_indices[i]) -= R_i.val();
+      }
     }
   }
 }
@@ -345,10 +431,8 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
 
   if (parameters.solver == Parameters<dim>::gmres)
   {
-    Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(),
-      newton_update.begin());
-    Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(),
-      right_hand_side.begin());
+    Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
+    Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), right_hand_side.begin());
 
     AztecOO solver;
     solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));

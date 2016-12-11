@@ -30,41 +30,29 @@ void load_slide_mesh<3>(Triangulation<3>& triangulation, Parameters<3>& paramete
 
   grid_in.read_ucd(input_file);
 
-  GridGenerator::extrude_triangulation(tempTriangulation, parameters.MeshSlicesInZDirection, 0.5, triangulation);
+  GridGenerator::extrude_triangulation(tempTriangulation, parameters.mesh_extrusion_slices, 0.5, triangulation);
 }
 
 template<int dim>
-void load_cube_mesh(Triangulation<dim>& triangulation, Parameters<dim>& parameters);
-
-template<>
-void load_cube_mesh<2>(Triangulation<2>& triangulation, Parameters<2>& parameters)
+void load_cube_mesh(Triangulation<dim>& triangulation, Parameters<dim>& parameters)
 {
-  GridGenerator::hyper_cube(triangulation, parameters.cube_left, parameters.cube_right);
-  triangulation.refine_global(parameters.uniform_refinements);
+  GridGenerator::subdivided_hyper_rectangle(triangulation, parameters.refinements, parameters.corner_a, parameters.corner_b);
 }
-
-template<>
-void load_cube_mesh<3>(Triangulation<3>& triangulation, Parameters<3>& parameters)
-{
-  GridGenerator::subdivided_hyper_rectangle(triangulation, std::vector<unsigned int>({ parameters.uniform_refinements, parameters.uniform_refinements, 1 }), Point<3>(parameters.cube_left, parameters.cube_left, -.01), Point<3>(parameters.cube_right, parameters.cube_right, 0.01));
-}
-
 
 template <int dim>
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
-  this->mesh_filename = "slide.inp";
-  this->MeshSlicesInZDirection = 2;
-  this->cube_left = -.5;
-  this->cube_right = .5;
-  this->uniform_refinements = 50;
+  this->corner_a = Point<dim>(-.5, -.5, -.01);
+  this->corner_b = Point<dim>(.5, .5, .01);
+  this->refinements = { 1, 1, 1 };
+
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
-  this->time_step = .0001;
+  this->time_step = .001;
   this->theta = 0.0;
-  this->time_step_after_initialization = .0001;
-  this->theta_after_initialization = .5;
+  this->time_step_after_initialization = .001;
+  this->theta_after_initialization = .0;
   this->initialization_time = 0.;
 
   this->output = OutputType::quiet_solver;
@@ -78,7 +66,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->gas_gamma = 1.4;
 
-  this->polynomial_order = 0;
+  this->polynomial_order = 1;
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-10;
 
@@ -88,6 +76,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->lax_friedrich_stabilization_value = 1.;
 
   this->is_stationary = false;
+
+  this->needs_gradients = false;
 }
 
 template class Parameters<2>;

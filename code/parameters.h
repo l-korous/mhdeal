@@ -39,12 +39,15 @@ public:
   int polynomial_order;
   int max_nonlinear_iterations;
   double nonlinear_residual_norm_threshold;
+  bool needs_gradients;
 
-  // Mesh
+  // Mesh - string input
   std::string mesh_filename;
-  int MeshSlicesInZDirection;
-  double cube_left, cube_right;
-  unsigned int uniform_refinements;
+  int mesh_extrusion_slices;
+
+  // Mesh - generation
+  Point<dim> corner_a, corner_b;
+  std::vector<unsigned int> refinements;
 };
 
 #endif
