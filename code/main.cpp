@@ -17,16 +17,10 @@ int main(int argc, char *argv[])
 
 #endif
 
+    deal_II_exceptions::disable_abort_on_exception();
+
   try
   {
-    using namespace dealii;
-
-    if (argc != 2)
-    {
-      std::cout << "Usage:" << argv[0] << " input_file" << std::endl;
-      std::exit(1);
-    }
-
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, dealii::numbers::invalid_unsigned_int);
 
     Triangulation<DIMENSION> triangulation;

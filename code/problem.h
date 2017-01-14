@@ -49,7 +49,7 @@ private:
 
   Equations<equationsType, dim>& equations;
 
-  Vector<double> right_hand_side;
+  Vector<double> system_rhs;
 
   TrilinosWrappers::SparseMatrix system_matrix;
 

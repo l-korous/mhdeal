@@ -44,18 +44,20 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->corner_a = Point<dim>(-.5, -.5, -.01);
   this->corner_b = Point<dim>(.5, .5, .01);
-  this->refinements = { 20, 20, 1 };
+  this->refinements = { 10, 10, 1 };
 
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
-  this->time_step = .001;
+  this->time_step = .0001;
   this->theta = 0.0;
-  this->time_step_after_initialization = .001;
-  this->theta_after_initialization = .5;
+  this->time_step_after_initialization = .0001;
+  this->theta_after_initialization = .0;
   this->initialization_time = 0.;
 
   this->output = OutputType::quiet_solver;
+  this->output_matrix = false;
+
   this->solver = SolverType::direct;
   this->linear_residual = 1e-10;
   this->max_iterations = 300;
@@ -66,7 +68,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->gas_gamma = 1.4;
 
-  this->polynomial_order = 0;
+  this->polynomial_order_dg = 0;
+  this->polynomial_order_hdiv = 1;
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-10;
 

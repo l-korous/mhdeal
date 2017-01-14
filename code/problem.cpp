@@ -8,10 +8,12 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
   mapping(),
-  fe(FE_DGQ<dim>(parameters.polynomial_order), Equations<equationsType, dim>::n_components),
+  fe(FE_DGQ<dim>(parameters.polynomial_order_dg), 4,
+    FE_RaviartThomas<dim>(1), 1,
+    FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
   dof_handler(triangulation),
-  quadrature(parameters.polynomial_order + 1),
-  face_quadrature(parameters.polynomial_order + 1),
+  quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 1),
+  face_quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 1),
   verbose_cout(std::cout, false)
 {
 }
@@ -136,18 +138,30 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       }
     }
 
+    const FEValuesExtractors::Vector mag(dim + 1);
+
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int c = fe_v.get_fe().system_to_component_index(i).first;
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
-        W_old[q][c] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, c);
+        if (component_i == 1)
+        {
+          W_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+          W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+          W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+        }
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+        }
 
-        if (this->parameters.needs_gradients)
+        if (parameters.theta > 0. && this->parameters.needs_gradients)
         {
           for (unsigned int d = 0; d < dim; d++)
-            grad_W_old[q][c][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, c)[d];
+            grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
         }
       }
     }
@@ -167,27 +181,39 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
       double val = 0;
 
-      for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
+      for (unsigned int q = 0; q < fe_v.n_quadrature_points; ++q)
       {
         if (parameters.is_stationary == false)
-          val -= 1.0 / parameters.time_step * W_old[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        {
+          if (component_i == 1)
+          {
+            val -= (1.0 / parameters.time_step)
+              * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
+              * fe_v.JxW(q);
+          }
+          else
+          {
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+          }
+        }
 
         for (unsigned int d = 0; d < dim; d++)
-          val -= (1.0 - parameters.theta) * flux_old[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+          val -= (1.0 - parameters.theta) * flux_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
         if (this->parameters.needs_gradients)
         {
           for (unsigned int d = 0; d < dim; d++)
-            val += (1.0 - parameters.theta) * jacobian_addition_old[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+            val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
         }
 
-        val -= (1.0 - parameters.theta) * forcing_old[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
       }
 
-      right_hand_side(dof_indices[i]) -= val;
+      system_rhs(dof_indices[i]) -= val;
     }
   }
 
@@ -217,18 +243,30 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       }
     }
 
+    const FEValuesExtractors::Vector mag(dim + 1);
+
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int c = fe_v.get_fe().system_to_component_index(i).first;
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
-        W[q][c] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, c);
+        if (component_i == 1)
+        {
+          W[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
+          W[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
+          W[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
+        }
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          W[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
+        }
 
         if (parameters.theta > 0. && this->parameters.needs_gradients)
         {
           for (unsigned int d = 0; d < dim; d++)
-            grad_W[q][c][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, c)[d];
+            grad_W[q][component_i][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, component_i)[d];
         }
       }
     }
@@ -251,25 +289,37 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
     {
-      const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
       Sacado::Fad::DFad<double> R_i = 0;
 
-      for (unsigned int point = 0; point < fe_v.n_quadrature_points; ++point)
+      for (unsigned int q = 0; q < fe_v.n_quadrature_points; ++q)
       {
         if (parameters.is_stationary == false)
-          R_i += 1.0 / parameters.time_step * W[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        {
+          if (component_i == 1)
+          {
+            R_i += (1.0 / parameters.time_step)
+              * (W[q][4] * fe_v[mag].value(i, q)[0] + W[q][5] * fe_v[mag].value(i, q)[1] + W[q][6] * fe_v[mag].value(i, q)[2])
+              * fe_v.JxW(q);
+          }
+          else
+          {
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+          }
+        }
 
         if (this->parameters.theta > 0.) {
           for (unsigned int d = 0; d < dim; d++)
-            R_i -= parameters.theta * flux[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+            R_i -= parameters.theta * flux[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
           if (this->parameters.needs_gradients)
           {
             for (unsigned int d = 0; d < dim; d++)
-              R_i += parameters.theta * jacobian_addition[point][component_i][d] * fe_v.shape_grad_component(i, point, component_i)[d] * fe_v.JxW(point);
+              R_i += parameters.theta * jacobian_addition[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
           }
 
-          R_i -= parameters.theta * forcing[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+          R_i -= parameters.theta * forcing[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
         }
       }
 
@@ -277,7 +327,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         residual_derivatives[k] = R_i.fastAccessDx(k);
 
       system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
-      right_hand_side(dof_indices[i]) -= R_i.val();
+      system_rhs(dof_indices[i]) -= R_i.val();
     }
   }
 }
@@ -308,16 +358,41 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
 
+    const FEValuesExtractors::Vector mag(dim + 1);
+
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
-        Wplus_old[q][component_i] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_i);
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+
+        if (component_i == 1)
+        {
+          Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+          Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+          Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+        }
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+        }
+
         if (!external_face)
         {
-          const unsigned int component_i = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-          Wminus_old[q][component_i] += old_solution(dof_indices_neighbor[i])* fe_v_neighbor.shape_value_component(i, q, component_i);
+          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+
+          if (component_i_neighbor == 1)
+          {
+            Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+            Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+            Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+          }
+          else
+          {
+            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+            Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+          }
         }
       }
       if (external_face)
@@ -330,13 +405,25 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
         double val = 0.;
 
-        for (unsigned int point = 0; point < n_q_points; ++point)
-          val += (1.0 - parameters.theta) * normal_fluxes_old[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        for (unsigned int q = 0; q < n_q_points; ++q)
+        {
+          if (component_i == 1)
+          {
+            val += (1.0 - parameters.theta)
+              * (normal_fluxes_old[q][4] * fe_v[mag].value(i, q)[0] + normal_fluxes_old[q][5] * fe_v[mag].value(i, q)[1] + normal_fluxes_old[q][6] * fe_v[mag].value(i, q)[2])
+              * fe_v.JxW(q);
+          }
+          else
+          {
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            val += (1.0 - parameters.theta) * normal_fluxes_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+          }
+        }
 
-        right_hand_side(dof_indices[i]) -= val;
+        system_rhs(dof_indices[i]) -= val;
       }
     }
   }
@@ -366,16 +453,41 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       }
     }
 
+    const FEValuesExtractors::Vector mag(dim + 1);
+
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
-        Wplus[q][component_i] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_i);
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+
+        if (component_i == 1)
+        {
+          Wplus[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
+          Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
+          Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
+        }
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          Wplus[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
+        }
+
         if (!external_face)
         {
-          const unsigned int component_i = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-          Wminus[q][component_i] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_i);
+          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+
+          if (component_i_neighbor == 1)
+          {
+            Wminus[q][4] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
+            Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
+            Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
+          }
+          else
+          {
+            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+            Wminus[q][component_ii_neighbor] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+          }
         }
       }
       if (external_face)
@@ -390,11 +502,23 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_component_index(i).first;
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
         Sacado::Fad::DFad<double> R_i = 0;
 
-        for (unsigned int point = 0; point < n_q_points; ++point)
-          R_i += parameters.theta * normal_fluxes[point][component_i] * fe_v.shape_value_component(i, point, component_i) * fe_v.JxW(point);
+        for (unsigned int q = 0; q < n_q_points; ++q)
+        {
+          if (component_i == 1)
+          {
+            R_i += (1.0 - parameters.theta)
+              * (normal_fluxes[q][4] * fe_v[mag].value(i, q)[0] + normal_fluxes[q][5] * fe_v[mag].value(i, q)[1] + normal_fluxes[q][6] * fe_v[mag].value(i, q)[2])
+              * fe_v.JxW(q);
+          }
+          else
+          {
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            R_i += (1.0 - parameters.theta) * normal_fluxes[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+          }
+        }
 
         for (unsigned int k = 0; k < dofs_per_cell; ++k)
           residual_derivatives[k] = R_i.fastAccessDx(k);
@@ -407,7 +531,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           system_matrix.add(dof_indices[i], dof_indices_neighbor, residual_derivatives);
         }
 
-        right_hand_side(dof_indices[i]) -= R_i.val();
+        system_rhs(dof_indices[i]) -= R_i.val();
       }
     }
   }
@@ -423,7 +547,7 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
     TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
     TrilinosWrappers::SolverDirect direct(solver_control, data);
 
-    direct.solve(system_matrix, newton_update, right_hand_side);
+    direct.solve(system_matrix, newton_update, system_rhs);
 
     return std::pair<unsigned int, double>(solver_control.last_step(),
       solver_control.last_value());
@@ -432,7 +556,7 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
   if (parameters.solver == Parameters<dim>::gmres)
   {
     Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
-    Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), right_hand_side.begin());
+    Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
 
     AztecOO solver;
     solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
@@ -493,11 +617,13 @@ void Problem<equationsType, dim>::run()
   old_solution.reinit(dof_handler.n_dofs());
   current_solution.reinit(dof_handler.n_dofs());
   newton_initial_guess.reinit(dof_handler.n_dofs());
-  right_hand_side.reinit(dof_handler.n_dofs());
+  system_rhs.reinit(dof_handler.n_dofs());
 
   setup_system();
 
-  VectorTools::interpolate(dof_handler, initial_condition, old_solution);
+  ConstraintMatrix constraints;
+  constraints.close();
+  VectorTools::project(dof_handler, constraints, quadrature, initial_condition, old_solution);
   current_solution = old_solution;
   newton_initial_guess = old_solution;
 
@@ -506,6 +632,7 @@ void Problem<equationsType, dim>::run()
   Vector<double> newton_update(dof_handler.n_dofs());
 
   double time = 0;
+  int time_step = 0;
   double next_output = time + parameters.output_step;
 
   newton_initial_guess = old_solution;
@@ -526,10 +653,26 @@ void Problem<equationsType, dim>::run()
     {
       system_matrix = 0;
 
-      right_hand_side = 0;
+      system_rhs = 0;
       assemble_system();
 
-      const double res_norm = right_hand_side.l2_norm();
+      if (parameters.output_matrix)
+      {
+        std::ofstream m;
+        std::stringstream ssm;
+        ssm << "m-" << time_step << "-" << nonlin_iter;
+        m.open(ssm.str());
+        system_matrix.print(m);
+        m.close();
+        std::ofstream r;
+        std::stringstream ssr;
+        ssr << "r-" << time_step++ << "-" << nonlin_iter;
+        r.open(ssr.str());
+        system_rhs.print(r, 3, false, false);
+        r.close();
+      }
+
+      const double res_norm = system_rhs.l2_norm();
       if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
       {
         std::printf("   %-16.3e (converged)\n\n", res_norm);
@@ -537,10 +680,10 @@ void Problem<equationsType, dim>::run()
       }
       else
       {
+        std::printf("   %-16.3e\n", res_norm);
         newton_update = 0;
         std::pair<unsigned int, double> convergence = solve(newton_update);
         current_solution += newton_update;
-        std::printf("   %-16.3e %04d        %-5.2e\n", res_norm, convergence.first, convergence.second);
       }
 
       ++nonlin_iter;

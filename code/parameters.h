@@ -17,6 +17,7 @@ public:
 
   // Output
   double output_step;
+  double output_matrix;
 
   double gas_gamma;
 
@@ -36,7 +37,8 @@ public:
   double time_step, final_time, theta;
   double time_step_after_initialization, initialization_time, theta_after_initialization;
   bool is_stationary;
-  int polynomial_order;
+  int polynomial_order_dg;
+  int polynomial_order_hdiv;
   int max_nonlinear_iterations;
   double nonlinear_residual_norm_threshold;
   bool needs_gradients;
