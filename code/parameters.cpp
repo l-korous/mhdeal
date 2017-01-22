@@ -42,37 +42,38 @@ void load_cube_mesh(Triangulation<dim>& triangulation, Parameters<dim>& paramete
 template <int dim>
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
-  this->corner_a = Point<dim>(-.5, -.5, -.01);
-  this->corner_b = Point<dim>(.5, .5, .01);
-  this->refinements = { 10, 10, 1 };
-
+  this->corner_a = Point<dim>(-.5, -.75, -.01);
+  this->corner_b = Point<dim>(.5, .75, .01);
+  this->refinements = { 64, 64, 1 };
+  
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
-  this->time_step = .0001;
+  this->time_step = 1e-6;
   this->theta = 0.0;
-  this->time_step_after_initialization = .0001;
-  this->theta_after_initialization = .0;
+  this->time_step_after_initialization = 1e-4;
+  this->theta_after_initialization = .5;
   this->initialization_time = 0.;
 
   this->output = OutputType::quiet_solver;
   this->output_matrix = false;
 
   this->linear_residual = 1e-10;
-  this->max_iterations = 300;
+  this->max_iterations = 10000;
   this->ilut_fill = 1.5;
   this->ilut_drop = 1e-6;
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
+  this->newton_damping = .8
 
   this->gas_gamma = 1.4;
 
   this->polynomial_order_dg = 0;
   this->polynomial_order_hdiv = 1;
   this->max_nonlinear_iterations = 30;
-  this->nonlinear_residual_norm_threshold = 1e-10;
+  this->nonlinear_residual_norm_threshold = 1e-12;
 
-  this->output_step = this->time_step;
+  this->output_step = 1e-3;
 
   this->num_flux_type = hlld;
   this->lax_friedrich_stabilization_value = 1.;

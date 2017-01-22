@@ -21,6 +21,11 @@ public:
 
   double gas_gamma;
 
+  // Nonlinear solver
+  double newton_damping;
+  int max_nonlinear_iterations;
+  double nonlinear_residual_norm_threshold;
+
   // Linear solver
   enum SolverType { gmres, direct };
   SolverType solver;
@@ -39,8 +44,6 @@ public:
   bool is_stationary;
   int polynomial_order_dg;
   int polynomial_order_hdiv;
-  int max_nonlinear_iterations;
-  double nonlinear_residual_norm_threshold;
   bool needs_gradients;
 
   // Mesh - string input

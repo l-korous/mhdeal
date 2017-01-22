@@ -595,14 +595,22 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
   dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
   SolverControl solver_control(dof_handler.n_dofs(), 1e-12);
   dealii::LinearAlgebraTrilinos::SolverCG solver(solver_control);
-  dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG preconditioner;
-  dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG::AdditionalData data;
-
-  preconditioner.initialize(system_matrix, data);
-  solver.solve(system_matrix, completely_distributed_solution, system_rhs, preconditioner);
+  if (parameters.theta < 1e-12)
+  {
+    dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi preconditioner;
+    dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi::AdditionalData data;
+    preconditioner.initialize(system_matrix, data);
+    solver.solve(system_matrix, completely_distributed_solution, system_rhs, preconditioner);
+  }
+  else
+  {
+    dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG preconditioner;
+    dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG::AdditionalData data;
+    preconditioner.initialize(system_matrix, data);
+    solver.solve(system_matrix, completely_distributed_solution, system_rhs, preconditioner);
+  }
 
   constraints.distribute(completely_distributed_solution);
-
   newton_update = completely_distributed_solution;
 #else
   SolverControl solver_control(1, 0);
