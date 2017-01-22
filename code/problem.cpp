@@ -697,10 +697,13 @@ void Problem<equationsType, dim>::process_initial_condition()
   VectorTools::project(temporaryDofHandler, temporaryConstraints, quadrature, initial_condition, first_solution);
   std::vector<types::global_dof_index> indices;
   std::vector<double> targetVector;
-  this->locally_relevant_dofs.fill_index_vector(indices);
+  this->locally_owned_dofs.fill_index_vector(indices);
   targetVector.reserve(indices.size());
   first_solution.extract_subvector_to(indices, targetVector);
-  old_solution.add(indices, targetVector);
+  TrilinosWrappers::MPI::Vector     old_solution_temp;
+  old_solution_temp.reinit(locally_owned_dofs, mpi_communicator);
+  old_solution_temp.add(indices, targetVector);
+  old_solution = old_solution_temp;
 #else
   VectorTools::project(dof_handler, temporaryConstraints, quadrature, initial_condition, old_solution);
 #endif
