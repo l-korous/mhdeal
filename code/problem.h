@@ -9,11 +9,13 @@ template <EquationsType equationsType, int dim>
 class Problem
 {
 public:
+  Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
-  Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations, parallel::distributed::Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
+    parallel::distributed::Triangulation<dim>& triangulation,
 #else
-  Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations, Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
+    Triangulation<dim>& triangulation,
 #endif
+    InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
   void run();
 
 private:

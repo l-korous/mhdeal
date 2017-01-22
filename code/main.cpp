@@ -29,7 +29,6 @@ int main(int argc, char *argv[])
     system("rm *.pvtu");
 #endif
 #endif
-    deal_II_exceptions::disable_abort_on_exception();
   }
 
 #ifdef HAVE_MPI
