@@ -8,6 +8,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   Triangulation<dim>& triangulation,
 #endif
   InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
+#ifdef HAVE_MPI
+  mpi_communicator(MPI_COMM_WORLD),
+#endif
   parameters(parameters),
   equations(equations),
   triangulation(triangulation),
