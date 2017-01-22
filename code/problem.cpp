@@ -690,7 +690,12 @@ void Problem<equationsType, dim>::process_initial_condition()
 
 #ifdef HAVE_MPI
   DoFHandler<dim> temporaryDofHandler(this->sharedTriangulationForInitialCondition);
-  VectorTools::project(temporaryDofHandler, temporaryConstraints, quadrature, initial_condition, old_solution);
+  temporaryDofHandler.clear();
+  temporaryDofHandler.distribute_dofs(fe);
+  Vector<double> first_solution;
+  first_solution.reinit(dof_handler.n_dofs());
+  VectorTools::project(temporaryDofHandler, temporaryConstraints, quadrature, initial_condition, first_solution);
+  old_solution = first_solution;
 #else
   VectorTools::project(dof_handler, temporaryConstraints, quadrature, initial_condition, old_solution);
 #endif
