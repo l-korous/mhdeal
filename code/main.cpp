@@ -20,10 +20,12 @@ int main(int argc, char *argv[])
   {
 #ifdef DELETE_VTK_ON_START
 #ifdef _MSC_VER
+    system("del *.visit");
     system("del *.vtk");
     system("del *.vtu");
     system("del *.pvtu");
 #else
+    system("rm *.visit");
     system("rm *.vtk");
     system("rm *.vtu");
     system("rm *.pvtu");
