@@ -7,13 +7,14 @@
 
 int main(int argc, char *argv[])
 {
-  try
-  {
-    Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, dealii::numbers::invalid_unsigned_int);
-
+  Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, dealii::numbers::invalid_unsigned_int);
 #ifdef HAVE_MPI
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
+#endif
 
+  try
+  {
+#ifdef HAVE_MPI
   if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
 #endif
   {
