@@ -58,7 +58,6 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->output = OutputType::quiet_solver;
   this->output_matrix = false;
 
-  this->solver = SolverType::direct;
   this->linear_residual = 1e-10;
   this->max_iterations = 300;
   this->ilut_fill = 1.5;

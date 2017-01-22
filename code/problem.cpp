@@ -1,7 +1,13 @@
 #include "problem.h"
 
 template <EquationsType equationsType, int dim>
-Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations, Triangulation<dim>& triangulation, InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
+Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
+#ifdef HAVE_MPI
+  parallel::distributed::Triangulation<dim>& triangulation,
+#else
+  Triangulation<dim>& triangulation,
+#endif
+  InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
   parameters(parameters),
   equations(equations),
   triangulation(triangulation),
@@ -12,8 +18,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
     FE_RaviartThomas<dim>(1), 1,
     FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
   dof_handler(triangulation),
-  quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 1),
-  face_quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 1),
+  quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 2),
+  face_quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 2),
   verbose_cout(std::cout, false)
 {
 }
@@ -21,10 +27,27 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::setup_system()
 {
-  DynamicSparsityPattern dsp(dof_handler.n_dofs(), dof_handler.n_dofs());
-  DoFTools::make_flux_sparsity_pattern(dof_handler, dsp);
+  dof_handler.clear();
+  dof_handler.distribute_dofs(fe);
+  DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
+  locally_owned_dofs = dof_handler.locally_owned_dofs();
 
+  constraints.clear();
+  constraints.reinit(locally_relevant_dofs);
+  DoFTools::make_hanging_node_constraints(dof_handler, constraints);
+  constraints.close();
+
+  DynamicSparsityPattern dsp(locally_relevant_dofs);
+  DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
+
+#ifdef HAVE_MPI
+  system_rhs.reinit(locally_owned_dofs, mpi_communicator);
+  SparsityTools::distribute_sparsity_pattern(dsp, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
+  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
+#else
   system_matrix.reinit(dsp);
+  system_rhs.reinit(dof_handler.n_dofs());
+#endif
 }
 
 template <EquationsType equationsType, int dim>
@@ -45,19 +68,33 @@ void Problem<equationsType, dim>::assemble_system()
   FEFaceValues<dim> fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags);
   FESubfaceValues<dim> fe_v_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags);
 
+  FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
+  FullMatrix<double> cell_matrix_neighbor(dofs_per_cell, dofs_per_cell);
+  Vector<double> cell_rhs(dofs_per_cell);
+  Vector<double> cell_rhs_neighbor(dofs_per_cell);
+
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
   {
+    if (!cell->is_locally_owned())
+      continue;
+
+    cell_matrix = 0;
+    cell_rhs = 0;
+
     fe_v.reinit(cell);
     cell->get_dof_indices(dof_indices);
 
-    assemble_cell_term(fe_v, dof_indices);
+    assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
 
     for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
     {
+      cell_matrix_neighbor = 0;
+      cell_rhs_neighbor = 0;
+
       if (cell->at_boundary(face_no))
       {
         fe_v_face.reinit(cell, face_no);
-        assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter());
+        assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
       }
       else
       {
@@ -77,7 +114,9 @@ void Problem<equationsType, dim>::assemble_system()
 
             neighbor_child->get_dof_indices(dof_indices_neighbor);
 
-            assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter());
+            assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+
+            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
         }
         else if (cell->neighbor(face_no)->level() != cell->level())
@@ -95,7 +134,9 @@ void Problem<equationsType, dim>::assemble_system()
           fe_v_face.reinit(cell, face_no);
           fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
 
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter());
+          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+
+          constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
         }
         else
         {
@@ -105,16 +146,23 @@ void Problem<equationsType, dim>::assemble_system()
           fe_v_face.reinit(cell, face_no);
           fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
 
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter());
+          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+
+          constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
         }
       }
     }
+
+    constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
   }
+
+  system_matrix.compress(VectorOperation::add);
+  system_rhs.compress(VectorOperation::add);
 }
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index> &dof_indices)
+Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& dof_indices, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs)
 {
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
@@ -213,7 +261,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
       }
 
-      system_rhs(dof_indices[i]) -= val;
+      cell_rhs(i) -= val;
     }
   }
 
@@ -324,10 +372,9 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       }
 
       for (unsigned int k = 0; k < dofs_per_cell; ++k)
-        residual_derivatives[k] = R_i.fastAccessDx(k);
+        cell_matrix(i, k) += R_i.fastAccessDx(k);
 
-      system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
-      system_rhs(dof_indices[i]) -= R_i.val();
+      cell_rhs(i) -= R_i.val();
     }
   }
 }
@@ -341,7 +388,8 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
   const std::vector<types::global_dof_index> &dof_indices_neighbor,
   const bool                   external_face,
   const unsigned int           boundary_id,
-  const double                 face_diameter)
+  const double                 face_diameter,
+  FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, FullMatrix<double>& cell_matrix_neighbor, Vector<double>& cell_rhs_neighbor)
 {
   const unsigned int n_q_points = fe_v.n_quadrature_points;
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
@@ -423,7 +471,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
 
-        system_rhs(dof_indices[i]) -= val;
+        cell_rhs(i) -= val;
       }
     }
   }
@@ -521,66 +569,48 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         }
 
         for (unsigned int k = 0; k < dofs_per_cell; ++k)
-          residual_derivatives[k] = R_i.fastAccessDx(k);
-        system_matrix.add(dof_indices[i], dof_indices, residual_derivatives);
+          cell_matrix(i, k) += R_i.fastAccessDx(k);
 
         if (external_face == false)
         {
           for (unsigned int k = 0; k < dofs_per_cell; ++k)
-            residual_derivatives[k] = R_i.fastAccessDx(dofs_per_cell + k);
-          system_matrix.add(dof_indices[i], dof_indices_neighbor, residual_derivatives);
+            cell_matrix_neighbor(i, k) += R_i.fastAccessDx(dofs_per_cell + k);
         }
 
-        system_rhs(dof_indices[i]) -= R_i.val();
+        cell_rhs(i) -= R_i.val();
       }
     }
   }
 }
 
 template <EquationsType equationsType, int dim>
-std::pair<unsigned int, double>
+void
+#ifdef HAVE_MPI
+Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
+#else
 Problem<equationsType, dim>::solve(Vector<double> &newton_update)
+#endif
 {
-  if (parameters.solver == Parameters<dim>::direct)
-  {
-    SolverControl solver_control(1, 0);
-    TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
-    TrilinosWrappers::SolverDirect direct(solver_control, data);
+#ifdef HAVE_MPI
+  dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
+  SolverControl solver_control(dof_handler.n_dofs(), 1e-12);
+  dealii::LinearAlgebraTrilinos::SolverCG solver(solver_control);
+  dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG preconditioner;
+  dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG::AdditionalData data;
 
-    direct.solve(system_matrix, newton_update, system_rhs);
+  preconditioner.initialize(system_matrix, data);
+  solver.solve(system_matrix, completely_distributed_solution, system_rhs, preconditioner);
 
-    return std::pair<unsigned int, double>(solver_control.last_step(),
-      solver_control.last_value());
-  }
+  constraints.distribute(completely_distributed_solution);
 
-  if (parameters.solver == Parameters<dim>::gmres)
-  {
-    Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
-    Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
+  newton_update = completely_distributed_solution;
+#else
+  SolverControl solver_control(1, 0);
+  TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
+  TrilinosWrappers::SolverDirect direct(solver_control, data);
 
-    AztecOO solver;
-    solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
-    solver.SetAztecOption(AZ_solver, AZ_gmres);
-    solver.SetRHS(&b);
-    solver.SetLHS(&x);
-
-    solver.SetAztecOption(AZ_precond, AZ_dom_decomp);
-    solver.SetAztecOption(AZ_subdomain_solve, AZ_ilut);
-    solver.SetAztecOption(AZ_overlap, 0);
-    solver.SetAztecOption(AZ_reorder, 0);
-
-    solver.SetAztecParam(AZ_drop, parameters.ilut_drop);
-    solver.SetAztecParam(AZ_ilut_fill, parameters.ilut_fill);
-    solver.SetAztecParam(AZ_athresh, parameters.ilut_atol);
-    solver.SetAztecParam(AZ_rthresh, parameters.ilut_rtol);
-
-    solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *>
-      (&system_matrix.trilinos_matrix()));
-
-    solver.Iterate(parameters.max_iterations, parameters.linear_residual);
-
-    return std::pair<unsigned int, double>(solver.NumIters(), solver.TrueResidual());
-  }
+  direct.solve(system_matrix, newton_update, system_rhs);
+#endif
 }
 
 template <EquationsType equationsType, int dim>
@@ -597,12 +627,43 @@ void Problem<equationsType, dim>::output_results() const
   // Derived quantities.
   data_out.add_data_vector(current_solution, postprocessor);
 
+#ifdef HAVE_MPI
+  // Subdomains.
+  Vector<float> subdomain(triangulation.n_active_cells());
+  for (unsigned int i = 0; i < subdomain.size(); ++i)
+    subdomain(i) = triangulation.locally_owned_subdomain();
+  data_out.add_data_vector(subdomain, "subdomain");
+#endif
+
   data_out.build_patches();
 
   static unsigned int output_file_number = 0;
+
+#ifdef HAVE_MPI
+  const std::string filename_base = "solution-" + Utilities::int_to_string(output_file_number, 3);
+
+  const std::string filename = (filename_base + "-" + Utilities::int_to_string(triangulation.locally_owned_subdomain(), 4));
+
+  std::ofstream output_vtu((filename + ".vtu").c_str());
+  data_out.write_vtu(output_vtu);
+
+  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+  {
+    std::vector<std::string> filenames;
+    for (unsigned int i = 0; i < Utilities::MPI::n_mpi_processes(mpi_communicator); ++i)
+      filenames.push_back(filename_base + "-" + Utilities::int_to_string(i, 4) + ".vtu");
+
+    std::ofstream pvtu_master_output((filename_base + ".pvtu").c_str());
+    data_out.write_pvtu_record(pvtu_master_output, filenames);
+
+    std::ofstream visit_master_output((filename_base + ".visit").c_str());
+    data_out.write_visit_record(visit_master_output, filenames);
+  }
+#else
   std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
   data_out.write_vtk(output);
+#endif
 
   ++output_file_number;
 }
@@ -617,9 +678,20 @@ void Problem<equationsType, dim>::run()
   old_solution.reinit(dof_handler.n_dofs());
   current_solution.reinit(dof_handler.n_dofs());
   newton_initial_guess.reinit(dof_handler.n_dofs());
-  system_rhs.reinit(dof_handler.n_dofs());
 
   setup_system();
+
+#ifdef HAVE_MPI
+  old_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
+  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
+#else
+  old_solution.reinit(dof_handler.n_dofs());
+  current_solution.reinit(dof_handler.n_dofs());
+  newton_initial_guess.reinit(dof_handler.n_dofs());
+  Vector<double> newton_update(dof_handler.n_dofs());
+#endif
 
   ConstraintMatrix constraints;
   constraints.close();
@@ -629,13 +701,10 @@ void Problem<equationsType, dim>::run()
 
   output_results();
 
-  Vector<double> newton_update(dof_handler.n_dofs());
-
   double time = 0;
   int time_step = 0;
   double next_output = time + parameters.output_step;
 
-  newton_initial_guess = old_solution;
   while (time < parameters.final_time)
   {
     if (time > this->parameters.initialization_time) {
@@ -643,9 +712,14 @@ void Problem<equationsType, dim>::run()
       this->parameters.theta = this->parameters.theta_after_initialization;
     }
 
-    std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
-      << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
-    std::cout << "   NonLin Res     Lin Iter       Lin Res" << std::endl << "   _____________________________________" << std::endl;
+#ifdef HAVE_MPI
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+#endif
+    {
+      std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
+        << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
+      std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
+    }
 
     unsigned int nonlin_iter = 0;
     current_solution = newton_initial_guess;
@@ -656,6 +730,8 @@ void Problem<equationsType, dim>::run()
       system_rhs = 0;
       assemble_system();
 
+
+#ifndef HAVE_MPI
       if (parameters.output_matrix)
       {
         std::ofstream m;
@@ -671,18 +747,25 @@ void Problem<equationsType, dim>::run()
         system_rhs.print(r, 3, false, false);
         r.close();
       }
-
+#endif
       const double res_norm = system_rhs.l2_norm();
-      if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
+
+#ifdef HAVE_MPI
+      if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+#endif
       {
-        std::printf("   %-16.3e (converged)\n\n", res_norm);
-        break;
+        if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
+          std::printf("   %-16.3e (converged)\n\n", res_norm);
+        else
+          std::printf("   %-16.3e\n", res_norm);
       }
+
+      if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
+        break;
       else
       {
-        std::printf("   %-16.3e\n", res_norm);
         newton_update = 0;
-        std::pair<unsigned int, double> convergence = solve(newton_update);
+        solve(newton_update);
         current_solution += newton_update;
       }
 

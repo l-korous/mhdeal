@@ -45,6 +45,11 @@
 #include <deal.II/lac/trilinos_precondition.h>
 #include <deal.II/lac/trilinos_solver.h>
 #include <Sacado.hpp>
+#include <deal.II/lac/generic_linear_algebra.h>
+#include <deal.II/base/index_set.h>
+#include <deal.II/distributed/tria.h>
+#include <deal.II/lac/sparsity_tools.h>
+#include <deal.II/distributed/solution_transfer.h>
 
 using namespace dealii;
 #endif

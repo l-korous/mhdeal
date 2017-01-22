@@ -7,26 +7,38 @@
 
 int main(int argc, char *argv[])
 {
-#ifdef DELETE_VTK_ON_START
-
-#ifdef _MSC_VER
-    system("del *.vtk");
-#else
-    system("rm *.vtk");
-#endif
-
-#endif
-
-    deal_II_exceptions::disable_abort_on_exception();
-
   try
   {
     Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, dealii::numbers::invalid_unsigned_int);
 
+#ifdef HAVE_MPI
+  MPI_Comm mpi_communicator(MPI_COMM_WORLD);
+
+  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+#endif
+  {
+#ifdef DELETE_VTK_ON_START
+#ifdef _MSC_VER
+    system("del *.vtk");
+    system("del *.vtu");
+    system("del *.pvtu");
+#else
+    system("rm *.vtk");
+    system("rm *.vtu");
+    system("rm *.pvtu");
+#endif
+#endif
+    deal_II_exceptions::disable_abort_on_exception();
+  }
+
+#ifdef HAVE_MPI
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::smoothing_on_refinement | Triangulation<DIMENSION>::smoothing_on_coarsening));
+#else
     Triangulation<DIMENSION> triangulation;
-    
+#endif    
+
     Parameters<DIMENSION> parameters(triangulation);
-    
+
     InitialCondition<EQUATIONS, DIMENSION> initial_condition(parameters);
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;
 
