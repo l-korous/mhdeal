@@ -698,6 +698,7 @@ void Problem<equationsType, dim>::process_initial_condition()
   std::vector<types::global_dof_index> indices;
   std::vector<double> targetVector;
   this->locally_relevant_dofs.fill_index_vector(indices);
+  targetVector.reserve(indices.size());
   first_solution.extract_subvector_to(indices, targetVector);
   old_solution.add(indices, targetVector);
 #else
