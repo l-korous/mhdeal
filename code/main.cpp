@@ -15,31 +15,33 @@ int main(int argc, char *argv[])
   try
   {
 #ifdef HAVE_MPI
-  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
 #endif
-  {
+    {
 #ifdef DELETE_VTK_ON_START
 #ifdef _MSC_VER
-    system("del *.visit");
-    system("del *.vtk");
-    system("del *.vtu");
-    system("del *.pvtu");
+      system("del *.visit");
+      system("del *.vtk");
+      system("del *.vtu");
+      system("del *.pvtu");
 #else
-    system("rm *.visit");
-    system("rm *.vtk");
-    system("rm *.vtu");
-    system("rm *.pvtu");
+      system("rm *.visit");
+      system("rm *.vtk");
+      system("rm *.vtu");
+      system("rm *.pvtu");
 #endif
 #endif
-  }
+    }
 
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::smoothing_on_refinement | Triangulation<DIMENSION>::smoothing_on_coarsening));
+    Triangulation<DIMENSION> sharedTriangulationForInitialCondition;
+    Parameters<DIMENSION> parameters(triangulation, sharedTriangulationForInitialCondition);
 #else
     Triangulation<DIMENSION> triangulation;
+    Parameters<DIMENSION> parameters(triangulation);
 #endif    
 
-    Parameters<DIMENSION> parameters(triangulation);
 
     InitialCondition<EQUATIONS, DIMENSION> initial_condition(parameters);
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;

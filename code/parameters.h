@@ -8,7 +8,11 @@ template <int dim>
 class Parameters
 {
 public:
+#ifdef HAVE_MPI
+  Parameters(parallel::distributed::Triangulation<dim> &triangulation, Triangulation<dim> &sharedTriangulationForInitialCondition);
+#else
   Parameters(Triangulation<dim> &triangulation);
+#endif
 
   // Flux
   enum NumFluxType { hlld, lax_friedrich };

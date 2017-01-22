@@ -12,6 +12,7 @@ public:
   Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation,
+    Triangulation<dim>& sharedTriangulationForInitialCondition,
 #else
     Triangulation<dim>& triangulation,
 #endif
@@ -20,6 +21,8 @@ public:
 
 private:
   void setup_system();
+
+  void process_initial_condition();
 
   void assemble_system();
   void assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& local_dofs, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs);
@@ -30,6 +33,7 @@ private:
 #ifdef HAVE_MPI
   MPI_Comm mpi_communicator;
   parallel::distributed::Triangulation<dim>& triangulation;
+  Triangulation<dim>& sharedTriangulationForInitialCondition;
 #else
   Triangulation<dim>& triangulation;
 #endif

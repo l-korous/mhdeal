@@ -40,12 +40,19 @@ void load_cube_mesh(Triangulation<dim>& triangulation, Parameters<dim>& paramete
 }
 
 template <int dim>
+#ifdef HAVE_MPI
+Parameters(parallel::distributed::Triangulation<dim> &triangulation, Triangulation<dim> &sharedTriangulationForInitialCondition)
+#else
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
+#endif
 {
   this->corner_a = Point<dim>(-.5, -.75, -.01);
   this->corner_b = Point<dim>(.5, .75, .01);
   this->refinements = { 100, 100, 1 };
-  
+
+#ifdef HAVE_MPI
+  load_cube_mesh<dim>(sharedTriangulationForInitialCondition, *this);
+#endif
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
@@ -64,7 +71,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->ilut_drop = 1e-6;
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
-  this->newton_damping = .8;
+  this->newton_damping = 1.;
 
   this->gas_gamma = 1.4;
 

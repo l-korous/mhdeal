@@ -4,6 +4,7 @@ template <EquationsType equationsType, int dim>
 Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation,
+  Triangulation<dim>& sharedTriangulationForInitialCondition,
 #else
   Triangulation<dim>& triangulation,
 #endif
@@ -596,9 +597,9 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
 {
 #ifdef HAVE_MPI
   dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
-  SolverControl solver_control(dof_handler.n_dofs(), 1e-12);
+  SolverControl solver_control(dof_handler.n_dofs(), 1e;
   dealii::LinearAlgebraTrilinos::SolverCG solver(solver_control);
-  if (parameters.theta < 1e-12)
+  if (parameters.theta == 0.)
   {
     dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi preconditioner;
     dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi::AdditionalData data;
@@ -679,6 +680,24 @@ void Problem<equationsType, dim>::output_results() const
   ++output_file_number;
 }
 
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::process_initial_condition()
+{
+  ConstraintMatrix temporaryConstraints;
+  temporaryConstraints.close();
+
+#ifdef HAVE_MPI
+  DoFHandler<dim> temporaryDofHandler(this->sharedTriangulationForInitialCondition);
+  VectorTools::project(temporaryDofHandler, temporaryConstraints, quadrature, initial_condition, old_solution);
+#else
+  VectorTools::project(dof_handler, temporaryConstraints, quadrature, initial_condition, old_solution);
+#endif
+
+  current_solution = old_solution;
+  newton_initial_guess = old_solution;
+}
+
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::run()
 {
@@ -696,11 +715,7 @@ void Problem<equationsType, dim>::run()
   Vector<double> newton_update(dof_handler.n_dofs());
 #endif
 
-  ConstraintMatrix constraints;
-  constraints.close();
-  VectorTools::project(dof_handler, constraints, quadrature, initial_condition, old_solution);
-  current_solution = old_solution;
-  newton_initial_guess = old_solution;
+  process_initial_condition();
 
   output_results();
 
@@ -769,6 +784,8 @@ void Problem<equationsType, dim>::run()
       {
         newton_update = 0;
         solve(newton_update);
+        if(parameters.theta > 0.)
+          newton_update *= parameters.newton_damping;
         current_solution += newton_update;
       }
 
