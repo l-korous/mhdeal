@@ -692,10 +692,14 @@ void Problem<equationsType, dim>::process_initial_condition()
   DoFHandler<dim> temporaryDofHandler(this->sharedTriangulationForInitialCondition);
   temporaryDofHandler.clear();
   temporaryDofHandler.distribute_dofs(fe);
-  TrilinosWrappers::MPI::Vector first_solution;
-  first_solution.reinit(locally_owned_dofs, mpi_communicator);
+  Vector<double> first_solution;
+  first_solution.reinit(dof_handler.n_dofs());
   VectorTools::project(temporaryDofHandler, temporaryConstraints, quadrature, initial_condition, first_solution);
-  old_solution = first_solution;
+  std::vector<types::global_dof_index> indices;
+  std::vector<double> targetVector;
+  this->locally_relevant_dofs.fill_index_vector(indices);
+  first_solution.extract_subvector_to(indices, targetVector);
+  old_solution.add(indices, targetVector);
 #else
   VectorTools::project(dof_handler, temporaryConstraints, quadrature, initial_condition, old_solution);
 #endif
