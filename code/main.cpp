@@ -42,12 +42,15 @@ int main(int argc, char *argv[])
     Parameters<DIMENSION> parameters(triangulation);
 #endif    
 
-
     InitialCondition<EQUATIONS, DIMENSION> initial_condition(parameters);
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;
 
     Equations<EQUATIONS, DIMENSION> equations(parameters);
+#ifdef HAVE_MPI
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, sharedTriangulationForInitialCondition, initial_condition, boundary_conditions);
+#else
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+#endif    
     problem.run();
   }
   catch (std::exception &exc)
