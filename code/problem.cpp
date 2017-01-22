@@ -679,14 +679,6 @@ void Problem<equationsType, dim>::output_results() const
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::run()
 {
-  dof_handler.clear();
-  dof_handler.distribute_dofs(fe);
-
-  // Size all of the fields.
-  old_solution.reinit(dof_handler.n_dofs());
-  current_solution.reinit(dof_handler.n_dofs());
-  newton_initial_guess.reinit(dof_handler.n_dofs());
-
   setup_system();
 
 #ifdef HAVE_MPI

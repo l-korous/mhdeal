@@ -64,7 +64,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->ilut_drop = 1e-6;
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
-  this->newton_damping = .8
+  this->newton_damping = .8;
 
   this->gas_gamma = 1.4;
 
