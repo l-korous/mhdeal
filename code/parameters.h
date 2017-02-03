@@ -44,6 +44,7 @@ public:
 
   // Global
   double time_step, final_time, theta;
+  bool initial_step;
   double time_step_after_initialization, initialization_time, theta_after_initialization;
   bool is_stationary;
   int polynomial_order_dg;

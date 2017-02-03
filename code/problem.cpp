@@ -65,7 +65,7 @@ void Problem<equationsType, dim>::assemble_system()
 
   const UpdateFlags update_flags = update_values | update_gradients | update_q_points | update_JxW_values;
   const UpdateFlags face_update_flags = update_values | update_q_points | update_JxW_values | update_normal_vectors;
-  const UpdateFlags neighbor_face_update_flags = update_values;
+  const UpdateFlags neighbor_face_update_flags = update_q_points | update_values;
 
   FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
   FEFaceValues<dim> fe_v_face(mapping, fe, face_quadrature, face_update_flags);
@@ -193,28 +193,40 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     const FEValuesExtractors::Vector mag(dim + 1);
 
-    for (unsigned int q = 0; q < n_q_points; ++q)
+    if (parameters.initial_step)
     {
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      for (unsigned int q = 0; q < n_q_points; ++q)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+        Point<dim> p = fe_v.quadrature_point(q);
+        for (unsigned int i = 0; i < this->equations.n_components; ++i)
+          W_old[q][i] = initial_condition.value(p, i);
+      }
+    }
+    else
+    {
+      for (unsigned int q = 0; q < n_q_points; ++q)
+      {
+        for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
-        if (component_i == 1)
-        {
-          W_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-          W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-          W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
-        }
-        else
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-        }
+          if (component_i == 1)
+          {
+            W_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+            W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+            W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+          }
+          else
+          {
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+          }
 
-        if (parameters.theta > 0. && this->parameters.needs_gradients)
-        {
-          for (unsigned int d = 0; d < dim; d++)
-            grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
+          if (parameters.theta > 0. && this->parameters.needs_gradients)
+          {
+            for (unsigned int d = 0; d < dim; d++)
+              grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
+          }
         }
       }
     }
@@ -415,36 +427,51 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      if (parameters.initial_step)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-        if (component_i == 1)
-        {
-          Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-          Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-          Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
-        }
-        else
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-        }
-
+        Point<dim> p = fe_v.quadrature_point(q);
+        for (unsigned int i = 0; i < this->equations.n_components; ++i)
+          Wplus_old[q][i] = initial_condition.value(p, i);
         if (!external_face)
         {
-          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+          Point<dim> pn = fe_v_neighbor.quadrature_point(q);
+          for (unsigned int i = 0; i < this->equations.n_components; ++i)
+            Wminus_old[q][i] = initial_condition.value(pn, i);
+        }
+      }
+      else
+      {
+        for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
-          if (component_i_neighbor == 1)
+          if (component_i == 1)
           {
-            Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
-            Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
-            Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+            Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
           }
           else
           {
-            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-            Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+          }
+
+          if (!external_face)
+          {
+            const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+
+            if (component_i_neighbor == 1)
+            {
+              Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+              Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+              Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+            }
+            else
+            {
+              const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+              Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+            }
           }
         }
       }
@@ -685,29 +712,7 @@ void Problem<equationsType, dim>::output_results() const
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::process_initial_condition()
 {
-  ConstraintMatrix temporaryConstraints;
-  temporaryConstraints.close();
-
-#ifdef HAVE_MPI
-  DoFHandler<dim> temporaryDofHandler(this->sharedTriangulationForInitialCondition);
-  temporaryDofHandler.clear();
-  temporaryDofHandler.distribute_dofs(fe);
-  Vector<double> first_solution;
-  first_solution.reinit(dof_handler.n_dofs());
-  VectorTools::project(temporaryDofHandler, temporaryConstraints, quadrature, initial_condition, first_solution);
-  std::vector<types::global_dof_index> indices;
-  std::vector<double> targetVector;
-  this->locally_owned_dofs.fill_index_vector(indices);
-  targetVector.reserve(indices.size());
-  first_solution.extract_subvector_to(indices, targetVector);
-  TrilinosWrappers::MPI::Vector     old_solution_temp;
-  old_solution_temp.reinit(locally_owned_dofs, mpi_communicator);
-  old_solution_temp.add(indices, targetVector);
-  old_solution = old_solution_temp;
-#else
-  VectorTools::project(dof_handler, temporaryConstraints, quadrature, initial_condition, old_solution);
-#endif
-
+  old_solution = 0;
   current_solution = old_solution;
   newton_initial_guess = old_solution;
 }
@@ -730,8 +735,6 @@ void Problem<equationsType, dim>::run()
 #endif
 
   process_initial_condition();
-
-  output_results();
 
   double time = 0;
   int time_step = 0;
@@ -758,10 +761,8 @@ void Problem<equationsType, dim>::run()
     while (true)
     {
       system_matrix = 0;
-
       system_rhs = 0;
       assemble_system();
-
 
 #ifndef HAVE_MPI
       if (parameters.output_matrix)
@@ -774,7 +775,7 @@ void Problem<equationsType, dim>::run()
         m.close();
         std::ofstream r;
         std::stringstream ssr;
-        ssr << "r-" << time_step++ << "-" << nonlin_iter;
+        ssr << "r-" << time_step << "-" << nonlin_iter;
         r.open(ssr.str());
         system_rhs.print(r, 3, false, false);
         r.close();
@@ -807,6 +808,7 @@ void Problem<equationsType, dim>::run()
       AssertThrow(nonlin_iter <= parameters.max_nonlinear_iterations, ExcMessage("No convergence in nonlinear solver"));
     }
 
+    ++time_step;
     time += parameters.time_step;
 
     if (parameters.output_step < 0)
@@ -823,6 +825,7 @@ void Problem<equationsType, dim>::run()
     newton_initial_guess.sadd(2.0, -1.0, old_solution);
 
     old_solution = current_solution;
+    this->parameters.initial_step = false;
   }
 }
 
