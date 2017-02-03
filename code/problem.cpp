@@ -626,7 +626,7 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
 #ifdef HAVE_MPI
   dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
   SolverControl solver_control(dof_handler.n_dofs(), 1e-12);
-  dealii::LinearAlgebraTrilinos::SolverCG solver(solver_control);
+  dealii::LinearAlgebraTrilinos::SolverGMRES solver(solver_control);
   if (parameters.theta == 0.)
   {
     dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi preconditioner;
