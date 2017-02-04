@@ -201,6 +201,7 @@ void Problem<equationsType, dim>::assemble_system()
 
   if (parameters.debug)
   {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000 * Utilities::MPI::this_mpi_process(mpi_communicator)));
     std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << "system_rhs AFTER compress:" << std::endl;
     system_rhs.print(std::cout, 3, false, false);
   }
