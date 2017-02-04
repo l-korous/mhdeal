@@ -118,7 +118,7 @@ void Problem<equationsType, dim>::assemble_system()
             if (parameters.debug)
             {
               std::cout << "cell_rhs_neighbor:" << std::endl;
-              cell_rhs_neighbor.print();
+              cell_rhs_neighbor.print(std::cout, 3, false, false);
               std::cout << "dof_indices:" << std::endl;
               for (int i = 0; i < dof_indices_neighbor.size(); i++)
                 std::cout << dof_indices_neighbor[i] << std::endl;
@@ -147,7 +147,7 @@ void Problem<equationsType, dim>::assemble_system()
           if (parameters.debug)
           {
             std::cout << "cell_rhs_neighbor:" << std::endl;
-            cell_rhs_neighbor.print();
+            cell_rhs_neighbor.print(std::cout, 3, false, false);
             std::cout << "dof_indices:" << std::endl;
             for (int i = 0; i < dof_indices_neighbor.size(); i++)
               std::cout << dof_indices_neighbor[i] << std::endl;
@@ -168,7 +168,7 @@ void Problem<equationsType, dim>::assemble_system()
           if (parameters.debug)
           {
             std::cout << "cell_rhs_neighbor:" << std::endl;
-            cell_rhs_neighbor.print();
+            cell_rhs_neighbor.print(std::cout, 3, false, false);
             std::cout << "dof_indices:" << std::endl;
             for (int i = 0; i < dof_indices_neighbor.size(); i++)
               std::cout << dof_indices_neighbor[i] << std::endl;
