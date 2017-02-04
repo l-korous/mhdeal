@@ -645,6 +645,26 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
   constraints.distribute(completely_distributed_solution);
   newton_update = completely_distributed_solution;
 #else
+  Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(),
+    newton_update.begin());
+  Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(),
+    system_rhs.begin());
+
+  AztecOO solver;
+  solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
+  solver.SetAztecOption(AZ_solver, AZ_gmres);
+  solver.SetRHS(&b);
+  solver.SetLHS(&x);
+
+  solver.SetAztecOption(AZ_precond, AZ_Jacobi);
+
+  solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *>
+    (&system_matrix.trilinos_matrix()));
+
+  solver.Iterate(parameters.max_iterations, parameters.linear_residual);
+
+
+  return;
   SolverControl solver_control(1, 0);
   TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
   TrilinosWrappers::SolverDirect direct(solver_control, data);
@@ -764,7 +784,9 @@ void Problem<equationsType, dim>::run()
       system_rhs = 0;
       assemble_system();
 
-#ifndef HAVE_MPI
+#ifdef HAVE_MPI
+      if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+#endif
       if (parameters.output_matrix)
       {
         std::ofstream m;

@@ -81,7 +81,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-8;
 
-  this->time_step_after_initialization = 1e-3;
+  this->output_step = 1e-4;
 
   this->num_flux_type = hlld;
   this->lax_friedrich_stabilization_value = 1.;
