@@ -802,7 +802,6 @@ void Problem<equationsType, dim>::run()
         system_rhs.print(r, 3, false, false);
         r.close();
       }
-#endif
       const double res_norm = system_rhs.l2_norm();
 
 #ifdef HAVE_MPI
