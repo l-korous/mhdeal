@@ -115,6 +115,15 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
+            if (parameters.debug)
+            {
+              std::cout << "cell_rhs_neighbor:" << std::endl;
+              cell_rhs_neighbor.print();
+              std::cout << "dof_indices:" << std::endl;
+              for (int i = 0; i < dof_indices_neighbor.size(); i++)
+                std::cout << dof_indices_neighbor[i] << std::endl;
+            }
+
             constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
         }
@@ -135,6 +144,15 @@ void Problem<equationsType, dim>::assemble_system()
 
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
+          if (parameters.debug)
+          {
+            std::cout << "cell_rhs_neighbor:" << std::endl;
+            cell_rhs_neighbor.print();
+            std::cout << "dof_indices:" << std::endl;
+            for (int i = 0; i < dof_indices_neighbor.size(); i++)
+              std::cout << dof_indices_neighbor[i] << std::endl;
+          }
+
           constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
         }
         else
@@ -147,6 +165,15 @@ void Problem<equationsType, dim>::assemble_system()
 
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
+          if (parameters.debug)
+          {
+            std::cout << "cell_rhs_neighbor:" << std::endl;
+            cell_rhs_neighbor.print();
+            std::cout << "dof_indices:" << std::endl;
+            for (int i = 0; i < dof_indices_neighbor.size(); i++)
+              std::cout << dof_indices_neighbor[i] << std::endl;
+          }
+
           constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
         }
       }
@@ -154,12 +181,11 @@ void Problem<equationsType, dim>::assemble_system()
 
     if (parameters.debug)
     {
-      std::cout << "cell_rhs: " << std::endl;
+      std::cout << "cell_rhs:" << std::endl;
       cell_rhs.print();
-      std::cout << "dof_indices: ";
+      std::cout << "dof_indices:" << std::endl;
       for (int i = 0; i < dof_indices.size(); i++)
-        std::cout << (i == 0 ? "" : ", ") << dof_indices[i];
-      std::cout << std::endl;
+        std::cout << dof_indices[i] << std::endl;
     }
     constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
   }
@@ -177,18 +203,16 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
   if (parameters.debug)
   {
-    std::cout << "indices to components" << std::endl;
+    std::cout << "indices to components:" << std::endl;
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-      if (i > 0)
-        std::cout << ", ";
       if (component_i == 1)
-        std::cout << i << " : " << component_i << " (vector)";
+        std::cout << i << " : " << component_i << " v";
       else
         std::cout << i << " : " << fe_v.get_fe().system_to_component_index(i).first;
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
   }
 
   // This is for the explicit case.
