@@ -28,9 +28,10 @@ private:
   void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const std::vector<types::global_dof_index>& local_dofs,
     const std::vector<types::global_dof_index>& local_dofs_neighbor, const bool external_face, const unsigned int boundary_id, const double face_diameter, FullMatrix<double>& cell_matrix,
     Vector<double>& cell_rhs, FullMatrix<double>& cell_matrix_neighbor, Vector<double>& cell_rhs_neighbor);
+  
+  MPI_Comm mpi_communicator;
 
 #ifdef HAVE_MPI
-  MPI_Comm mpi_communicator;
   parallel::distributed::Triangulation<dim>& triangulation;
 #else
   Triangulation<dim>& triangulation;
@@ -54,33 +55,17 @@ private:
 
   const QGauss<dim - 1> face_quadrature;
 
-#ifdef HAVE_MPI
-  dealii::LinearAlgebraTrilinos::MPI::Vector locally_relevant_solution;
-
   TrilinosWrappers::MPI::Vector     current_solution;
 
   TrilinosWrappers::MPI::Vector     old_solution;
 
   TrilinosWrappers::MPI::Vector newton_initial_guess;
 
-  dealii::LinearAlgebraTrilinos::MPI::Vector system_rhs;
-
-  dealii::LinearAlgebraTrilinos::MPI::SparseMatrix system_matrix;
-
-  void solve(TrilinosWrappers::MPI::Vector &newton_update);
-#else
-  Vector<double> old_solution;
-
-  Vector<double> current_solution;
-
-  Vector<double> newton_initial_guess;
-
-  Vector<double> system_rhs;
+  TrilinosWrappers::MPI::Vector system_rhs;
 
   TrilinosWrappers::SparseMatrix system_matrix;
 
-  void solve(Vector<double> &newton_update);
-#endif
+  void solve(TrilinosWrappers::MPI::Vector &newton_update);
 
   Equations<equationsType, dim>& equations;
 

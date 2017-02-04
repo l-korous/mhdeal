@@ -8,9 +8,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   Triangulation<dim>& triangulation,
 #endif
   InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
-#ifdef HAVE_MPI
   mpi_communicator(MPI_COMM_WORLD),
-#endif
   parameters(parameters),
   equations(equations),
   triangulation(triangulation),
@@ -43,14 +41,13 @@ void Problem<equationsType, dim>::setup_system()
   DynamicSparsityPattern dsp(locally_relevant_dofs);
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
 
-#ifdef HAVE_MPI
   system_rhs.reinit(locally_owned_dofs, mpi_communicator);
+
+#ifdef HAVE_MPI
   SparsityTools::distribute_sparsity_pattern(dsp, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
-  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
-#else
-  system_matrix.reinit(dsp);
-  system_rhs.reinit(dof_handler.n_dofs());
 #endif
+ 
+  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
 }
 
 template <EquationsType equationsType, int dim>
@@ -615,38 +612,18 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
 template <EquationsType equationsType, int dim>
 void
-#ifdef HAVE_MPI
 Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
-#else
-Problem<equationsType, dim>::solve(Vector<double> &newton_update)
-#endif
 {
-#ifdef HAVE_MPI
-  dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
-  SolverControl solver_control(dof_handler.n_dofs(), 1e-12);
-  dealii::LinearAlgebraTrilinos::SolverGMRES solver(solver_control);
-  if (parameters.theta == 0.)
-  {
-    dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi preconditioner;
-    dealii::LinearAlgebraTrilinos::MPI::PreconditionJacobi::AdditionalData data;
-    preconditioner.initialize(system_matrix, data);
-    solver.solve(system_matrix, completely_distributed_solution, system_rhs, preconditioner);
-  }
-  else
-  {
-    dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG preconditioner;
-    dealii::LinearAlgebraTrilinos::MPI::PreconditionAMG::AdditionalData data;
-    preconditioner.initialize(system_matrix, data);
-    solver.solve(system_matrix, completely_distributed_solution, system_rhs, preconditioner);
-  }
+#ifndef HAVE_MPI
+  SolverControl solver_control(1, 0);
+  TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
+  TrilinosWrappers::SolverDirect direct(solver_control, data);
+  direct.solve(system_matrix, newton_update, system_rhs);
+  return;
+#endif
 
-  constraints.distribute(completely_distributed_solution);
-  newton_update = completely_distributed_solution;
-#else
-  Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(),
-    newton_update.begin());
-  Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(),
-    system_rhs.begin());
+  Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
+  Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
 
   AztecOO solver;
   solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
@@ -654,21 +631,11 @@ Problem<equationsType, dim>::solve(Vector<double> &newton_update)
   solver.SetRHS(&b);
   solver.SetLHS(&x);
 
-  solver.SetAztecOption(AZ_precond, AZ_Jacobi);
+  solver.SetAztecOption(AZ_precond, AZ_dom_decomp);
 
-  solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *>
-    (&system_matrix.trilinos_matrix()));
+  solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
 
   solver.Iterate(parameters.max_iterations, parameters.linear_residual);
-
-
-  return;
-  SolverControl solver_control(1, 0);
-  TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
-  TrilinosWrappers::SolverDirect direct(solver_control, data);
-
-  direct.solve(system_matrix, newton_update, system_rhs);
-#endif
 }
 
 template <EquationsType equationsType, int dim>
@@ -746,10 +713,11 @@ void Problem<equationsType, dim>::run()
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
   TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
 #else
-  old_solution.reinit(dof_handler.n_dofs());
-  current_solution.reinit(dof_handler.n_dofs());
-  newton_initial_guess.reinit(dof_handler.n_dofs());
-  Vector<double> newton_update(dof_handler.n_dofs());
+  old_solution.reinit(locally_relevant_dofs);
+  current_solution.reinit(locally_relevant_dofs);
+  newton_initial_guess.reinit(locally_owned_dofs);
+  TrilinosWrappers::MPI::Vector newton_update;
+  newton_update.reinit(locally_relevant_dofs);
 #endif
 
   process_initial_condition();
@@ -765,9 +733,7 @@ void Problem<equationsType, dim>::run()
       this->parameters.theta = this->parameters.theta_after_initialization;
     }
 
-#ifdef HAVE_MPI
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-#endif
     {
       std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
         << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
@@ -782,9 +748,7 @@ void Problem<equationsType, dim>::run()
       system_rhs = 0;
       assemble_system();
 
-#ifdef HAVE_MPI
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-#endif
       if (parameters.output_matrix)
       {
         std::ofstream m;
@@ -802,9 +766,7 @@ void Problem<equationsType, dim>::run()
       }
       const double res_norm = system_rhs.l2_norm();
 
-#ifdef HAVE_MPI
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-#endif
       {
         if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
           std::printf("   %-16.3e (converged)\n\n", res_norm);

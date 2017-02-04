@@ -9,7 +9,7 @@ class Parameters
 {
 public:
 #ifdef HAVE_MPI
-  Parameters(parallel::distributed::Triangulation<dim> &triangulation, Triangulation<dim> &sharedTriangulationForInitialCondition);
+  Parameters(parallel::distributed::Triangulation<dim> &triangulation);
 #else
   Parameters(Triangulation<dim> &triangulation);
 #endif
