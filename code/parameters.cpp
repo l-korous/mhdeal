@@ -50,9 +50,6 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->corner_b = Point<dim>(.5, .75, .01);
   this->refinements = { 10, 10, 1 };
 
-#ifdef HAVE_MPI
-  load_cube_mesh<dim>(sharedTriangulationForInitialCondition, *this);
-#endif
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
