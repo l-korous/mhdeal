@@ -614,7 +614,7 @@ template <EquationsType equationsType, int dim>
 void
 Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
 {
-#ifndef HAVE_MPI
+#ifdef HAVE_MPI
   SolverControl solver_control(1, 0);
   TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
   TrilinosWrappers::SolverDirect direct(solver_control, data);
@@ -707,18 +707,10 @@ void Problem<equationsType, dim>::run()
 {
   setup_system();
 
-#ifdef HAVE_MPI
   old_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
   TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
-#else
-  old_solution.reinit(locally_relevant_dofs);
-  current_solution.reinit(locally_relevant_dofs);
-  newton_initial_guess.reinit(locally_owned_dofs);
-  TrilinosWrappers::MPI::Vector newton_update;
-  newton_update.reinit(locally_relevant_dofs);
-#endif
 
   process_initial_condition();
 
