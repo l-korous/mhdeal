@@ -152,6 +152,15 @@ void Problem<equationsType, dim>::assemble_system()
       }
     }
 
+    if (parameters.debug)
+    {
+      std::cout << "cell_rhs: " << std::endl;
+      cell_rhs.print();
+      std::cout << "dof_indices: ";
+      for (int i = 0; i < dof_indices.size(); i++)
+        std::cout << (i == 0 ? "" : ", ") << dof_indices[i];
+      std::cout << std::endl;
+    }
     constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
   }
 
@@ -168,14 +177,18 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
   if (parameters.debug)
   {
+    std::cout << "indices to components" << std::endl;
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+      if (i > 0)
+        std::cout << ", ";
       if (component_i == 1)
-        std::cout << i << "-" << component_i << std::endl;
+        std::cout << i << " : " << component_i << " (vector)";
       else
-        std::cout << i << "-" << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+        std::cout << i << " : " << fe_v.get_fe().system_to_component_index(i).first;
     }
+    std::cout << std::endl;
   }
 
   // This is for the explicit case.
