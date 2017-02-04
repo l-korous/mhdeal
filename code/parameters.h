@@ -58,6 +58,9 @@ public:
   // Mesh - generation
   Point<dim> corner_a, corner_b;
   std::vector<unsigned int> refinements;
+
+  // Debugging purposes
+  bool debug;
 };
 
 #endif

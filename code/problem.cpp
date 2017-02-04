@@ -167,6 +167,18 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
 
+  if (parameters.debug)
+  {
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    {
+      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+      if (component_i == 1)
+        std::cout << i << "-" << component_i << std::endl;
+      else
+        std::cout << i << "-" << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+    }
+  }
+
   // This is for the explicit case.
   if (parameters.theta < 1.)
   {
@@ -239,12 +251,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
     }
 
-    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+      
       double val = 0;
 
-      for (unsigned int q = 0; q < fe_v.n_quadrature_points; ++q)
+      for (unsigned int q = 0; q < n_q_points; ++q)
       {
         if (parameters.is_stationary == false)
         {
@@ -347,12 +360,12 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       }
     }
 
-    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
       Sacado::Fad::DFad<double> R_i = 0;
 
-      for (unsigned int q = 0; q < fe_v.n_quadrature_points; ++q)
+      for (unsigned int q = 0; q < n_q_points; ++q)
       {
         if (parameters.is_stationary == false)
         {
@@ -476,7 +489,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
     }
 
-    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
       {
@@ -573,7 +586,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     std::vector<double> residual_derivatives(dofs_per_cell);
 
-    for (unsigned int i = 0; i < fe_v.dofs_per_cell; ++i)
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
       {
@@ -614,28 +627,38 @@ template <EquationsType equationsType, int dim>
 void
 Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
 {
-#ifdef HAVE_MPI
-  SolverControl solver_control(1, 0);
-  TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
-  TrilinosWrappers::SolverDirect direct(solver_control, data);
-  direct.solve(system_matrix, newton_update, system_rhs);
-  return;
-#endif
+  if (parameters.solver == parameters.direct)
+  {
+    SolverControl solver_control(1, 0);
+    TrilinosWrappers::SolverDirect::AdditionalData data(parameters.output == Parameters<dim>::verbose_solver);
+    TrilinosWrappers::SolverDirect direct(solver_control, data);
+    direct.solve(system_matrix, newton_update, system_rhs);
+    return;
+  }
+  else
+  {
+    Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
+    Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
 
-  Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
-  Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
+    AztecOO solver;
+    solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
+    solver.SetAztecOption(AZ_solver, AZ_gmres);
+    solver.SetRHS(&b);
+    solver.SetLHS(&x);
 
-  AztecOO solver;
-  solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
-  solver.SetAztecOption(AZ_solver, AZ_gmres);
-  solver.SetRHS(&b);
-  solver.SetLHS(&x);
+    solver.SetAztecOption(AZ_precond, AZ_dom_decomp);
+    solver.SetAztecOption(AZ_subdomain_solve, AZ_ilut);
+    solver.SetAztecOption(AZ_overlap, 0);
+    solver.SetAztecOption(AZ_reorder, 0);
+    solver.SetAztecParam(AZ_drop, parameters.ilut_drop);
+    solver.SetAztecParam(AZ_ilut_fill, parameters.ilut_fill);
+    solver.SetAztecParam(AZ_athresh, parameters.ilut_atol);
+    solver.SetAztecParam(AZ_rthresh, parameters.ilut_rtol);
 
-  solver.SetAztecOption(AZ_precond, AZ_dom_decomp);
+    solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
 
-  solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
-
-  solver.Iterate(parameters.max_iterations, parameters.linear_residual);
+    solver.Iterate(parameters.max_iterations, parameters.linear_residual);
+  }
 }
 
 template <EquationsType equationsType, int dim>
@@ -740,18 +763,17 @@ void Problem<equationsType, dim>::run()
       system_rhs = 0;
       assemble_system();
 
-      if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
       if (parameters.output_matrix)
       {
         std::ofstream m;
         std::stringstream ssm;
-        ssm << "m-" << time_step << "-" << nonlin_iter;
+        ssm << "m-" << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator);
         m.open(ssm.str());
         system_matrix.print(m);
         m.close();
         std::ofstream r;
         std::stringstream ssr;
-        ssr << "r-" << time_step << "-" << nonlin_iter;
+        ssr << "r-" << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator);
         r.open(ssr.str());
         system_rhs.print(r, 3, false, false);
         r.close();

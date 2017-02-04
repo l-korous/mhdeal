@@ -48,7 +48,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->corner_a = Point<dim>(-.5, -.75, -.01);
   this->corner_b = Point<dim>(.5, .75, .01);
-  this->refinements = { 10, 10, 1 };
+  this->refinements = { 2, 1, 1 };
 
   load_cube_mesh<dim>(triangulation, *this);
 
@@ -59,9 +59,10 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->theta_after_initialization = 0.;
   this->initialization_time = 0.;
 
-  this->output = OutputType::quiet_solver;
-  this->output_matrix = false;
+  this->output = OutputType::verbose_solver;
+  this->output_matrix = true;
 
+  this->solver = direct;
   this->linear_residual = 1e-10;
   this->max_iterations = 10000;
   this->ilut_fill = 1.5;
@@ -86,6 +87,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->is_stationary = false;
 
   this->needs_gradients = false;
+
+  this->debug = false;
 }
 
 template class Parameters<2>;
