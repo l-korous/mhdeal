@@ -36,10 +36,9 @@ void Problem<equationsType, dim>::setup_system()
   constraints.clear();
   constraints.reinit(locally_relevant_dofs);
   DoFTools::make_hanging_node_constraints(dof_handler, constraints);
-  constraints.close();
-
   DynamicSparsityPattern dsp(locally_relevant_dofs);
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
+  constraints.close();
 
   system_rhs.reinit(locally_owned_dofs, mpi_communicator);
 
