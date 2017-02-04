@@ -41,7 +41,7 @@ void load_cube_mesh(Triangulation<dim>& triangulation, Parameters<dim>& paramete
 
 template <int dim>
 #ifdef HAVE_MPI
-Parameters<dim>::Parameters(parallel::distributed::Triangulation<dim> &triangulation, Triangulation<dim> &sharedTriangulationForInitialCondition)
+Parameters<dim>::Parameters(parallel::distributed::Triangulation<dim> &triangulation)
 #else
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 #endif
