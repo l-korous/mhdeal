@@ -182,16 +182,28 @@ void Problem<equationsType, dim>::assemble_system()
     if (parameters.debug)
     {
       std::cout << "cell_rhs:" << std::endl;
-      cell_rhs.print();
+      cell_rhs.print(std::cout, 3, false, false);
       std::cout << "dof_indices:" << std::endl;
       for (int i = 0; i < dof_indices.size(); i++)
         std::cout << dof_indices[i] << std::endl;
     }
     constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
+
+    if (parameters.debug)
+    {
+      std::cout << "system_rhs BEFORE compress:" << std::endl;
+      system_rhs.print(std::cout, 3, false, false);
+    }
   }
 
   system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
+
+  if (parameters.debug)
+  {
+    std::cout << "system_rhs AFTER compress:" << std::endl;
+    system_rhs.print(std::cout, 3, false, false);
+  }
 }
 
 template <EquationsType equationsType, int dim>
