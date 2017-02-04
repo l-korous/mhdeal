@@ -115,7 +115,7 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            if (parameters.debug)
+            if (parameters.debug_neighbor)
             {
               std::cout << "cell_rhs_neighbor:" << std::endl;
               cell_rhs_neighbor.print(std::cout, 3, false, false);
@@ -144,7 +144,7 @@ void Problem<equationsType, dim>::assemble_system()
 
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-          if (parameters.debug)
+          if (parameters.debug_neighbor)
           {
             std::cout << "cell_rhs_neighbor:" << std::endl;
             cell_rhs_neighbor.print(std::cout, 3, false, false);
@@ -165,7 +165,7 @@ void Problem<equationsType, dim>::assemble_system()
 
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-          if (parameters.debug)
+          if (parameters.debug_neighbor)
           {
             std::cout << "cell_rhs_neighbor:" << std::endl;
             cell_rhs_neighbor.print(std::cout, 3, false, false);
@@ -181,17 +181,17 @@ void Problem<equationsType, dim>::assemble_system()
 
     if (parameters.debug)
     {
-      std::cout << "cell_rhs:" << std::endl;
+      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | cell_rhs:" << std::endl;
       cell_rhs.print(std::cout, 3, false, false);
-      std::cout << "dof_indices:" << std::endl;
+      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | dof_indices:" << std::endl;
       for (int i = 0; i < dof_indices.size(); i++)
-        std::cout << dof_indices[i] << std::endl;
+        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << dof_indices[i] << std::endl;
     }
     constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
 
     if (parameters.debug)
     {
-      std::cout << "system_rhs BEFORE compress:" << std::endl;
+      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << "system_rhs BEFORE compress:" << std::endl;
       system_rhs.print(std::cout, 3, false, false);
     }
   }
@@ -201,7 +201,7 @@ void Problem<equationsType, dim>::assemble_system()
 
   if (parameters.debug)
   {
-    std::cout << "system_rhs AFTER compress:" << std::endl;
+    std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << "system_rhs AFTER compress:" << std::endl;
     system_rhs.print(std::cout, 3, false, false);
   }
 }

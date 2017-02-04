@@ -89,6 +89,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->needs_gradients = false;
 
   this->debug = true;
+  this->debug_neighbor = false;
 }
 
 template class Parameters<2>;
