@@ -4,14 +4,12 @@ template <EquationsType equationsType, int dim>
 Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation,
-  Triangulation<dim>& sharedTriangulationForInitialCondition,
 #else
   Triangulation<dim>& triangulation,
 #endif
   InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
 #ifdef HAVE_MPI
   mpi_communicator(MPI_COMM_WORLD),
-  sharedTriangulationForInitialCondition(sharedTriangulationForInitialCondition),
 #endif
   parameters(parameters),
   equations(equations),

@@ -12,7 +12,6 @@ public:
   Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation,
-    Triangulation<dim>& sharedTriangulationForInitialCondition,
 #else
     Triangulation<dim>& triangulation,
 #endif
@@ -33,7 +32,6 @@ private:
 #ifdef HAVE_MPI
   MPI_Comm mpi_communicator;
   parallel::distributed::Triangulation<dim>& triangulation;
-  Triangulation<dim>& sharedTriangulationForInitialCondition;
 #else
   Triangulation<dim>& triangulation;
 #endif
