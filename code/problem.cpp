@@ -686,7 +686,9 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
   }
   else
   {
-    Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), newton_update.begin());
+    dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
+
+    Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), completely_distributed_solution.begin());
     Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
 
     AztecOO solver;
@@ -707,6 +709,9 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
     solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
 
     solver.Iterate(parameters.max_iterations, parameters.linear_residual);
+
+    constraints.distribute(completely_distributed_solution);
+    newton_update = completely_distributed_solution;
   }
 }
 
@@ -843,6 +848,15 @@ void Problem<equationsType, dim>::run()
       {
         newton_update = 0;
         solve(newton_update);
+        if (parameters.output_matrix)
+        {
+          std::ofstream r;
+          std::stringstream ssr;
+          ssr << "s-" << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator);
+          r.open(ssr.str());
+          newton_update.print(r, 3, false, false);
+          r.close();
+        }
         if(parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
         current_solution += newton_update;
