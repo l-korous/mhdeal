@@ -725,7 +725,7 @@ void Problem<equationsType, dim>::run()
   old_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
-  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
+  TrilinosWrappers::MPI::Vector newton_update(locally_owned_dofs, mpi_communicator);
 
   process_initial_condition();
 
@@ -795,10 +795,14 @@ void Problem<equationsType, dim>::run()
           newton_update.print(r, 3, false, false);
           r.close();
         }
-        exit(-1);
         if(parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
-        current_solution += newton_update;
+
+	TrilinosWrappers::MPI::Vector temp_vector;
+	temp_vector.reinit(locally_relevant_dofs, mpi_communicator);
+	temp_vector = newton_update;
+
+        current_solution += temp_vector;
       }
 
       ++nonlin_iter;
