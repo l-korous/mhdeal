@@ -614,6 +614,7 @@ template <EquationsType equationsType, int dim>
 void
 Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
 {
+#ifndef HAVE_MPI
   if (parameters.solver == parameters.direct)
   {
     SolverControl solver_control(1, 0);
@@ -623,6 +624,7 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
     return;
   }
   else
+#endif
   {
     dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
 
@@ -725,7 +727,7 @@ void Problem<equationsType, dim>::run()
   old_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
-  TrilinosWrappers::MPI::Vector newton_update(locally_owned_dofs, mpi_communicator);
+  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
 
   process_initial_condition();
 
@@ -798,11 +800,7 @@ void Problem<equationsType, dim>::run()
         if(parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
 
-	TrilinosWrappers::MPI::Vector temp_vector;
-	temp_vector.reinit(locally_relevant_dofs, mpi_communicator);
-	temp_vector = newton_update;
-
-        current_solution += temp_vector;
+        current_solution += newton_update;
       }
 
       ++nonlin_iter;

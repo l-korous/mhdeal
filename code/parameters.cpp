@@ -48,7 +48,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->corner_a = Point<dim>(-.5, -.75, -.01);
   this->corner_b = Point<dim>(.5, .75, .01);
-  this->refinements = { 2, 1, 1 };
+  this->refinements = { 40, 60, 1 };
 
   load_cube_mesh<dim>(triangulation, *this);
 
@@ -60,9 +60,9 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->initialization_time = 0.;
 
   this->output = OutputType::verbose_solver;
-  this->output_matrix = true;
+  this->output_matrix = false;
 
-  this->solver = direct;
+  this->solver = gmres;
   this->linear_residual = 1e-10;
   this->max_iterations = 10000;
   this->ilut_fill = 1.5;
@@ -88,7 +88,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->needs_gradients = false;
 
-  this->debug = true;
+  this->debug = false;
   this->debug_neighbor = false;
 }
 
