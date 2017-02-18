@@ -115,15 +115,6 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            if (parameters.debug_neighbor)
-            {
-              std::cout << "cell_rhs_neighbor:" << std::endl;
-              cell_rhs_neighbor.print(std::cout, 3, false, false);
-              std::cout << "dof_indices:" << std::endl;
-              for (int i = 0; i < dof_indices_neighbor.size(); i++)
-                std::cout << dof_indices_neighbor[i] << std::endl;
-            }
-
             constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
         }
@@ -144,15 +135,6 @@ void Problem<equationsType, dim>::assemble_system()
 
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-          if (parameters.debug_neighbor)
-          {
-            std::cout << "cell_rhs_neighbor:" << std::endl;
-            cell_rhs_neighbor.print(std::cout, 3, false, false);
-            std::cout << "dof_indices:" << std::endl;
-            for (int i = 0; i < dof_indices_neighbor.size(); i++)
-              std::cout << dof_indices_neighbor[i] << std::endl;
-          }
-
           constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
         }
         else
@@ -165,46 +147,16 @@ void Problem<equationsType, dim>::assemble_system()
 
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-          if (parameters.debug_neighbor)
-          {
-            std::cout << "cell_rhs_neighbor:" << std::endl;
-            cell_rhs_neighbor.print(std::cout, 3, false, false);
-            std::cout << "dof_indices:" << std::endl;
-            for (int i = 0; i < dof_indices_neighbor.size(); i++)
-              std::cout << dof_indices_neighbor[i] << std::endl;
-          }
-
           constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
         }
       }
     }
 
-    if (parameters.debug)
-    {
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | cell_rhs:" << std::endl;
-      cell_rhs.print(std::cout, 3, false, false);
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | dof_indices:" << std::endl;
-      for (int i = 0; i < dof_indices.size(); i++)
-        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << dof_indices[i] << std::endl;
-    }
     constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
-
-    if (parameters.debug)
-    {
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << "system_rhs BEFORE compress:" << std::endl;
-      system_rhs.print(std::cout, 3, false, false);
-    }
   }
 
   system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
-
-  if (parameters.debug)
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000 * Utilities::MPI::this_mpi_process(mpi_communicator)));
-    std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << " | " << "system_rhs AFTER compress:" << std::endl;
-    system_rhs.print(std::cout, 3, false, false);
-  }
 }
 
 template <EquationsType equationsType, int dim>
@@ -213,20 +165,6 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 {
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
-
-  if (parameters.debug)
-  {
-    std::cout << "indices to components:" << std::endl;
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    {
-      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-      if (component_i == 1)
-        std::cout << i << " : " << component_i << " v";
-      else
-        std::cout << i << " : " << fe_v.get_fe().system_to_component_index(i).first;
-      std::cout << std::endl;
-    }
-  }
 
   // This is for the explicit case.
   if (parameters.theta < 1.)
@@ -857,6 +795,7 @@ void Problem<equationsType, dim>::run()
           newton_update.print(r, 3, false, false);
           r.close();
         }
+        exit(-1);
         if(parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
         current_solution += newton_update;
