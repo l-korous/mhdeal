@@ -761,13 +761,13 @@ void Problem<equationsType, dim>::run()
       {
         std::ofstream m;
         std::stringstream ssm;
-        ssm << "m-" << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator);
+        ssm << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".matrix";
         m.open(ssm.str());
         system_matrix.print(m);
         m.close();
         std::ofstream r;
         std::stringstream ssr;
-        ssr << "r-" << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator);
+        ssr << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".rhs";
         r.open(ssr.str());
         system_rhs.print(r, 3, false, false);
         r.close();
@@ -790,12 +790,12 @@ void Problem<equationsType, dim>::run()
         solve(newton_update);
         if (parameters.output_matrix)
         {
-          std::ofstream r;
-          std::stringstream ssr;
-          ssr << "s-" << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator);
-          r.open(ssr.str());
-          newton_update.print(r, 3, false, false);
-          r.close();
+          std::ofstream s;
+          std::stringstream sss;
+          sss << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".solution";
+          s.open(sss.str());
+          newton_update.print(s, 3, false, false);
+          s.close();
         }
         if(parameters.theta > 0.)
           newton_update *= parameters.newton_damping;

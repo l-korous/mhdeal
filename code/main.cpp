@@ -3,7 +3,7 @@
 
 #define DIMENSION 3
 #define EQUATIONS EquationsTypeMhd
-#define DELETE_VTK_ON_START
+#define DELETE_OUTPUTS_ON_START
 
 int main(int argc, char *argv[])
 {
@@ -14,17 +14,23 @@ int main(int argc, char *argv[])
   {
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
-#ifdef DELETE_VTK_ON_START
+#ifdef DELETE_OUTPUTS_ON_START
 #ifdef _MSC_VER
       system("del *.visit");
       system("del *.vtk");
       system("del *.vtu");
       system("del *.pvtu");
+      system("del *.solution");
+      system("del *.matrix");
+      system("del *.rhs");
 #else
       system("rm *.visit");
       system("rm *.vtk");
       system("rm *.vtu");
       system("rm *.pvtu");
+      system("rm *.solution");
+      system("rm *.matrix");
+      system("rm *.rhs");
 #endif
 #endif
     }

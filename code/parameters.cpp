@@ -48,14 +48,14 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->corner_a = Point<dim>(-.5, -.75, -.01);
   this->corner_b = Point<dim>(.5, .75, .01);
-  this->refinements = { 40, 60, 1 };
+  this->refinements = { 100, 150, 1 };
 
   load_cube_mesh<dim>(triangulation, *this);
 
   this->final_time = 10.;
   this->time_step = 1e-6;
   this->theta = 0.0;
-  this->time_step_after_initialization = 1e-4;
+  this->time_step_after_initialization = 1e-5;
   this->theta_after_initialization = 0.;
   this->initialization_time = 0.;
 
