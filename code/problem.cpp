@@ -45,7 +45,7 @@ void Problem<equationsType, dim>::setup_system()
 #ifdef HAVE_MPI
   SparsityTools::distribute_sparsity_pattern(dsp, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
 #endif
- 
+
   system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
 }
 
@@ -241,7 +241,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-      
+
       double val = 0;
 
       for (unsigned int q = 0; q < n_q_points; ++q)
@@ -333,7 +333,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > flux(n_q_points);
     std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > forcing(n_q_points);
-    // LK: This is for e.g. stabilization for Euler
+    // This is for e.g. stabilization for Euler
     std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
 
     if (this->parameters.theta > 0.)
@@ -765,6 +765,9 @@ void Problem<equationsType, dim>::run()
         m.open(ssm.str());
         system_matrix.print(m);
         m.close();
+      }
+      if (parameters.output_rhs)
+      {
         std::ofstream r;
         std::stringstream ssr;
         ssr << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".rhs";
@@ -788,7 +791,7 @@ void Problem<equationsType, dim>::run()
       {
         newton_update = 0;
         solve(newton_update);
-        if (parameters.output_matrix)
+        if (parameters.output_solution)
         {
           std::ofstream s;
           std::stringstream sss;
@@ -797,7 +800,7 @@ void Problem<equationsType, dim>::run()
           newton_update.print(s, 3, false, false);
           s.close();
         }
-        if(parameters.theta > 0.)
+        if (parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
 
         current_solution += newton_update;

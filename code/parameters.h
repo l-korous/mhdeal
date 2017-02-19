@@ -22,6 +22,8 @@ public:
   // Output
   double output_step;
   double output_matrix;
+  double output_rhs;
+  double output_solution;
 
   double gas_gamma;
 
