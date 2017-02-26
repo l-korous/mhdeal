@@ -37,7 +37,7 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinet
   for (unsigned int d = 0; d < dim; ++d)
     kinetic_energy += W[first_momentum_component + d] * W[first_momentum_component + d];
 
-  kinetic_energy *= 1. / (2 * W[density_component]);
+  kinetic_energy *= 1. / (2. * W[density_component]);
 
   return kinetic_energy;
 }
@@ -78,7 +78,7 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
       flux[first_momentum_component + d][e] -= W[first_magnetic_flux_component + d] * W[first_magnetic_flux_component + e];
     }
 
-    flux[first_momentum_component + d][d] += pressure;
+    flux[first_momentum_component + d][d] += 0.5 * pressure;
     flux[first_momentum_component + d][d] += magnetic_energy;
   }
 
@@ -109,7 +109,7 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
   for (unsigned int d = 0; d < dim; ++d)
   {
     flux[energy_component][d] = (W[first_momentum_component + d] / W[density_component]) * ((parameters.gas_gamma * pressure / (parameters.gas_gamma - 1.0)) + kinetic_energy);
-    flux[energy_component][d] += energy_item[d];
+    flux[energy_component][d] += (2. / W[density_component]) * energy_item[d];
   }
 }
 

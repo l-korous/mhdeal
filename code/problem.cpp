@@ -19,8 +19,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
     FE_RaviartThomas<dim>(1), 1,
     FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
   dof_handler(triangulation),
-  quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 2),
-  face_quadrature(std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 2),
+  quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 1),
+  face_quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 1),
   verbose_cout(std::cout, false)
 {
 }
@@ -253,16 +253,19 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             val -= (1.0 / parameters.time_step)
               * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
+
+            for (unsigned int d = 0; d < dim; d++)
+              val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v.shape_grad_component(i, q, 4)[d] + flux_old[q][5][d] * fe_v.shape_grad_component(i, q, 5)[d] + flux_old[q][6][d] * fe_v.shape_grad_component(i, q, 6)[d]) * fe_v.JxW(q);
           }
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+
+            for (unsigned int d = 0; d < dim; d++)
+              val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
           }
         }
-
-        for (unsigned int d = 0; d < dim; d++)
-          val -= (1.0 - parameters.theta) * flux_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
         if (this->parameters.needs_gradients)
         {
@@ -750,6 +753,17 @@ void Problem<equationsType, dim>::run()
     }
 
     unsigned int nonlin_iter = 0;
+
+    if (parameters.output_solution)
+    {
+      std::ofstream s;
+      std::stringstream sss;
+      sss << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".newton_initial_guess";
+      s.open(sss.str());
+      newton_initial_guess.print(s, 10, false, false);
+      s.close();
+    }
+
     current_solution = newton_initial_guess;
     while (true)
     {
@@ -772,7 +786,7 @@ void Problem<equationsType, dim>::run()
         std::stringstream ssr;
         ssr << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".rhs";
         r.open(ssr.str());
-        system_rhs.print(r, 3, false, false);
+        system_rhs.print(r, 10, false, false);
         r.close();
       }
       const double res_norm = system_rhs.l2_norm();
@@ -793,12 +807,12 @@ void Problem<equationsType, dim>::run()
         solve(newton_update);
         if (parameters.output_solution)
         {
-          std::ofstream s;
-          std::stringstream sss;
-          sss << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".solution";
-          s.open(sss.str());
-          newton_update.print(s, 3, false, false);
-          s.close();
+          std::ofstream n;
+          std::stringstream ssn;
+          ssn << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".newton_update";
+          n.open(ssn.str());
+          newton_update.print(n, 10, false, false);
+          n.close();
         }
         if (parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
@@ -808,6 +822,16 @@ void Problem<equationsType, dim>::run()
 
       ++nonlin_iter;
       AssertThrow(nonlin_iter <= parameters.max_nonlinear_iterations, ExcMessage("No convergence in nonlinear solver"));
+    }
+
+    if (parameters.output_solution)
+    {
+      std::ofstream s;
+      std::stringstream sss;
+      sss << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".current_solution";
+      s.open(sss.str());
+      current_solution.print(s, 10, false, false);
+      s.close();
     }
 
     ++time_step;

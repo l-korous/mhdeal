@@ -59,9 +59,9 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->theta_after_initialization = 0.;
   this->initialization_time = 0.;
 
-  this->output = OutputType::verbose_solver;
   this->output_matrix = false;
-  this->output_rhs = true;
+  this->output = OutputType::quiet_solver;
+  this->output_rhs = false;
   this->output_solution = false;
 
   this->solver = gmres;
