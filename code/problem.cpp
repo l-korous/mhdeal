@@ -255,7 +255,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
               * fe_v.JxW(q);
 
             for (unsigned int d = 0; d < dim; d++)
-              val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v.shape_grad_component(i, q, 4)[d] + flux_old[q][5][d] * fe_v.shape_grad_component(i, q, 5)[d] + flux_old[q][6][d] * fe_v.shape_grad_component(i, q, 6)[d]) * fe_v.JxW(q);
+              val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
           }
           else
           {
