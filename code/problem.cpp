@@ -680,7 +680,7 @@ void Problem<equationsType, dim>::output_results() const
   data_out.add_data_vector(subdomain, "subdomain");
 #endif
 
-  data_out.build_patches();
+  data_out.build_patches(std::min(4., std::ceil(std::pow(1000. / std::max(parameters.refinements[1], parameters.refinements[2]), .333))));
 
   static unsigned int output_file_number = 0;
 
@@ -846,10 +846,6 @@ void Problem<equationsType, dim>::run()
     }
 
     newton_initial_guess = current_solution;
-
-    // Tohle je extrapolace - udelam stejny krok do dalsiho reseni jaky jsem udelal do tohohle.
-    newton_initial_guess.sadd(2.0, -1.0, old_solution);
-
     old_solution = current_solution;
     this->parameters.initial_step = false;
   }
