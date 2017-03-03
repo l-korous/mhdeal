@@ -76,7 +76,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->gas_gamma = 1.4;
 
   this->initial_step = true;
-  this->polynomial_order_dg = 0;
+  this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 1;
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-8;
