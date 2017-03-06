@@ -48,7 +48,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->corner_a = Point<dim>(-.5, -.75, -.01);
   this->corner_b = Point<dim>(.5, .75, .01);
-  this->refinements = { 7, 11, 1 };
+  this->refinements = { 61, 91, 1 };
 
   load_cube_mesh<dim>(triangulation, *this);
 

@@ -37,7 +37,7 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinet
   for (unsigned int d = 0; d < dim; ++d)
     kinetic_energy += W[first_momentum_component + d] * W[first_momentum_component + d];
 
-  kinetic_energy = (kinetic_energy / W[density_component]);
+  kinetic_energy = (0.5 * kinetic_energy) / W[density_component];
 
   return kinetic_energy;
 }
@@ -46,7 +46,7 @@ template <>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W) const
 {
-  return (W[first_magnetic_flux_component] * W[first_magnetic_flux_component]
+  return 0.5 * (W[first_magnetic_flux_component] * W[first_magnetic_flux_component]
     + W[first_magnetic_flux_component + 1] * W[first_magnetic_flux_component + 1]
     + W[first_magnetic_flux_component + 2] * W[first_magnetic_flux_component + 2]);
 }
@@ -79,7 +79,7 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
     }
 
     flux[first_momentum_component + d][d] += pressure;
-    flux[first_momentum_component + d][d] += 0.5 * magnetic_energy;
+    flux[first_momentum_component + d][d] += magnetic_energy;
   }
 
   for (unsigned int d = 0; d < dim; ++d)
@@ -96,20 +96,11 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
     }
   }
 
-  energy_item[0]
-    = (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component + 2])
-    - (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component + 1]);
-  energy_item[1]
-    = (((W[first_momentum_component + 1] * W[first_magnetic_flux_component]) - (W[first_momentum_component] * W[first_magnetic_flux_component + 1])) * W[first_magnetic_flux_component])
-    - (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 2]);
-  energy_item[2]
-    = (((W[first_momentum_component + 2] * W[first_magnetic_flux_component + 1]) - (W[first_momentum_component + 1] * W[first_magnetic_flux_component + 2])) * W[first_magnetic_flux_component + 1])
-    - (((W[first_momentum_component] * W[first_magnetic_flux_component + 2]) - (W[first_momentum_component + 2] * W[first_magnetic_flux_component])) * W[first_magnetic_flux_component]);
-
   for (unsigned int d = 0; d < dim; ++d)
   {
-    flux[energy_component][d] = (W[first_momentum_component + d] / W[density_component]) * ((parameters.gas_gamma * pressure / (parameters.gas_gamma - 1.0)) + kinetic_energy);
-    flux[energy_component][d] += (2. / W[density_component]) * energy_item[d];
+    flux[energy_component][d] = (W[energy_component] + pressure + magnetic_energy) * W[first_momentum_component + d];
+    for (unsigned int e = 0; e < dim; ++e)
+      flux[energy_component][d] -= (W[first_magnetic_flux_component + d] * W[first_momentum_component + e] * W[first_magnetic_flux_component + e]) / W[density_component];
   }
 }
 
