@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
 #else
       system("rm *.visit");
       system("rm *.vtk");
+      system("rm *nohup.out");
       system("rm *.vtu");
       system("rm *.pvtu");
       system("rm *.newton_update");

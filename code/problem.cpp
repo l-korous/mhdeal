@@ -85,69 +85,72 @@ void Problem<equationsType, dim>::assemble_system()
 
     assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
 
-    for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+    if (!parameters.initial_step)
     {
-      cell_matrix_neighbor = 0;
-      cell_rhs_neighbor = 0;
-
-      if (cell->at_boundary(face_no))
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        fe_v_face.reinit(cell, face_no);
-        assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
-      }
-      else
-      {
-        if (cell->neighbor(face_no)->has_children())
+        cell_matrix_neighbor = 0;
+        cell_rhs_neighbor = 0;
+
+        if (cell->at_boundary(face_no))
         {
-          const unsigned int neighbor2 = cell->neighbor_of_neighbor(face_no);
-
-          for (unsigned int subface_no = 0; subface_no < cell->face(face_no)->n_children(); ++subface_no)
-          {
-            const typename DoFHandler<dim>::active_cell_iterator neighbor_child = cell->neighbor_child_on_subface(face_no, subface_no);
-
-            Assert(neighbor_child->face(neighbor2) == cell->face(face_no)->child(subface_no), ExcInternalError());
-            Assert(neighbor_child->has_children() == false, ExcInternalError());
-
-            fe_v_subface.reinit(cell, face_no, subface_no);
-            fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
-
-            neighbor_child->get_dof_indices(dof_indices_neighbor);
-
-            assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
-
-            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
-          }
-        }
-        else if (cell->neighbor(face_no)->level() != cell->level())
-        {
-          const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-          Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
-
-          neighbor->get_dof_indices(dof_indices_neighbor);
-
-          const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
-          const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
-
-          Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == cell, ExcInternalError());
-
           fe_v_face.reinit(cell, face_no);
-          fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
-
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
-
-          constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+          assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
         }
         else
         {
-          const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-          neighbor->get_dof_indices(dof_indices_neighbor);
+          if (cell->neighbor(face_no)->has_children())
+          {
+            const unsigned int neighbor2 = cell->neighbor_of_neighbor(face_no);
 
-          fe_v_face.reinit(cell, face_no);
-          fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
+            for (unsigned int subface_no = 0; subface_no < cell->face(face_no)->n_children(); ++subface_no)
+            {
+              const typename DoFHandler<dim>::active_cell_iterator neighbor_child = cell->neighbor_child_on_subface(face_no, subface_no);
 
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+              Assert(neighbor_child->face(neighbor2) == cell->face(face_no)->child(subface_no), ExcInternalError());
+              Assert(neighbor_child->has_children() == false, ExcInternalError());
 
-          constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+              fe_v_subface.reinit(cell, face_no, subface_no);
+              fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
+
+              neighbor_child->get_dof_indices(dof_indices_neighbor);
+
+              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+
+              constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            }
+          }
+          else if (cell->neighbor(face_no)->level() != cell->level())
+          {
+            const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+            Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
+
+            neighbor->get_dof_indices(dof_indices_neighbor);
+
+            const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
+            const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
+
+            Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == cell, ExcInternalError());
+
+            fe_v_face.reinit(cell, face_no);
+            fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
+
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+
+            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+          }
+          else
+          {
+            const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+            neighbor->get_dof_indices(dof_indices_neighbor);
+
+            fe_v_face.reinit(cell, face_no);
+            fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
+
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+
+            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+          }
         }
       }
     }
@@ -254,26 +257,30 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
               * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
 
-            for (unsigned int d = 0; d < dim; d++)
-              val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+            if (!parameters.initial_step)
+              for (unsigned int d = 0; d < dim; d++)
+                val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
           }
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
 
-            for (unsigned int d = 0; d < dim; d++)
-              val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
+            if (!parameters.initial_step)
+              for (unsigned int d = 0; d < dim; d++)
+                val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
           }
         }
 
-        if (this->parameters.needs_gradients)
-        {
-          for (unsigned int d = 0; d < dim; d++)
-            val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-        }
+        if (!parameters.initial_step)
+          if (this->parameters.needs_gradients)
+          {
+            for (unsigned int d = 0; d < dim; d++)
+              val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+          }
 
-        val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+        if (!parameters.initial_step)
+          val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
       }
 
       cell_rhs(i) -= val;
@@ -703,7 +710,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_visit_record(visit_master_output, filenames);
-  }
+}
 #else
   std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -753,16 +760,6 @@ void Problem<equationsType, dim>::run()
     }
 
     unsigned int nonlin_iter = 0;
-
-    if (parameters.output_solution)
-    {
-      std::ofstream s;
-      std::stringstream sss;
-      sss << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".newton_initial_guess";
-      s.open(sss.str());
-      newton_initial_guess.print(s, 10, false, false);
-      s.close();
-    }
 
     current_solution = newton_initial_guess;
     while (true)

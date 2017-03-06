@@ -48,7 +48,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->corner_a = Point<dim>(-.5, -.75, -.01);
   this->corner_b = Point<dim>(.5, .75, .01);
-  this->refinements = { 100, 150, 1 };
+  this->refinements = { 7, 11, 1 };
 
   load_cube_mesh<dim>(triangulation, *this);
 
@@ -81,7 +81,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-8;
 
-  this->output_step = 1e-4;
+  this->output_step = -1e-4;
 
   this->num_flux_type = hlld;
   this->lax_friedrich_stabilization_value = 1.;
