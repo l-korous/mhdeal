@@ -270,13 +270,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   B2 = B*B;
 
   // Calculate left flux
-  if (std::abs(QedWplus[0]) < 1e-8)
-  {
-    std::cout << "Division by zero - QedWplus[0]." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
   hl[0] = 1.0 / QedWplus[0];
   Uk = 0.5*hl[0] * ((QedWplus[1] * QedWplus[1]) + (QedWplus[2] * QedWplus[2]) + (QedWplus[3] * QedWplus[3]));
   Um = 0.5*(QedWplus[4] * QedWplus[4] + QedWplus[5] * QedWplus[5] + QedWplus[6] * QedWplus[6]);
@@ -353,33 +346,12 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // Determine Alfven and middle speeds
   Sl = sp[0] - QedWplus[1] * hl[0];
   Sr = sp[4] - QedWminus[1] * hr[0];
-  if (std::abs((QedWplus[0] * Sl - QedWminus[0] * Sr)) < 1e-8)
-  {
-    std::cout << "Division by zero - (QedWplus[0] * Sl - QedWminus[0] * Sr)." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
-  sp[2] = (QedWplus[1] * Sl - QedWminus[1] * Sr - ptl + ptr) / (QedWplus[0] * Sl - QedWminus[0] * Sr);
+  sp[2] = std::min(std::max((QedWplus[1] * Sl - QedWminus[1] * Sr - ptl + ptr) / (QedWplus[0] * Sl - QedWminus[0] * Sr), sp[0]), sp[4]);
   sml = sp[0] - sp[2];
   smr = sp[4] - sp[2];
 
   // Density
-  if (std::abs(sml) < 1e-8)
-  {
-    std::cout << "Division by zero - sml." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
   Ul[0] = QedWplus[0] * Sl / sml;
-  if (std::abs(smr) < 1e-8)
-  {
-    std::cout << "Division by zero - smr." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
   Ur[0] = QedWminus[0] * Sr / smr;
 
   Ul[4] = Udl[4] = QedWplus[4];
@@ -389,22 +361,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   srdr = sqrt(Ur[0]);
 
   // Sl*
-  if (std::abs(srdl) < 1e-8)
-  {
-    std::cout << "Division by zero - srdl." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
   sp[1] = sp[2] - fabs(Ul[4]) / srdl;
   // Sr*
-  if (std::abs(srdr) < 1e-8)
-  {
-    std::cout << "Division by zero - srdr." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
   sp[3] = sp[2] + fabs(Ur[4]) / srdr;
 
   ptst = ptl + QedWplus[0] * Sl*(Sl - sml);
@@ -423,13 +381,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
   else
   {
-    if (std::abs(cl) < 1e-8)
-    {
-      std::cout << "Division by zero - cl." << std::endl;
-      for (int i = 0; i < 8; i++)
-        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-    }
     cl = 1.0 / cl;
     cm = Ul[4] * (Sl - sml)*cl;
     Ul[2] = Ul[0] * (QedWplus[2] * hl[0] - QedWplus[5] * cm);
@@ -438,13 +389,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     Ul[5] = QedWplus[5] * cm;
     Ul[6] = QedWplus[6] * cm;
   }
-  if (std::abs(Ul[0]) < 1e-8)
-  {
-    std::cout << "Division by zero - Ul[0]." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
+
   vbstl = (Ul[1] * Ul[4] + Ul[2] * Ul[5] + Ul[3] * Ul[6]) / Ul[0];
 
   Ul[7] = (Sl*QedWplus[7] - ptl*QedWplus[1] * hl[0] + ptst*sp[2] + Ul[4] *
@@ -462,13 +407,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
   else
   {
-    if (std::abs(cl) < 1e-8)
-    {
-      std::cout << "Division by zero - cl." << std::endl;
-      for (int i = 0; i < 8; i++)
-        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-    }
     cl = 1.0 / cl;
     cm = Ur[4] * (Sr - smr)*cl;
     Ur[2] = Ur[0] * (QedWminus[2] * hr[0] - QedWminus[5] * cm);
@@ -477,13 +415,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     Ur[5] = QedWminus[5] * cm;
     Ur[6] = QedWminus[6] * cm;
   }
-  if (std::abs(Ur[0]) < 1e-8)
-  {
-    std::cout << "Division by zero - Ur[0]." << std::endl;
-    for (int i = 0; i < 8; i++)
-      std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-    std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-  }
+
   vbstr = (Ur[1] * Ur[4] + Ur[2] * Ur[5] + Ur[3] * Ur[6]) / Ur[0];
 
   Ur[7] = (Sr*QedWminus[7] - ptr*QedWminus[1] * hr[0] + ptstr*sp[2] + Ur[4] *
@@ -515,13 +447,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
   else
   {
-    if (std::abs((srdl + srdr)) < 1e-8)
-    {
-      std::cout << "Division by zero - (srdl + srdr)." << std::endl;
-      for (int i = 0; i < 8; i++)
-        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-    }
     invsumd = 1.0 / (srdl + srdr);
     Bsgnl = (Ul[4] > 0.0) ? 1.0 : -1.0;
     Bsgnr = (Ur[4] > 0.0) ? 1.0 : -1.0;
@@ -552,20 +477,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     Udl[6] = cm + Bsgnl*cl;
     Udr[6] = cm + Bsgnr*cl;
 
-    if (std::abs(Udl[0]) < 1e-8)
-    {
-      std::cout << "Division by zero - Udl[0]." << std::endl;
-      for (int i = 0; i < 8; i++)
-        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-    }
-    if (std::abs(Udr[0]) < 1e-8)
-    {
-      std::cout << "Division by zero - Udr[0]." << std::endl;
-      for (int i = 0; i < 8; i++)
-        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
-      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
-    }
     Udl[7] = Ul[7] - srdl*Bsgnl*(vbstl - sp[2] * Ul[4] - (Udl[2] * Udl[5] + Udl[3] * Udl[6]) / Udl[0]);
     Udr[7] = Ur[7] + srdr*Bsgnr*(vbstr - sp[2] * Ur[4] - (Udr[2] * Udr[5] + Udr[3] * Udr[6]) / Udr[0]);
   }

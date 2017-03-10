@@ -835,6 +835,7 @@ void Problem<equationsType, dim>::run()
         if (std::isnan(res_norm))
         {
           output_results();
+          std::this_thread::sleep_for(std::chrono::milliseconds(10000));
           exit(1);
         }
       }
