@@ -317,17 +317,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   ptr = hr[1] + pmr;
 
   // maximum of fast magnetoacoustic speeds L/R
-  cm = (cl > cr) ? cl : cr;
-  if (QedWplus[1] * hl[0] <= QedWminus[1] * hr[0])
-  {
-    sp[0] = QedWplus[1] * hl[0] - cm;
-    sp[4] = QedWminus[1] * hr[0] + cm;
-  }
-  else
-  {
-    sp[0] = QedWminus[1] * hr[0] - cm;
-    sp[4] = QedWplus[1] * hl[0] + cm;
-  }
+  sp[0] = std::min(QedWplus[1] * hl[0] - cl, QedWminus[1] * hr[0] - cr);
+  sp[4] = std::max(QedWplus[1] * hl[0] + cl, QedWminus[1] * hr[0] + cr);
 
   // Upwind flux in the case of supersonic flow
   if (sp[0] >= 0.0)
@@ -347,6 +338,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   Sl = sp[0] - QedWplus[1] * hl[0];
   Sr = sp[4] - QedWminus[1] * hr[0];
   sp[2] = std::min(std::max((QedWplus[1] * Sl - QedWminus[1] * Sr - ptl + ptr) / (QedWplus[0] * Sl - QedWminus[0] * Sr), sp[0]), sp[4]);
+  sp[2] = (QedWminus[1] * Sr - QedWplus[1] * Sl - ptr + ptl) / (QedWminus[0] * Sr - QedWplus[0] * Sl);
   sml = sp[0] - sp[2];
   smr = sp[4] - sp[2];
 

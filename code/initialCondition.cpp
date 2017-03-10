@@ -79,9 +79,9 @@ double InitialCondition<EquationsTypeMhd, 3>::value(const Point<3> &p, const uns
     break;
   case 7:
     if (p.norm() < 0.1)
-      return 10. / (parameters.gas_gamma - 1.0) + 1.0;
+      return 10. / (parameters.gas_gamma - 1.0) + 0.5;
     else
-      return 0.1 / (parameters.gas_gamma - 1.0) + 1.0;
+      return 0.1 / (parameters.gas_gamma - 1.0) + 0.5;
     break;
   }
 };
