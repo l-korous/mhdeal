@@ -816,7 +816,7 @@ void Problem<equationsType, dim>::run()
 
         current_solution += newton_update;
 
-        if (isnan(res_norm))
+        if (std::isnan(res_norm))
         {
           output_results();
           exit(1);
