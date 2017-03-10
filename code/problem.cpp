@@ -225,6 +225,8 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
               grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
           }
         }
+        if (W_old[q][7] < 0.)
+          W_old[q][7] = 0.;
       }
     }
 
@@ -480,6 +482,11 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       }
       if (external_face)
         equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
+
+      if (Wplus_old[q][7] < 0.)
+        Wplus_old[q][7] = 0.;
+      if (Wminus_old[q][7] < 0.)
+        Wminus_old[q][7] = 0.;
 
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
     }
