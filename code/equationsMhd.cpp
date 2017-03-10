@@ -120,8 +120,8 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
   typename InputVector::value_type a;
-  if (std::abs(normal[1]) < 1e-12)
-    a = acos(normal[0] / cos(b));
+  if ((std::abs(normal[2] - 1.) < 1e-12) || (std::abs(normal[2] + 1.) < 1e-12))
+    a = 0.;
   else
     a = asin(normal[1] / cos(b));
   typename InputVector::value_type sa = normal[1] / cos(b);
@@ -337,7 +337,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // Determine Alfven and middle speeds
   Sl = sp[0] - QedWplus[1] * hl[0];
   Sr = sp[4] - QedWminus[1] * hr[0];
-  sp[2] = std::min(std::max((QedWplus[1] * Sl - QedWminus[1] * Sr - ptl + ptr) / (QedWplus[0] * Sl - QedWminus[0] * Sr), sp[0]), sp[4]);
   sp[2] = (QedWminus[1] * Sr - QedWplus[1] * Sl - ptr + ptl) / (QedWminus[0] * Sr - QedWplus[0] * Sl);
   sml = sp[0] - sp[2];
   smr = sp[4] - sp[2];
