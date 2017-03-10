@@ -55,7 +55,7 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
 {
-  return ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
+  return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
@@ -273,7 +273,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   hl[0] = 1.0 / QedWplus[0];
   Uk = 0.5*hl[0] * ((QedWplus[1] * QedWplus[1]) + (QedWplus[2] * QedWplus[2]) + (QedWplus[3] * QedWplus[3]));
   Um = 0.5*(QedWplus[4] * QedWplus[4] + QedWplus[5] * QedWplus[5] + QedWplus[6] * QedWplus[6]);
-  hl[1] = (parameters.gas_gamma - 1)*(QedWplus[7] - Uk - Um);
+  hl[1] = std::max(0.,(parameters.gas_gamma - 1)*(QedWplus[7] - Uk - Um));
   E2 = hl[0] * (QedWplus[1] * QedWplus[6] - QedWplus[3] * QedWplus[4]);
   E3 = hl[0] * (QedWplus[2] * QedWplus[4] - QedWplus[1] * QedWplus[5]);
 
@@ -290,7 +290,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   hr[0] = 1.0 / QedWminus[0];
   Uk = 0.5*hr[0] * (QedWminus[1] * QedWminus[1] + QedWminus[2] * QedWminus[2] + QedWminus[3] * QedWminus[3]);
   Um = 0.5*(QedWminus[4] * QedWminus[4] + QedWminus[5] * QedWminus[5] + QedWminus[6] * QedWminus[6]);
-  hr[1] = (parameters.gas_gamma - 1)*(QedWminus[7] - Uk - Um);
+  hr[1] = std::max(0., (parameters.gas_gamma - 1)*(QedWminus[7] - Uk - Um));
   E2 = hr[0] * (QedWminus[1] * QedWminus[6] - QedWminus[3] * QedWminus[4]);
   E3 = hr[0] * (QedWminus[2] * QedWminus[4] - QedWminus[1] * QedWminus[5]);
 
