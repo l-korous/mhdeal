@@ -89,6 +89,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->is_stationary = false;
 
   this->needs_gradients = false;
+  this->needs_forcing = false;
 
   this->debug = false;
   this->debug_neighbor = false;

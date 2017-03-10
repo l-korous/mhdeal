@@ -52,6 +52,7 @@ public:
   int polynomial_order_dg;
   int polynomial_order_hdiv;
   bool needs_gradients;
+  bool needs_forcing;
 
   // Mesh - string input
   std::string mesh_filename;

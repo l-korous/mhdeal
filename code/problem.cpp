@@ -19,8 +19,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
     FE_RaviartThomas<dim>(1), 1,
     FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
   dof_handler(triangulation),
-  quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 3),
-  face_quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 3),
+  quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 5),
+  face_quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 5),
   verbose_cout(std::cout, false)
 {
 }
@@ -272,14 +272,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           }
         }
 
-        if (!parameters.initial_step)
-          if (this->parameters.needs_gradients)
-          {
-            for (unsigned int d = 0; d < dim; d++)
-              val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-          }
+        if (this->parameters.needs_gradients && !parameters.initial_step)
+          for (unsigned int d = 0; d < dim; d++)
+            val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
-        if (!parameters.initial_step)
+        if (this->parameters.needs_gradients && !parameters.initial_step)
           val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
       }
 
@@ -514,15 +511,15 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             val += (1.0 - parameters.theta) * normal_fluxes_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
           }
-        }
 
-        if (std::isnan(val))
-        {
-          std::cout << "isnan: " << val << std::endl;
-          std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-          std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
-          for (int j = 0; j < 8; j++)
-            std::cout << "W+ [" << j << "]: " << Wplus_old[0][j] << ", W- [" << j << "]: " << Wminus_old[0][j] << ", F [" << j << "]: " << normal_fluxes_old[0][j] << std::endl;
+          if (std::isnan(val))
+          {
+            std::cout << "isnan: " << val << std::endl;
+            std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+            std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
+            for (int j = 0; j < 8; j++)
+              std::cout << "W+ [" << j << "]: " << Wplus_old[q][j] << ", W- [" << j << "]: " << Wminus_old[q][j] << ", F [" << j << "]: " << normal_fluxes_old[q][j] << std::endl;
+          }
         }
         cell_rhs(i) -= val;
       }
@@ -726,7 +723,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_visit_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
