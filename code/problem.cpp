@@ -815,6 +815,12 @@ void Problem<equationsType, dim>::run()
           newton_update *= parameters.newton_damping;
 
         current_solution += newton_update;
+
+        if (isnan(res_norm))
+        {
+          output_results();
+          exit(1);
+        }
       }
 
       ++nonlin_iter;
@@ -825,7 +831,7 @@ void Problem<equationsType, dim>::run()
     {
       std::ofstream s;
       std::stringstream sss;
-      sss << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".current_solution";
+      sss << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".current_solution";
       s.open(sss.str());
       current_solution.print(s, 10, false, false);
       s.close();

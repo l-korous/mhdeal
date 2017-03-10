@@ -172,11 +172,17 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
   typename InputVector::value_type a;
+  typename InputVector::value_type sa;
   if (std::abs(normal[1]) < 1e-12)
+  {
     a = acos(normal[0] / cos(b));
+    sa = 0.;
+  }
   else
+  {
     a = asin(normal[1] / cos(b));
-  typename InputVector::value_type sa = normal[1] / cos(b);
+    sa = normal[1] / cos(b);
+  }
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
   typename InputVector::value_type cb = cos(b);
@@ -417,6 +423,13 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
   else
   {
+    if (std::abs(cl) < 1e-8)
+    {
+      std::cout << "Division by zero - cl." << std::endl;
+      for (int i = 0; i < 8; i++)
+        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
+      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
+    }
     cl = 1.0 / cl;
     cm = Ul[4] * (Sl - sml)*cl;
     Ul[2] = Ul[0] * (QedWplus[2] * hl[0] - QedWplus[5] * cm);
@@ -449,6 +462,13 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
   else
   {
+    if (std::abs(cl) < 1e-8)
+    {
+      std::cout << "Division by zero - cl." << std::endl;
+      for (int i = 0; i < 8; i++)
+        std::cout << "Wplus [" << i << "]: " << Wplus[i] << ", Wminus [" << i << "]: " << Wminus[i] << std::endl;
+      std::cout << "Normal: [" << normal[0] << ", " << normal[1] << ", " << normal[2] << "]" << std::endl;
+    }
     cl = 1.0 / cl;
     cm = Ur[4] * (Sr - smr)*cl;
     Ur[2] = Ur[0] * (QedWminus[2] * hr[0] - QedWminus[5] * cm);
