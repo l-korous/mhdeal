@@ -120,11 +120,17 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
   typename InputVector::value_type a;
+  typename InputVector::value_type sa;
   if ((std::abs(normal[2] - 1.) < 1e-12) || (std::abs(normal[2] + 1.) < 1e-12))
+  {
     a = 0.;
+    sa = 0.;
+  }
   else
+  {
     a = asin(normal[1] / cos(b));
-  typename InputVector::value_type sa = normal[1] / cos(b);
+    sa = normal[1] / cos(b);
+  }
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
   typename InputVector::value_type cb = cos(b);
