@@ -283,6 +283,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
       }
 
+      if (std::isnan(val))
+      {
+        std::cout << "isnan: " << val << std::endl;
+        std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+        std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
+        for (int j = 0; j < 8; j++)
+          std::cout << "W [" << j << "]: " << W_old[0][j] << ", F [" << j << "]: " << flux_old[0][j][0] << ", " << flux_old[0][j][1] << ", " << flux_old[0][j][2] << std::endl;
+      }
       cell_rhs(i) -= val;
     }
   }
@@ -508,6 +516,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
 
+        if (std::isnan(val))
+        {
+          std::cout << "isnan: " << val << std::endl;
+          std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+          std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
+          for (int j = 0; j < 8; j++)
+            std::cout << "W+ [" << j << "]: " << Wplus_old[0][j] << ", W- [" << j << "]: " << Wminus_old[0][j] << ", F [" << j << "]: " << normal_fluxes_old[0][j] << std::endl;
+        }
         cell_rhs(i) -= val;
       }
     }
