@@ -55,6 +55,13 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
 {
+  return std::max(0.,((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W))));
+}
+
+template <int dim>
+template <typename InputVector>
+typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const typename InputVector::value_type& Uk, const typename InputVector::value_type& Um) const
+{
   return ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
@@ -187,16 +194,8 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
   }
   else
   {
-    if (std::abs(normal[1]) < 1e-8)
-    {
-      a = acos(normal[0] / cos(b));
-      sa = sin(a);
-    }
-    else
-    {
-      a = asin(normal[1] / cos(b));
-      sa = normal[1] / cos(b);
-    }
+    a = acos(normal[0] / cos(b));
+    sa = sin(a);
   }
   
   typename InputVector::value_type sb = normal[2];
@@ -287,9 +286,9 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
   // Calculate left flux
   hl[0] = 1.0 / QedWplus[0];
-  Uk = 0.5*hl[0] * ((QedWplus[1] * QedWplus[1]) + (QedWplus[2] * QedWplus[2]) + (QedWplus[3] * QedWplus[3]));
-  Um = 0.5*(QedWplus[4] * QedWplus[4] + QedWplus[5] * QedWplus[5] + QedWplus[6] * QedWplus[6]);
-  hl[1] = (parameters.gas_gamma - 1)*(QedWplus[7] - Uk - Um);
+  Uk = compute_kinetic_energy(QedWplus);
+  Um = compute_magnetic_energy(QedWplus);
+  hl[1] = compute_pressure(QedWplus, Uk, Um);
   E2 = hl[0] * (QedWplus[1] * QedWplus[6] - QedWplus[3] * QedWplus[4]);
   E3 = hl[0] * (QedWplus[2] * QedWplus[4] - QedWplus[1] * QedWplus[5]);
 
@@ -304,9 +303,9 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
   // Calculate right flux
   hr[0] = 1.0 / QedWminus[0];
-  Uk = 0.5*hr[0] * (QedWminus[1] * QedWminus[1] + QedWminus[2] * QedWminus[2] + QedWminus[3] * QedWminus[3]);
-  Um = 0.5*(QedWminus[4] * QedWminus[4] + QedWminus[5] * QedWminus[5] + QedWminus[6] * QedWminus[6]);
-  hr[1] = (parameters.gas_gamma - 1)*(QedWminus[7] - Uk - Um);
+  Uk = compute_kinetic_energy(QedWminus);
+  Um = compute_magnetic_energy(QedWminus);
+  hr[1] = compute_pressure(QedWminus, Uk, Um);
   E2 = hr[0] * (QedWminus[1] * QedWminus[6] - QedWminus[3] * QedWminus[4]);
   E3 = hr[0] * (QedWminus[2] * QedWminus[4] - QedWminus[1] * QedWminus[5]);
 

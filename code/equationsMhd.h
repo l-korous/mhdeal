@@ -30,6 +30,9 @@ public:
   typename InputVector::value_type compute_pressure(const InputVector &W) const;
 
   template <typename InputVector>
+  typename InputVector::value_type compute_pressure(const InputVector &W, const typename InputVector::value_type& Uk, const typename InputVector::value_type& Um) const;
+
+  template <typename InputVector>
   void compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const;
 
   template <typename InputVector, typename ValueType>

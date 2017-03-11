@@ -3,6 +3,8 @@ template typename dealii::internal::TableBaseAccessors::Accessor<2, double, fals
 
 template typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W) const;
 
+template typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W, const typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type& Uk, const typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type& Um) const;
+
 template void Equations<EquationsTypeMhd, 3>::compute_flux_matrix(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W, std_cxx11::array <std_cxx11::array <typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type, 3>, n_components > &flux) const;
 
 template void Equations<EquationsTypeMhd, 3>::compute_jacobian_addition(double, const dealii::internal::TableBaseAccessors::Accessor<3, double, false, 2> &W, std_cxx11::array <std_cxx11::array <double, 3>, n_components > &jacobian_addition) const;
@@ -24,6 +26,8 @@ void Equations<EquationsTypeMhd, 3>::Q_inv<dealii::internal::TableBaseAccessors:
 template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_kinetic_energy(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W) const;
 
 template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W) const;
+
+template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W, const typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type& Uk, const typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type& Um) const;
 
 template void Equations<EquationsTypeMhd, 3>::compute_flux_matrix(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W, std_cxx11::array <std_cxx11::array <typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type, 3>, n_components > &flux) const;
 
