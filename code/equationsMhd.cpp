@@ -179,16 +179,26 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
   typename InputVector::value_type b = asin(normal[2]);
   typename InputVector::value_type a;
   typename InputVector::value_type sa;
-  if (std::abs(normal[1]) < 1e-12)
+  // normal[2] in {-1, 1}, we choose alpha
+  if (std::abs(normal[2]) > 0.99999999)
   {
-    a = acos(normal[0] / cos(b));
+    a = 0.;
     sa = 0.;
   }
   else
   {
-    a = asin(normal[1] / cos(b));
-    sa = normal[1] / cos(b);
+    if (std::abs(normal[1]) < 1e-8)
+    {
+      a = acos(normal[0] / cos(b));
+      sa = sin(a);
+    }
+    else
+    {
+      a = asin(normal[1] / cos(b));
+      sa = normal[1] / cos(b);
+    }
   }
+  
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
   typename InputVector::value_type cb = cos(b);

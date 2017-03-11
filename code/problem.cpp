@@ -225,8 +225,6 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
               grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
           }
         }
-        if (W_old[q][7] < 0.)
-          W_old[q][7] = 0.;
       }
     }
 
@@ -280,6 +278,15 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
         if (this->parameters.needs_forcing && !parameters.initial_step)
           val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+      }
+
+      if (std::isnan(val))
+      {
+        std::cout << "isnan: " << val << std::endl;
+        std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+        std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
+        for (int j = 0; j < 8; j++)
+          std::cout << "W [" << j << "]: " << W_old[0][j] << ", F [" << j << "]: " << flux_old[0][j][0] << ", " << flux_old[0][j][1] << ", " << flux_old[0][j][2] << std::endl;
       }
 
       cell_rhs(i) -= val;
@@ -483,11 +490,6 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       if (external_face)
         equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
 
-      if (Wplus_old[q][7] < 0.)
-        Wplus_old[q][7] = 0.;
-      if (Wminus_old[q][7] < 0.)
-        Wminus_old[q][7] = 0.;
-
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
     }
 
@@ -510,6 +512,15 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             val += (1.0 - parameters.theta) * normal_fluxes_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+          }
+
+          if (std::isnan(val))
+          {
+            std::cout << "isnan: " << val << std::endl;
+            std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+            std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
+            for (int j = 0; j < 8; j++)
+              std::cout << "W+ [" << j << "]: " << Wplus_old[q][j] << ", W- [" << j << "]: " << Wminus_old[q][j] << ", F [" << j << "]: " << normal_fluxes_old[q][j] << std::endl;
           }
         }
 
