@@ -62,7 +62,7 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const typename InputVector::value_type& Uk, const typename InputVector::value_type& Um) const
 {
-  return ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
+  return std::max(0., ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W))));
 }
 
 template <int dim>
