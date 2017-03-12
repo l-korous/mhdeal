@@ -62,7 +62,7 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const typename InputVector::value_type& Uk, const typename InputVector::value_type& Um) const
 {
-  return std::max(0., ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - compute_kinetic_energy(W) - compute_magnetic_energy(W))));
+  return std::max(0., ((this->parameters.gas_gamma - 1.0) * (W[energy_component] - Uk - Um)));
 }
 
 template <int dim>
@@ -130,8 +130,8 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
   typename InputVector::value_type sa;
   if (std::abs(normal[2]) > 0.99999999)
   {
-    a = 0.;
-    sa = 0.;
+    a = 1.57079632679489661923;
+    sa = 1.;
   }
   else
   {
@@ -189,8 +189,8 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
   // normal[2] in {-1, 1}, we choose alpha
   if (std::abs(normal[2]) > 0.99999999)
   {
-    a = 0.;
-    sa = 0.;
+    a = 1.57079632679489661923;
+    sa = 1.;
   }
   else
   {

@@ -50,6 +50,7 @@ public:
   double time_step_after_initialization, initialization_time, theta_after_initialization;
   bool is_stationary;
   int polynomial_order_dg;
+  int quadrature_order;
   int polynomial_order_hdiv;
   bool needs_gradients;
   bool needs_forcing;

@@ -19,8 +19,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
     FE_RaviartThomas<dim>(1), 1,
     FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
   dof_handler(triangulation),
-  quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 5),
-  face_quadrature(2 * std::max(parameters.polynomial_order_dg, parameters.polynomial_order_hdiv) + 5),
+  quadrature(parameters.quadrature_order),
+  face_quadrature(parameters.quadrature_order),
   verbose_cout(std::cout, false)
 {
 }
@@ -703,7 +703,7 @@ void Problem<equationsType, dim>::output_results() const
   data_out.add_data_vector(subdomain, "subdomain");
 #endif
 
-  data_out.build_patches(std::min(4., std::ceil(std::pow(1000. / std::max(parameters.refinements[1], parameters.refinements[2]), .333))));
+  data_out.build_patches(4);
 
   static unsigned int output_file_number = 0;
 

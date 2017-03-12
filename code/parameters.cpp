@@ -46,23 +46,27 @@ Parameters<dim>::Parameters(parallel::distributed::Triangulation<dim> &triangula
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 #endif
 {
-  this->corner_a = Point<dim>(-.5, -.75, -.01);
-  this->corner_b = Point<dim>(.5, .75, .01);
+  this->corner_a = Point<dim>(-.5, -.5, -.01);
+  this->corner_b = Point<dim>(.5, .5, .01);
   this->refinements = { 60, 90, 1 };
 
-  load_cube_mesh<dim>(triangulation, *this);
-
-  this->final_time = 10.;
   this->time_step = 1e-6;
   this->theta = 0.0;
   this->time_step_after_initialization = 1e-4;
   this->theta_after_initialization = 0.;
   this->initialization_time = 0.;
 
+  this->polynomial_order_dg = 1;
+  this->polynomial_order_hdiv = 1;
+
+  this->quadrature_order = 10;
+
   this->output_matrix = false;
   this->output = OutputType::quiet_solver;
   this->output_rhs = false;
   this->output_solution = false;
+
+  this->output_step = -1.;
 
   this->solver = gmres;
   this->linear_residual = 1e-10;
@@ -75,13 +79,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->gas_gamma = 1.4;
 
-  this->initial_step = true;
-  this->polynomial_order_dg = 1;
-  this->polynomial_order_hdiv = 1;
   this->max_nonlinear_iterations = 30;
   this->nonlinear_residual_norm_threshold = 1e-8;
-
-  this->output_step = -1.;
 
   this->num_flux_type = hlld;
   this->lax_friedrich_stabilization_value = 1.;
@@ -93,6 +92,9 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->debug = false;
   this->debug_neighbor = false;
+  this->initial_step = true;
+  load_cube_mesh<dim>(triangulation, *this);
+  this->final_time = 10.;
 }
 
 template class Parameters<2>;
