@@ -244,7 +244,8 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       if (parameters.debug)
       {
-        std::cout << "q: " << q << ", " << fe_v.quadrature_point(q) << std::endl;
+        std::cout << "point_i: " << q << std::endl;
+        std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
         std::cout << "W: ";
         for (unsigned int i = 0; i < 8; i++)
          std::cout << W_old[q][i] << (i < 7 ? ", " : "");

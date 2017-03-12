@@ -90,7 +90,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->needs_gradients = false;
   this->needs_forcing = false;
 
-  this->debug = false;
+  this->debug = true;
   this->debug_neighbor = false;
   this->initial_step = true;
   load_cube_mesh<dim>(triangulation, *this);
