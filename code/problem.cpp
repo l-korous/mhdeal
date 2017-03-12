@@ -83,6 +83,11 @@ void Problem<equationsType, dim>::assemble_system()
     fe_v.reinit(cell);
     cell->get_dof_indices(dof_indices);
 
+    if (parameters.debug)
+    {
+      std::cout << cell << std::endl;
+    }
+
     assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
 
     if (!parameters.initial_step)
@@ -236,6 +241,20 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       equations.compute_flux_matrix(W_old[q], flux_old[q]);
+
+      if (parameters.debug)
+      {
+        std::cout << "q: " << q << ", " << fe_v.quadrature_point(q) << std::endl;
+        std::cout << "W: ";
+        for (unsigned int i = 0; i < 8; i++)
+         std::cout << W_old[q][i] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+
+        std::cout << "F: ";
+        for (unsigned int i = 0; i < 8; i++)
+          std::cout << flux_old[q][i][0] << ", " << flux_old[q][i][1] << ", " << flux_old[q][i][2] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+      }
       equations.compute_forcing_vector(W_old[q], forcing_old[q]);
       if (this->parameters.needs_gradients)
         equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
@@ -437,6 +456,9 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     const FEValuesExtractors::Vector mag(dim + 1);
 
+    if (parameters.debug)
+      std::cout << "edqe: " << face_no << std::endl;
+
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       if (parameters.initial_step)
@@ -491,6 +513,26 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
 
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
+
+      if (parameters.debug)
+      {
+        std::cout << "point_i: " << q << std::endl;
+        std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
+        std::cout << "Wplus: ";
+        for (unsigned int i = 0; i < 8; i++)
+          std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+
+        std::cout << "Wminus: ";
+        for (unsigned int i = 0; i < 8; i++)
+          std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+
+        std::cout << "Num F: ";
+        for (unsigned int i = 0; i < 8; i++)
+          std::cout << normal_fluxes_old[q][i] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+      }
     }
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)

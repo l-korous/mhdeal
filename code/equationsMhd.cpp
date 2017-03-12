@@ -32,7 +32,7 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W) const
 {
-  typename InputVector::value_type kinetic_energy = 0;
+  typename InputVector::value_type kinetic_energy = 0.;
 
   for (unsigned int d = 0; d < dim; ++d)
     kinetic_energy += W[first_momentum_component + d] * W[first_momentum_component + d];
@@ -117,7 +117,7 @@ void Equations<EquationsTypeMhd, dim>::compute_jacobian_addition(double cell_dia
 {
   for (unsigned int i = 0; i < n_components; ++i)
     for (unsigned int d = 0; d < dim; ++d)
-      jacobian_addition[i][d] = 0;
+      jacobian_addition[i][d] = 0.;
 }
 
 template <>
@@ -510,7 +510,7 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const
 {
   for (unsigned int c = 0; c < n_components; ++c)
-    forcing[c] = 0;
+    forcing[c] = 0.;
 }
 
 template <int dim>

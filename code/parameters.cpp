@@ -59,7 +59,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 1;
 
-  this->quadrature_order = 10;
+  this->quadrature_order = 8;
 
   this->output_matrix = false;
   this->output = OutputType::quiet_solver;
