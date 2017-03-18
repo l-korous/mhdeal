@@ -245,15 +245,25 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       if (parameters.debug)
       {
         std::cout << "point_i: " << q << std::endl;
-        std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
+        std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
         std::cout << "W: ";
         for (unsigned int i = 0; i < 8; i++)
          std::cout << W_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
 
-        std::cout << "F: ";
+        std::cout << "F[x]: ";
         for (unsigned int i = 0; i < 8; i++)
-          std::cout << flux_old[q][i][0] << ", " << flux_old[q][i][1] << ", " << flux_old[q][i][2] << (i < 7 ? ", " : "");
+          std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+
+        std::cout << "F[y]: ";
+        for (unsigned int i = 0; i < 8; i++)
+          std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
+        std::cout << std::endl;
+
+        std::cout << "F[z]: ";
+        for (unsigned int i = 0; i < 8; i++)
+          std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
         std::cout << std::endl;
       }
       equations.compute_forcing_vector(W_old[q], forcing_old[q]);
@@ -559,9 +569,11 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
           if (std::isnan(val))
           {
+            equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
             std::cout << "isnan: " << val << std::endl;
             std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
+            std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
             for (int j = 0; j < 8; j++)
               std::cout << "W+ [" << j << "]: " << Wplus_old[q][j] << ", W- [" << j << "]: " << Wminus_old[q][j] << ", F [" << j << "]: " << normal_fluxes_old[q][j] << std::endl;
           }

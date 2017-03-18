@@ -126,21 +126,21 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
 {
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
+  typename InputVector::value_type cb = cos(b);
   typename InputVector::value_type a;
-  typename InputVector::value_type sa;
-  if (std::abs(normal[2]) > 0.99999999)
+  if (std::abs(normal[0]) < 1e-8)
   {
-    a = 1.57079632679489661923;
-    sa = 1.;
+    if (std::abs(cb) < 1e-8)
+      a = 0.;
+    else
+      a = asin(normal[1] / cb);
   }
   else
-  {
-    a = acos(normal[0] / cos(b));
-    sa = sin(a);
-  }
+    a = acos(normal[0] / cb);
+  
+  typename InputVector::value_type sa = sin(a);
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
-  typename InputVector::value_type cb = cos(b);
 
   forResult[density_component] = W[density_component];
 
@@ -184,23 +184,21 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
 {
   std_cxx11::array<typename InputVector::value_type, n_components> forResult;
   typename InputVector::value_type b = asin(normal[2]);
+  typename InputVector::value_type cb = cos(b);
   typename InputVector::value_type a;
-  typename InputVector::value_type sa;
-  // normal[2] in {-1, 1}, we choose alpha
-  if (std::abs(normal[2]) > 0.99999999)
+  if (std::abs(normal[0]) < 1e-8)
   {
-    a = 1.57079632679489661923;
-    sa = 1.;
+    if (std::abs(cb) < 1e-8)
+      a = 0.;
+    else
+      a = asin(normal[1] / cb);
   }
   else
-  {
-    a = acos(normal[0] / cos(b));
-    sa = sin(a);
-  }
-  
+    a = acos(normal[0] / cb);
+
+  typename InputVector::value_type sa = sin(a);
   typename InputVector::value_type sb = normal[2];
   typename InputVector::value_type ca = cos(a);
-  typename InputVector::value_type cb = cos(b);
 
   forResult[density_component] = F[density_component];
 
@@ -276,6 +274,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
   std_cxx11::array<typename InputVector::value_type, n_components> QedWminus;
   std_cxx11::array<typename InputVector::value_type, n_components> QedWplus;
+
 
   Q(QedWplus, Wplus, normal);
   Q(QedWminus, Wminus, normal);

@@ -65,7 +65,6 @@ public:
 
   // Debugging purposes
   bool debug;
-  bool debug_neighbor;
 };
 
 #endif
