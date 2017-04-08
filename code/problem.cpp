@@ -248,7 +248,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
         std::cout << "W: ";
         for (unsigned int i = 0; i < 8; i++)
-         std::cout << W_old[q][i] << (i < 7 ? ", " : "");
+          std::cout << W_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
 
         std::cout << "F[x]: ";
@@ -279,35 +279,45 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
-        if (parameters.is_stationary == false)
+        if (component_i == 1)
         {
-          if (component_i == 1)
-          {
+          if (parameters.is_stationary == false)
             val -= (1.0 / parameters.time_step)
-              * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
-              * fe_v.JxW(q);
+            * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
+            * fe_v.JxW(q);
 
-            if (!parameters.initial_step)
-              for (unsigned int d = 0; d < dim; d++)
-                val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
-          }
-          else
+          if (!parameters.initial_step)
           {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+            for (unsigned int d = 0; d < dim; d++)
+              val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
-            if (!parameters.initial_step)
+            if (this->parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
-                val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
+                val += (1.0 - parameters.theta) * (jacobian_addition_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+
+            if (this->parameters.needs_forcing)
+              val -= (1.0 - parameters.theta) * (forcing_old[q][4] * fe_v[mag].value(i, q)[0] + forcing_old[q][5] * fe_v[mag].value(i, q)[1] + forcing_old[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
         }
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          if (parameters.is_stationary == false)
+            val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
 
-        if (this->parameters.needs_gradients && !parameters.initial_step)
-          for (unsigned int d = 0; d < dim; d++)
-            val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+          if (!parameters.initial_step)
+          {
+            for (unsigned int d = 0; d < dim; d++)
+              val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
 
-        if (this->parameters.needs_forcing && !parameters.initial_step)
-          val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+          if (this->parameters.needs_gradients)
+            for (unsigned int d = 0; d < dim; d++)
+              val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+
+          if (this->parameters.needs_forcing)
+            val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+          }
+        }
       }
 
       if (std::isnan(val))
@@ -400,33 +410,45 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
-        if (parameters.is_stationary == false)
-        {
           if (component_i == 1)
           {
-            R_i += (1.0 / parameters.time_step)
+            if (parameters.is_stationary == false)
+              R_i += (1.0 / parameters.time_step)
               * (W[q][4] * fe_v[mag].value(i, q)[0] + W[q][5] * fe_v[mag].value(i, q)[1] + W[q][6] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
           }
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+            if (parameters.is_stationary == false)
+              R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
           }
-        }
 
         if (this->parameters.theta > 0.) {
-          for (unsigned int d = 0; d < dim; d++)
-            R_i -= parameters.theta * flux[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-
-          if (this->parameters.needs_gradients)
+          if (component_i == 1)
           {
             for (unsigned int d = 0; d < dim; d++)
-              R_i += parameters.theta * jacobian_addition[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-          }
+              R_i -= parameters.theta * (flux[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
-          if (this->parameters.needs_forcing)
-            R_i -= parameters.theta * forcing[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+            if (this->parameters.needs_gradients)
+              for (unsigned int d = 0; d < dim; d++)
+                R_i += parameters.theta * (jacobian_addition[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+
+            if (this->parameters.needs_forcing)
+              R_i -= parameters.theta * (forcing[q][4] * fe_v[mag].value(i, q)[0] + forcing[q][5] * fe_v[mag].value(i, q)[1] + forcing[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
+          }
+          else
+          {
+            for (unsigned int d = 0; d < dim; d++)
+              R_i -= parameters.theta * flux[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+
+            if (this->parameters.needs_gradients)
+              for (unsigned int d = 0; d < dim; d++)
+                R_i += parameters.theta * jacobian_addition[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+
+            if (this->parameters.needs_forcing)
+              R_i -= parameters.theta * forcing[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+          }
         }
       }
 
