@@ -84,7 +84,9 @@ void BoundaryConditions<equationsType, dim>::bc_vector_value(int boundary_id, co
   for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
   {
     for (int i = 0; i < points.size(); i++)
+    {
       result[i][j] = 0.;
+    }
   }
 }
 

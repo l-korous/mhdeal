@@ -6,6 +6,7 @@ enum EquationsType {
   EquationsTypeMhd
 };
 
+// Dummy class for templating.
 template <EquationsType equationsType, int dim>
 class Equations
 {

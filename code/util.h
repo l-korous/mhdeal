@@ -1,6 +1,8 @@
 #ifndef _UTIL_H
 #define _UTIL_H
 
+// This file is only for having all deal.II (and other) header files in one place.
+
 #include <iostream>
 #include <fstream>
 #include <vector>

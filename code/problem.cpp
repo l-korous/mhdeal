@@ -815,8 +815,13 @@ void Problem<equationsType, dim>::output_results() const
 
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::process_initial_condition()
+void Problem<equationsType, dim>::setup_initial_solution()
 {
+  old_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
+  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
+
   old_solution = 0;
   current_solution = old_solution;
   newton_initial_guess = old_solution;
@@ -827,12 +832,7 @@ void Problem<equationsType, dim>::run()
 {
   setup_system();
 
-  old_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  current_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
-  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
-
-  process_initial_condition();
+  setup_initial_solution();
 
   double time = 0;
   int time_step = 0;
@@ -840,11 +840,6 @@ void Problem<equationsType, dim>::run()
 
   while (time < parameters.final_time)
   {
-    if (time > this->parameters.initialization_time) {
-      this->parameters.time_step = this->parameters.time_step_after_initialization;
-      this->parameters.theta = this->parameters.theta_after_initialization;
-    }
-
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
       std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
