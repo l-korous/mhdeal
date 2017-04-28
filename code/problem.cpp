@@ -60,9 +60,7 @@ void Problem<equationsType, dim>::assemble_system()
   std::vector<types::global_dof_index> dof_indices_neighbor(dofs_per_cell);
 
   // What values we need for the assembly.
-  const UpdateFlags update_flags = update_values | update_q_points | update_JxW_values;
-  if (this->parameters.needs_gradients)
-    (const_cast<UpdateFlags>(update_flags)) |= update_gradients;
+  const UpdateFlags update_flags = update_values | update_q_points | update_JxW_values | update_gradients;
   const UpdateFlags face_update_flags = update_values | update_q_points | update_JxW_values | update_normal_vectors;
   const UpdateFlags neighbor_face_update_flags = update_q_points | update_values;
 
@@ -1003,4 +1001,4 @@ void Problem<equationsType, dim>::run()
   }
 }
 
-template class Problem<EquationsTypeMhd, 3>;
+  template class Problem<EquationsTypeMhd, 3>;
