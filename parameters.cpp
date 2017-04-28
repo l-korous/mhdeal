@@ -12,8 +12,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->debug = false;
 
   this->corner_a = Point<dim>(.0, .0, .0);
-  this->corner_b = Point<dim>(1, 1, 1);
-  this->refinements = { 50, 50, 50 };
+  this->corner_b = Point<dim>(.5, .5, .001);
+  this->refinements = { 5, 5, 5 };
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b);
 
   this->time_step = 1e-6;

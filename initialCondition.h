@@ -14,7 +14,7 @@ public:
   InitialCondition(Parameters<dim>& parameters);
 
   // To be overwritten.
-  double value(const Point<dim> &p, const unsigned int  component = 0) const;
+  void vector_value(const std::vector<Point<dim> > &points, std::vector<Vector<double> >&) const;
 
 private:
   Parameters<dim>& parameters;

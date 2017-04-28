@@ -13,9 +13,10 @@ BoundaryConditions<EquationsTypeMhd, 3>::BoundaryConditions()
 template <EquationsType equationsType, int dim>
 void BoundaryConditions<equationsType, dim>::bc_vector_value(int boundary_id, const std::vector<Point<dim> > &points, std::vector<Vector<double> > & result) const
 {
-  for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
+  // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
+  for (int i = 0; i < points.size(); i++)
   {
-    for (int i = 0; i < points.size(); i++)
+    for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
     {
       result[i][j] = 0.;
     }

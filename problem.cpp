@@ -54,7 +54,7 @@ void Problem<equationsType, dim>::assemble_system()
 {
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-  
+
   // DOF indices both on the currently assembled element and the neighbor.
   std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
   std::vector<types::global_dof_index> dof_indices_neighbor(dofs_per_cell);
@@ -211,12 +211,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     if (parameters.initial_step)
     {
+      std::vector<Vector<double> > initial_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
+      initial_condition.vector_value(fe_v.get_quadrature_points(), initial_values);
       for (unsigned int q = 0; q < n_q_points; ++q)
-      {
-        Point<dim> p = fe_v.quadrature_point(q);
         for (unsigned int i = 0; i < this->equations.n_components; ++i)
-          W_old[q][i] = initial_condition.value(p, i);
-      }
+          W_old[q][i] = initial_values[q][i];
     }
     else
     {
@@ -328,12 +327,12 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             for (unsigned int d = 0; d < dim; d++)
               val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
 
-          if (this->parameters.needs_gradients)
-            for (unsigned int d = 0; d < dim; d++)
-              val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+            if (this->parameters.needs_gradients)
+              for (unsigned int d = 0; d < dim; d++)
+                val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
-          if (this->parameters.needs_forcing)
-            val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+            if (this->parameters.needs_forcing)
+              val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
           }
         }
       }
@@ -433,18 +432,18 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       {
         // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
-          {
-            if (parameters.is_stationary == false)
-              R_i += (1.0 / parameters.time_step)
-              * (W[q][4] * fe_v[mag].value(i, q)[0] + W[q][5] * fe_v[mag].value(i, q)[1] + W[q][6] * fe_v[mag].value(i, q)[2])
-              * fe_v.JxW(q);
-          }
-          else
-          {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            if (parameters.is_stationary == false)
-              R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
-          }
+        {
+          if (parameters.is_stationary == false)
+            R_i += (1.0 / parameters.time_step)
+            * (W[q][4] * fe_v[mag].value(i, q)[0] + W[q][5] * fe_v[mag].value(i, q)[1] + W[q][6] * fe_v[mag].value(i, q)[2])
+            * fe_v.JxW(q);
+        }
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          if (parameters.is_stationary == false)
+            R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+        }
 
         if (this->parameters.theta > 0.) {
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
@@ -520,58 +519,44 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      if (parameters.initial_step)
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        Point<dim> p = fe_v.quadrature_point(q);
-        for (unsigned int i = 0; i < this->equations.n_components; ++i)
-          Wplus_old[q][i] = initial_condition.value(p, i);
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+
+        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+        if (component_i == 1)
+        {
+          Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+          Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+          Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+        }
+        // For the other components (spaces), we go by each component.
+        else
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+        }
+
         if (!external_face)
         {
-          Point<dim> pn = fe_v_neighbor.quadrature_point(q);
-          for (unsigned int i = 0; i < this->equations.n_components; ++i)
-            Wminus_old[q][i] = initial_condition.value(pn, i);
-        }
-      }
-      else
-      {
-        for (unsigned int i = 0; i < dofs_per_cell; ++i)
-        {
-          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
 
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
-          if (component_i == 1)
+          // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+          if (component_i_neighbor == 1)
           {
-            Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+            Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+            Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+            Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
           }
           // For the other components (spaces), we go by each component.
           else
           {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-          }
-
-          if (!external_face)
-          {
-            const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-
-            // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
-            if (component_i_neighbor == 1)
-            {
-              Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
-              Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
-              Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
-            }
-            // For the other components (spaces), we go by each component.
-            else
-            {
-              const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-              Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
-            }
+            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+            Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
           }
         }
       }
+
       // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values.
       if (external_face)
         equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
@@ -1001,4 +986,4 @@ void Problem<equationsType, dim>::run()
   }
 }
 
-  template class Problem<EquationsTypeMhd, 3>;
+template class Problem<EquationsTypeMhd, 3>;
