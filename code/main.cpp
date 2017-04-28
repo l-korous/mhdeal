@@ -1,8 +1,11 @@
 #include "util.h"
 #include "problem.h"
 
+// Dimension of the problem - passed as a template parameter to pretty much every class.
 #define DIMENSION 3
+// Type of equations, must be from the enumeration EquationsType defined in equations.h.
 #define EQUATIONS EquationsTypeMhd
+// Whether or not we want to delete all previous outputs (vtk, matrix outputs, solution output) on start.
 #define DELETE_OUTPUTS_ON_START
 
 int main(int argc, char *argv[])
@@ -12,6 +15,7 @@ int main(int argc, char *argv[])
 
   try
   {
+    // The main process will optionally delete outputs.
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
 #ifdef DELETE_OUTPUTS_ON_START
@@ -37,18 +41,24 @@ int main(int argc, char *argv[])
 #endif
     }
 
+    // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::smoothing_on_refinement | Triangulation<DIMENSION>::smoothing_on_coarsening));
 #else
     Triangulation<DIMENSION> triangulation;
 #endif    
     
+    // Initialization of parameters. See parameters.h for description of the individual parameters, set up values in parameters.cpp
     Parameters<DIMENSION> parameters(triangulation);
+    // Set up of initial condition. See initialCondition.h for description of methods, set up the specific function in initialCondition.cpp
     InitialCondition<EQUATIONS, DIMENSION> initial_condition(parameters);
+    // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;
+    // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations(parameters);
-
+    // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+    // Run the problem - entire transient problem.
     problem.run();
   }
   catch (std::exception &exc)

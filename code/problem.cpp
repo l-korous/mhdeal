@@ -15,6 +15,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
   mapping(),
+  // Creating the FE system - first spaces for density & momentum, then for the mag field, and lastly for the energy.
   fe(FE_DGQ<dim>(parameters.polynomial_order_dg), 4,
     FE_RaviartThomas<dim>(1), 1,
     FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
@@ -28,11 +29,11 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::setup_system()
 {
+  // This function body should not be changed - it does the usual deal.II setup
   dof_handler.clear();
   dof_handler.distribute_dofs(fe);
   DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
   locally_owned_dofs = dof_handler.locally_owned_dofs();
-
   constraints.clear();
   constraints.reinit(locally_relevant_dofs);
   DoFTools::make_hanging_node_constraints(dof_handler, constraints);
@@ -40,40 +41,48 @@ void Problem<equationsType, dim>::setup_system()
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
   constraints.close();
 
-  system_rhs.reinit(locally_owned_dofs, mpi_communicator);
-
 #ifdef HAVE_MPI
   SparsityTools::distribute_sparsity_pattern(dsp, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
 #endif
 
+  system_rhs.reinit(locally_owned_dofs, mpi_communicator);
   system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
 }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::assemble_system()
 {
+  // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-
+  
+  // DOF indices both on the currently assembled element and the neighbor.
   std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
   std::vector<types::global_dof_index> dof_indices_neighbor(dofs_per_cell);
 
-  const UpdateFlags update_flags = update_values | update_gradients | update_q_points | update_JxW_values;
+  // What values we need for the assembly.
+  const UpdateFlags update_flags = update_values | update_q_points | update_JxW_values;
+  if (this->parameters.needs_gradients)
+    (const_cast<UpdateFlags>(update_flags)) |= update_gradients;
   const UpdateFlags face_update_flags = update_values | update_q_points | update_JxW_values | update_normal_vectors;
   const UpdateFlags neighbor_face_update_flags = update_q_points | update_values;
 
+  // DOF indices both on the currently assembled element and the neighbor.
   FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
   FEFaceValues<dim> fe_v_face(mapping, fe, face_quadrature, face_update_flags);
   FESubfaceValues<dim> fe_v_subface(mapping, fe, face_quadrature, face_update_flags);
   FEFaceValues<dim> fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags);
   FESubfaceValues<dim> fe_v_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags);
 
+  // Local (cell) matrices and rhs - for the currently assembled element and the neighbor
   FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
   FullMatrix<double> cell_matrix_neighbor(dofs_per_cell, dofs_per_cell);
   Vector<double> cell_rhs(dofs_per_cell);
   Vector<double> cell_rhs_neighbor(dofs_per_cell);
 
+  // Loop through all cells.
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
   {
+    // Only assemble what belongs to this process.
     if (!cell->is_locally_owned())
       continue;
 
@@ -84,12 +93,12 @@ void Problem<equationsType, dim>::assemble_system()
     cell->get_dof_indices(dof_indices);
 
     if (parameters.debug)
-    {
       std::cout << cell << std::endl;
-    }
 
+    // Assemble the volumetric integrals.
     assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
 
+    // Assemble the face integrals - ONLY if this is not the initial step (where we do the projection of the initial condition).
     if (!parameters.initial_step)
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
@@ -97,6 +106,7 @@ void Problem<equationsType, dim>::assemble_system()
         cell_matrix_neighbor = 0;
         cell_rhs_neighbor = 0;
 
+        // Boundary face - here we pass the boundary id
         if (cell->at_boundary(face_no))
         {
           fe_v_face.reinit(cell, face_no);
@@ -104,6 +114,8 @@ void Problem<equationsType, dim>::assemble_system()
         }
         else
         {
+          // Here the neighbor face is more split than the current one (has children with respect to the current face of the current element), we need to assemble sub-face by sub-face
+          // Not performed if there is no adaptivity involved.
           if (cell->neighbor(face_no)->has_children())
           {
             const unsigned int neighbor2 = cell->neighbor_of_neighbor(face_no);
@@ -125,6 +137,8 @@ void Problem<equationsType, dim>::assemble_system()
               constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
             }
           }
+          // Here the neighbor face is less split than the current one, there is some transformation needed.
+          // Not performed if there is no adaptivity involved.
           else if (cell->neighbor(face_no)->level() != cell->level())
           {
             const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
@@ -144,6 +158,8 @@ void Problem<equationsType, dim>::assemble_system()
 
             constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
+          // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
+          // This is the only face assembly case performed without adaptivity.
           else
           {
             const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
@@ -212,12 +228,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         {
           const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             W_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
             W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
             W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
           }
+          // For the other components (spaces), we go by each component.
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
@@ -279,6 +297,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
+        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
         {
           if (parameters.is_stationary == false)
@@ -299,6 +318,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
               val -= (1.0 - parameters.theta) * (forcing_old[q][4] * fe_v[mag].value(i, q)[0] + forcing_old[q][5] * fe_v[mag].value(i, q)[1] + forcing_old[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
         }
+        // For the other components (spaces), we go by each component.
         else
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
@@ -334,6 +354,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
   }
 
   // Now this is for the implicit case. This is different from the face term, as the time derivative needs to be there in both explicit and implicit cases.
+  // So we do all the preparations, but only add the time-derivative contribution to the assembly if we in fact have the explicit case.
   {
     Table<2, Sacado::Fad::DFad<double> > W(n_q_points, Equations<equationsType, dim>::n_components);
     Table<3, Sacado::Fad::DFad<double> > grad_W(n_q_points, Equations<equationsType, dim>::n_components, dim);
@@ -367,12 +388,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       {
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
+        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
         {
           W[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
           W[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
           W[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
         }
+        // For the other components (spaces), we go by each component.
         else
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
@@ -389,7 +412,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > flux(n_q_points);
     std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > forcing(n_q_points);
-    // This is for e.g. stabilization for Euler
+    // This is for e.g. stabilization for Euler, it is any addition to the jacobian that is not a part of the flux.
     std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
 
     if (this->parameters.theta > 0.)
@@ -410,7 +433,8 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
-          if (component_i == 1)
+        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+        if (component_i == 1)
           {
             if (parameters.is_stationary == false)
               R_i += (1.0 / parameters.time_step)
@@ -425,6 +449,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           }
 
         if (this->parameters.theta > 0.) {
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             for (unsigned int d = 0; d < dim; d++)
@@ -437,6 +462,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             if (this->parameters.needs_forcing)
               R_i -= parameters.theta * (forcing[q][4] * fe_v[mag].value(i, q)[0] + forcing[q][5] * fe_v[mag].value(i, q)[1] + forcing[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
+          // For the other components (spaces), we go by each component.
           else
           {
             for (unsigned int d = 0; d < dim; d++)
@@ -476,6 +502,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
 
   // Boundary values handling.
+  // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
   std::vector<Vector<double> > boundary_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
   if (external_face)
     boundary_conditions.bc_vector_value(boundary_id, fe_v.get_quadrature_points(), boundary_values);
@@ -492,6 +519,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     if (parameters.debug)
       std::cout << "edqe: " << face_no << std::endl;
 
+    // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       if (parameters.initial_step)
@@ -512,12 +540,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         {
           const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
             Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
             Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
           }
+          // For the other components (spaces), we go by each component.
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
@@ -528,12 +558,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           {
             const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
 
+            // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
             if (component_i_neighbor == 1)
             {
               Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
               Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
               Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
             }
+            // For the other components (spaces), we go by each component.
             else
             {
               const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
@@ -542,11 +574,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
       }
+      // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values.
       if (external_face)
         equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
 
+      // Once we have the states on both sides of the face, we need to calculate the numerical flux.
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
 
+      // Some debugging outputs.
       if (parameters.debug)
       {
         std::cout << "point_i: " << q << std::endl;
@@ -568,6 +603,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       }
     }
 
+    // The actual contributions to the right-hand-side (this is the explicit case, no contribution to the matrix here).
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
@@ -577,18 +613,21 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
         for (unsigned int q = 0; q < n_q_points; ++q)
         {
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             val += (1.0 - parameters.theta)
               * (normal_fluxes_old[q][4] * fe_v[mag].value(i, q)[0] + normal_fluxes_old[q][5] * fe_v[mag].value(i, q)[1] + normal_fluxes_old[q][6] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
           }
+          // For the other components (spaces), we go by each component.
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             val += (1.0 - parameters.theta) * normal_fluxes_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
           }
 
+          // Some debugging outputs.
           if (std::isnan(val))
           {
             equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
@@ -622,6 +661,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       independent_local_dof_values[i].diff(i, n_independent_variables);
     }
 
+    // We need the neighbor values if this is an internal face.
     if (external_face == false)
     {
       for (unsigned int i = 0; i < dofs_per_cell; i++)
@@ -639,12 +679,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       {
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
+        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
         {
           Wplus[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
           Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
           Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
         }
+        // For the other components (spaces), we go by each component.
         else
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
@@ -655,12 +697,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         {
           const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
 
+          // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i_neighbor == 1)
           {
             Wminus[q][4] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
             Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
             Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
           }
+          // For the other components (spaces), we go by each component.
           else
           {
             const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
@@ -685,12 +729,14 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
         for (unsigned int q = 0; q < n_q_points; ++q)
         {
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             R_i += (1.0 - parameters.theta)
               * (normal_fluxes[q][4] * fe_v[mag].value(i, q)[0] + normal_fluxes[q][5] * fe_v[mag].value(i, q)[1] + normal_fluxes[q][6] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
           }
+          // For the other components (spaces), we go by each component.
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
@@ -701,6 +747,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         for (unsigned int k = 0; k < dofs_per_cell; ++k)
           cell_matrix(i, k) += R_i.fastAccessDx(k);
 
+        // We only add contribution to the matrix entries corresponding to a neighbor cell if there is any - and there is none there if we are dealing with an external face.
         if (external_face == false)
         {
           for (unsigned int k = 0; k < dofs_per_cell; ++k)
@@ -717,6 +764,7 @@ template <EquationsType equationsType, int dim>
 void
 Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
 {
+  // Direct solver is only usable without MPI, as it is not distributed.
 #ifndef HAVE_MPI
   if (parameters.solver == parameters.direct)
   {
@@ -820,7 +868,6 @@ void Problem<equationsType, dim>::setup_initial_solution()
   old_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
-  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
 
   old_solution = 0;
   current_solution = old_solution;
@@ -830,16 +877,20 @@ void Problem<equationsType, dim>::setup_initial_solution()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::run()
 {
+  // Preparations.
   setup_system();
-
   setup_initial_solution();
+  TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
 
+  // More preparations.
   double time = 0;
   int time_step = 0;
   double next_output = time + parameters.output_step;
 
+  // Time loop.
   while (time < parameters.final_time)
   {
+    // Some output.
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
       std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
@@ -847,20 +898,22 @@ void Problem<equationsType, dim>::run()
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
-    unsigned int nonlin_iter = 0;
-
+    // Preparation for the Newton loop.
+    unsigned int newton_iter = 0;
     current_solution = newton_initial_guess;
     while (true)
     {
+      // Assemble.
       system_matrix = 0;
       system_rhs = 0;
       assemble_system();
 
+      // Outputs of algebraic stuff (optional - possible to be set in the Parameters class).
       if (parameters.output_matrix)
       {
         std::ofstream m;
         std::stringstream ssm;
-        ssm << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".matrix";
+        ssm << time_step << "-" << newton_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".matrix";
         m.open(ssm.str());
         system_matrix.print(m);
         m.close();
@@ -869,23 +922,26 @@ void Problem<equationsType, dim>::run()
       {
         std::ofstream r;
         std::stringstream ssr;
-        ssr << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".rhs";
+        ssr << time_step << "-" << newton_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".rhs";
         r.open(ssr.str());
         system_rhs.print(r, 10, false, false);
         r.close();
       }
-      const double res_norm = system_rhs.l2_norm();
 
+      // L2 norm of the residual - to check Newton convergence
+      const double res_norm = system_rhs.l2_norm();
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
       {
-        if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
+        if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
           std::printf("   %-16.3e (converged)\n\n", res_norm);
         else
           std::printf("   %-16.3e\n", res_norm);
       }
 
-      if (std::fabs(res_norm) < parameters.nonlinear_residual_norm_threshold)
+      // If we are below threshold for the L2 residual norm, break the loop and go to next time step
+      if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
         break;
+      // Otherwise, solve the Newton' iteration, optionally output the solution.
       else
       {
         newton_update = 0;
@@ -894,16 +950,19 @@ void Problem<equationsType, dim>::run()
         {
           std::ofstream n;
           std::stringstream ssn;
-          ssn << time_step << "-" << nonlin_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".newton_update";
+          ssn << time_step << "-" << newton_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".newton_update";
           n.open(ssn.str());
           newton_update.print(n, 10, false, false);
           n.close();
         }
+        // If we have an implicit problem, we may use some damping factor (settable in Parameters).
         if (parameters.theta > 0.)
           newton_update *= parameters.newton_damping;
 
+        // Update the solution using the Newton's solution (which is just a difference).
         current_solution += newton_update;
 
+        // If the residual norm is NaN, output results - give it some time - and quit.
         if (std::isnan(res_norm))
         {
           output_results();
@@ -912,10 +971,11 @@ void Problem<equationsType, dim>::run()
         }
       }
 
-      ++nonlin_iter;
-      AssertThrow(nonlin_iter <= parameters.max_nonlinear_iterations, ExcMessage("No convergence in nonlinear solver"));
+      ++newton_iter;
+      AssertThrow(newton_iter <= parameters.newton_max_iterations, ExcMessage("No convergence in nonlinear solver"));
     }
 
+    // Output solution vector optionally and move on to the next time step.
     if (parameters.output_solution)
     {
       std::ofstream s;
@@ -942,8 +1002,5 @@ void Problem<equationsType, dim>::run()
     this->parameters.initial_step = false;
   }
 }
-
-template class Problem<EquationsTypeEuler, 2>;
-template class Problem<EquationsTypeEuler, 3>;
 
 template class Problem<EquationsTypeMhd, 3>;

@@ -18,6 +18,13 @@ public:
   static const unsigned int density_component = 0;
   static const unsigned int energy_component = 2 * dim + 1;
 
+  // Boundary types enumeration
+  enum BoundaryKind
+  {
+    inflow_boundary,
+    outflow_boundary
+  };
+
   template <typename InputVector>
   typename InputVector::value_type compute_kinetic_energy(const InputVector &W) const;
 
@@ -58,20 +65,13 @@ public:
   // Helper used in numerical_normal_flux
   // Calculate Wminus (state vector on the other-external side of the boundary)
   // E.g. in free BC, this is the same state vector as the provided Wplus, for Dirichlet, these are the prescribed values.
-  template <typename DataVector>
-  void compute_Wminus(const BoundaryKind(&boundary_kind)[n_components], const Tensor<1, dim> &normal_vector, const DataVector &Wplus, const Vector<double> &boundary_values,
-    const DataVector &Wminus) const;
+  template <typename InputVector>
+  void compute_Wminus(const BoundaryKind(&boundary_kind)[n_components], const Tensor<1, dim> &normal_vector, const InputVector &Wplus, const Vector<double> &boundary_values,
+    const InputVector &Wminus) const;
 
   // Compute the values for forcing (source, absolute) term
   template <typename InputVector>
   void compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const;
-
-  // Boundary types enumeration
-  enum BoundaryKind
-  {
-    inflow_boundary,
-    outflow_boundary
-  };
 
   // Passed as a constructor parameter
   Parameters<dim>& parameters;

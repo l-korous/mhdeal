@@ -38,9 +38,9 @@ public:
   // Damping factor in Newton
   double newton_damping;
   // Maximum allowed nonlinear iterations count, fail if exceeded
-  int max_nonlinear_iterations;
-  // Tolerance for nonlinear residual norm, succeed the nonlinear loop if norm < nonlinear_residual_norm_threshold
-  double nonlinear_residual_norm_threshold;
+  int newton_max_iterations;
+  // Tolerance for nonlinear residual norm, succeed the nonlinear loop if norm < newton_residual_norm_threshold
+  double newton_residual_norm_threshold;
 
   // Linear solver type enumeration
   enum SolverType { gmres, direct };
@@ -51,7 +51,7 @@ public:
   // Verbosity selected
   OutputType output;
 
-  // Tolerance for linear residual norm, succeed the linear loop if norm < nonlinear_residual_norm_threshold
+  // Tolerance for linear residual norm, succeed the linear loop if norm < newton_residual_norm_threshold
   double linear_residual;
   // Maximum allowed linear iterations count, succeed the linear loop exceeded
   int max_iterations;
