@@ -1,7 +1,7 @@
 This document describes all that is necessary to insert a new problem so that it can get computed. For the time being, it must be a full MHD problem (in future, there might be an option to also get an Euler problem solved - currently the support is not complete).
 
 1) Equations
-- equations in https://github.com/l-korous/mhdeal/blob/master/equationsMhd.h should be changed when:
+- equations in https://github.com/l-korous/mhdeal/blob/master/equationsMhd.h should be changed when::
 -- either additional term is needed in the flux, then the method Equations<EquationsTypeMhd, dim>::compute_flux_matrix is what needs to change
 -- or additional term that depends on state variables gradients is needed, then the method Equations<EquationsTypeMhd, dim>::compute_jacobian_addition is what needs to change
 --- also, in parameters.cpp, you need to set this->needs_gradients = true;
