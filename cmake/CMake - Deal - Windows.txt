@@ -1,0 +1,1 @@
+cmake -DDEAL_II_WITH_TRILINOS:BOOL=ON -DTRILINOS_DIR:STRING="c:/Program Files (x86)/Trilinos" -DTrilinos_INCLUDE_DIRS:STRING="c:/Program Files (x86)/Trilinos/include" .

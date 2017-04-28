@@ -1,0 +1,13 @@
+MPI
+- sudo apt-get install libopenmpi-dev
+
+Trilinos
+- use commit b260ac0579d90dbb07820525c5ce393a7be3e193
+- build:
+-- mkdir build
+-- cd build
+-- CMake - Trililnos - Linux.txt
+
+DealII
+- use commit d7c645108ddca62905c510f5d33a40c0c87f952e
+- CMake - Deal - Linux.txt

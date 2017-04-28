@@ -1,1 +1,0 @@
-cmake -DDEAL_II_DIR="C:/Program Files (x86)/deal.II" .

@@ -64,15 +64,7 @@ Debug/
 *.kdev*
 
 # Documentation generated
-*.html
-*.eps
-*.js
-*.tex
-*.ps
-*.pdf
-*.png
 *.aux
-*.css
 *.tag
 *.sty
 *.dvi
