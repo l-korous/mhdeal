@@ -20,3 +20,6 @@ This document describes all that is necessary to insert a new problem so that it
 
 4. Boundary conditions
   * see boundaryConditions.cpp, namely BoundaryConditions<equationsType, dim>::bc_vector_value
+  * The enumeration BoundaryKind (which is defined for a particular set of equaions, e.g. now in https://github.com/l-korous/mhdeal/blob/master/equationsMhd.h#L22) should be used in BoundaryConditions<EquationsTypeMhd, 3>::BoundaryConditions() constructor to assign a particular boundary part the appropriate type.
+   * How to obtain boundary_ids from the created triangulation - consult deal.II documentation
+   * As we do DG, there is no such thing as Dirichlet conditions, only 'inlet' / 'input' / 'inflow' conditions, whose values get into the solution via the boundary - using numerical fluxes. Therefore the condition that corresponds to Dirichlet is called 'inflow'.
