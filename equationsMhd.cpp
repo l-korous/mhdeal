@@ -42,7 +42,7 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinet
 }
 
 template <int dim>
-typename double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const
+double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const
 {
   typename double divergence = 0.;
 
