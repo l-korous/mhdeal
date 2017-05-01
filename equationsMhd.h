@@ -28,6 +28,8 @@ public:
   template <typename InputVector>
   typename InputVector::value_type compute_kinetic_energy(const InputVector &W) const;
 
+  double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const;
+
   template <typename InputVector>
   typename InputVector::value_type compute_magnetic_energy(const InputVector &W) const;
 

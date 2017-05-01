@@ -24,7 +24,6 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
-
   return data_component_interpretation;
 }
 
@@ -40,6 +39,17 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinet
   kinetic_energy = (0.5 * kinetic_energy) / W[density_component];
 
   return kinetic_energy;
+}
+
+template <int dim>
+typename double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const
+{
+  typename double divergence = 0.;
+
+  for (unsigned int d = 0; d < dim; ++d)
+    divergence += W[first_magnetic_flux_component + d][d];
+
+  return divergence;
 }
 
 template <>
@@ -266,7 +276,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
 
   // If we use HLLD
-  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  if (this->parameters.num_flux_type == Parameters<dim>::hlld)
   {
     typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, Um, E2, E3, Sl, Sr, pml, pmr, B, B2, cl, cm, cr, ptl, ptr;
     typename InputVector::value_type sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
@@ -562,8 +572,6 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
   Assert(uh[0].size() == n_components,
     ExcInternalError());
 
-  Assert(computed_quantities[0].size() == dim + 1, ExcInternalError());
-
   for (unsigned int q = 0; q < n_quadrature_points; ++q)
   {
     const double density = uh[q](density_component);
@@ -572,13 +580,14 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
       computed_quantities[q](d) = uh[q](first_momentum_component + d) / density;
 
     computed_quantities[q](dim) = equations.compute_pressure(uh[q]);
+    computed_quantities[q](dim + 1) = equations.compute_magnetic_field_divergence(duh[q]);
   }
 }
 
 template <int dim>
 std::vector<std::string> Equations<EquationsTypeMhd, dim>::Postprocessor::get_names() const
 {
-  return{ "velocity", "velocity", "velocity", "pressure" };
+  return{ "velocity", "velocity", "velocity", "pressure", "mag_field_divergence" };
 }
 
 template <int dim>
@@ -586,6 +595,7 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
 {
   std::vector<DataComponentInterpretation::DataComponentInterpretation> interpretation(dim, DataComponentInterpretation::component_is_part_of_vector);
 
+  interpretation.push_back(DataComponentInterpretation::component_is_scalar);
   interpretation.push_back(DataComponentInterpretation::component_is_scalar);
 
   return interpretation;
