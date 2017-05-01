@@ -44,7 +44,7 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinet
 template <int dim>
 double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const
 {
-  typename double divergence = 0.;
+  double divergence = 0.;
 
   for (unsigned int d = 0; d < dim; ++d)
     divergence += W[first_magnetic_flux_component + d][d];
