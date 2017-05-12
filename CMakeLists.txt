@@ -31,6 +31,8 @@ SET(TARGET_SRC
   initialCondition.h
   problem.cpp
   problem.h
+  complete_elliptic_integrals.cc
+  complete_elliptic_integrals.h
   )
 
 # A custom command line to run the program
