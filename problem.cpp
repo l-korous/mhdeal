@@ -833,7 +833,7 @@ void Problem<equationsType, dim>::output_results() const
     data_out.write_pvtu_record(pvtu_master_output, filenames);
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
-    data_out.write_visit_record(visit_master_output, filenames);
+    data_out.write_pvtu_record(visit_master_output, filenames);
   }
 #else
   std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";

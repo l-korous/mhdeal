@@ -13,9 +13,9 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   // Two corners of the hyper-rectangle
   // - corner A
-  this->corner_a = Point<dim>(.0, .0, .0);
+  this->corner_a = Point<dim>(-10.0, -10.0, 0.0);
   // - and corner B which should be the farthest one from corner A
-  this->corner_b = Point<dim>(.5, .5, .001);
+  this->corner_b = Point<dim>(10.0, 10.0, 20.0);
   // Refinements in x-, y-, and z- coordinates.
   this->refinements = { 6, 6, 1 };
   // deal.II function that takes the above attributes and returns the triangulation (the first parameter, passed by reference).
@@ -46,6 +46,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
 
+  this->initCond = 1;
   this->gas_gamma = 1.4;
 
   this->newton_damping = 1.;

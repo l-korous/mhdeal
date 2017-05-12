@@ -31,6 +31,9 @@ public:
   // Output current_solution after solve() in Problem::run().
   bool output_solution;
 
+  // initial conditions: 0 - MHD Blast, 1 - Titov&Demoulin flux rope
+  unsigned int initCond;
+  
   // Gas gamma value.
   double gas_gamma;
 

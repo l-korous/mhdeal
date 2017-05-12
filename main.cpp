@@ -12,6 +12,7 @@ int main(int argc, char *argv[])
 {
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, dealii::numbers::invalid_unsigned_int);
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
+  InitialCondition<EQUATIONS, DIMENSION> *initial_condition;
 
   try
   {
@@ -51,13 +52,21 @@ int main(int argc, char *argv[])
     // Initialization of parameters. See parameters.h for description of the individual parameters, set up values in parameters.cpp
     Parameters<DIMENSION> parameters(triangulation);
     // Set up of initial condition. See initialCondition.h for description of methods, set up the specific function in initialCondition.cpp
-    InitialCondition<EQUATIONS, DIMENSION> initial_condition(parameters);
+    switch(parameters.initCond){
+      case 0:
+        initial_condition = new MHDBlastIC<EQUATIONS, DIMENSION>(parameters);
+        break;
+      case 1:
+        initial_condition = new TitovDemoulinIC<EQUATIONS, DIMENSION>(parameters);
+      default:
+        break;
+    }
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations(parameters);
     // Put together the problem.
-    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, *initial_condition, boundary_conditions);
     // Run the problem - entire transient problem.
     problem.run();
   }
@@ -71,6 +80,7 @@ int main(int argc, char *argv[])
       << "Aborting!" << std::endl
       << "----------------------------------------------------"
       << std::endl;
+    delete initial_condition;
     return 1;
   }
   catch (...)
@@ -82,8 +92,11 @@ int main(int argc, char *argv[])
       << "Aborting!" << std::endl
       << "----------------------------------------------------"
       << std::endl;
+    delete initial_condition;
     return 1;
   };
 
+  delete initial_condition;
+  
   return 0;
 }
