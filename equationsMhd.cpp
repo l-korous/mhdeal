@@ -554,6 +554,21 @@ template <int dim>
 Equations<EquationsTypeMhd, dim>::Postprocessor::Postprocessor(Equations<EquationsTypeMhd, dim>& equations) : equations(equations)
 {}
 
+
+template <int dim>
+void
+Equations<EquationsTypeMhd, dim>::Postprocessor::evaluate_vector_field(
+      const ::DataPostprocessorInputs::Vector<dim> &inputs,
+      std::vector<Vector<double> > &computed_quantities) const
+{
+  const unsigned int n_quadrature_points = inputs.solution_values.size();
+  Assert (computed_quantities.size() == n_quadrature_points,
+          ExcInternalError());
+  
+  for(unsigned int q=0; q<n_quadrature_points; ++q)
+      computed_quantities[q](0) = inputs.solution_values[q](0);
+}
+
 template <int dim>
 void
 Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vector(

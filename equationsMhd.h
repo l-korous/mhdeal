@@ -83,7 +83,12 @@ public:
   {
   public:
     Postprocessor(Equations<EquationsTypeMhd, dim>& equations);
-
+    // TODO: this function is added due to runtime error - missing implemetation of virtual 
+    //       function evaluate_vector_field. Now it just copy imput to the output.
+    //       Can replace funciton compute_derived_quantities_vector???
+    virtual void evaluate_vector_field(const ::DataPostprocessorInputs::Vector<dim> &,
+                                       std::vector<Vector<double> > &) const;
+    
     virtual void compute_derived_quantities_vector(
       const std::vector<Vector<double> > &uh,
       const std::vector<std::vector<Tensor<1, dim> > > &duh,
