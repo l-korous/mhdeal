@@ -554,21 +554,27 @@ template <int dim>
 Equations<EquationsTypeMhd, dim>::Postprocessor::Postprocessor(Equations<EquationsTypeMhd, dim>& equations) : equations(equations)
 {}
 
-
+#if DEAL_II_VERSION_MAJOR > 8 || (DEAL_II_VERSION_MAJOR == 8 && DEAL_II_VERSION_MINOR > 5) || (DEAL_II_VERSION_MAJOR == 8 && DEAL_II_VERSION_MINOR == 5 && DEAL_II_VERSION_SUBMINOR > 0)
 template <int dim>
 void
 Equations<EquationsTypeMhd, dim>::Postprocessor::evaluate_vector_field(
-      const ::DataPostprocessorInputs::Vector<dim> &inputs,
-      std::vector<Vector<double> > &computed_quantities) const
+  const DataPostprocessorInputs::Vector<dim> &inputs,
+  std::vector<Vector<double> > &computed_quantities) const
 {
   const unsigned int n_quadrature_points = inputs.solution_values.size();
-  Assert (computed_quantities.size() == n_quadrature_points,
-          ExcInternalError());
-  
-  for(unsigned int q=0; q<n_quadrature_points; ++q)
-      computed_quantities[q](0) = inputs.solution_values[q](0);
-}
 
+  for (unsigned int q = 0; q < n_quadrature_points; ++q)
+  {
+    const double density = inputs.solution_values[q](density_component);
+
+    for (unsigned int d = 0; d < dim; ++d)
+      computed_quantities[q](d) = inputs.solution_values[q](first_momentum_component + d) / density;
+
+    computed_quantities[q](dim) = equations.compute_pressure(inputs.solution_values[q]);
+    computed_quantities[q](dim + 1) = equations.compute_magnetic_field_divergence(inputs.solution_gradients[q]);
+  }
+}
+#else
 template <int dim>
 void
 Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vector(
@@ -598,6 +604,7 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
     computed_quantities[q](dim + 1) = equations.compute_magnetic_field_divergence(duh[q]);
   }
 }
+#endif
 
 template <int dim>
 std::vector<std::string> Equations<EquationsTypeMhd, dim>::Postprocessor::get_names() const

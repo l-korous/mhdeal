@@ -1,5 +1,4 @@
 #include "util.h"
-#include "equationsEuler.h"
 #include "equationsMhd.h"
 #include "parameters.h"
 #include "initialCondition.h"

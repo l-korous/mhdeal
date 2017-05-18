@@ -1,5 +1,4 @@
 #include "boundaryConditions.h"
-#include "equationsEuler.h"
 #include "equationsMhd.h"
 
 template<>

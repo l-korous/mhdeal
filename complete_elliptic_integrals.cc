@@ -85,7 +85,7 @@ double Complete_Elliptic_Integral_First_Kind(char arg, double x)
    long double a_old;      // previous average
    long double g_old;      // previous geometric mean
 
-   if ( x == 0.0 ) return M_PI_2;
+   if ( x == 0.0 ) return PI_2;
 
    switch (arg) {
       case 'k': k = fabsl((long double) x);
@@ -196,7 +196,7 @@ double Complete_Elliptic_Integral_Second_Kind(char arg, double x)
    long double two_n;  // power of 2
    long double Ek;
 
-   if ( x == 0.0 ) return M_PI_2;
+   if ( x == 0.0 ) return PI_2;
 
    switch (arg) {
       case 'k': k = fabsl((long double) x);
@@ -244,7 +244,7 @@ void Complete_Elliptic_Integrals(char arg, double x, double& K, double& E)
    long double two_n;      // power of 2
 
    if ( x == 0.0 ){
-     K = E = M_PI_2;
+     K = E = PI_2;
      return;
    }
 
@@ -299,7 +299,7 @@ void Complete_Elliptic_Integrals_Modulus(double x, double& K, double& E)
    long double cE;         // sum
 
    if ( x == 0.0 ){
-     K = E = M_PI_2;
+     K = E = PI_2;
      return;
    }
 

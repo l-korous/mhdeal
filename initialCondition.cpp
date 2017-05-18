@@ -1,6 +1,5 @@
 #include "complete_elliptic_integrals.h"
 #include "initialCondition.h"
-#include "equationsEuler.h"
 #include "equationsMhd.h"
 
 template <EquationsType equationsType, int dim>

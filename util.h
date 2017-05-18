@@ -41,6 +41,7 @@
 #include <deal.II/fe/fe_raviart_thomas.h>
 
 #include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/data_postprocessor.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/solution_transfer.h>
 

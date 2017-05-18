@@ -83,12 +83,12 @@ public:
   {
   public:
     Postprocessor(Equations<EquationsTypeMhd, dim>& equations);
-    // TODO: this function is added due to runtime error - missing implemetation of virtual 
-    //       function evaluate_vector_field. Now it just copy imput to the output.
-    //       Can replace funciton compute_derived_quantities_vector???
-    virtual void evaluate_vector_field(const ::DataPostprocessorInputs::Vector<dim> &,
-                                       std::vector<Vector<double> > &) const;
     
+#if DEAL_II_VERSION_MAJOR > 8 || (DEAL_II_VERSION_MAJOR == 8 && DEAL_II_VERSION_MINOR > 5) || (DEAL_II_VERSION_MAJOR == 8 && DEAL_II_VERSION_MINOR == 5 && DEAL_II_VERSION_SUBMINOR > 0)
+    virtual void evaluate_vector_field(
+      const dealii::DataPostprocessor::DataPostprocessorInputs::Vector<dim> &inputs,
+      std::vector<Vector<double> > &computed_quantities) const;
+#else
     virtual void compute_derived_quantities_vector(
       const std::vector<Vector<double> > &uh,
       const std::vector<std::vector<Tensor<1, dim> > > &duh,
@@ -96,6 +96,7 @@ public:
       const std::vector<Point<dim> > &normals,
       const std::vector<Point<dim> > &evaluation_points,
       std::vector<Vector<double> > &computed_quantities) const;
+#endif
 
     virtual std::vector<std::string> get_names() const;
 

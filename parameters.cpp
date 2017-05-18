@@ -1,5 +1,4 @@
 #include "parameters.h"
-#include "equationsEuler.h"
 #include "equationsMhd.h"
 
 template <int dim>

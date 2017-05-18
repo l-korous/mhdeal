@@ -19,8 +19,6 @@ SET(TARGET_SRC
   main.cpp
   util.h
   equations.h
-  equationsEuler.cpp
-  equationsEuler.h
   equationsMhd.cpp
   equationsMhd.h
   parameters.cpp

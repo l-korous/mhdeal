@@ -166,23 +166,11 @@ Equations<EquationsTypeEuler, dim>::Postprocessor::Postprocessor(Equations<Equat
 
 template <int dim>
 void
-Equations<EquationsTypeEuler, dim>::Postprocessor::compute_derived_quantities_vector(
-  const std::vector<Vector<double> > &uh,
-  const std::vector<std::vector<Tensor<1, dim> > > &duh,
-  const std::vector<std::vector<Tensor<2, dim> > > &/*dduh*/,
-  const std::vector<Point<dim> > &/*normals*/,
-  const std::vector<Point<dim> > &/*evaluation_points*/,
+Equations<EquationsTypeEuler, dim>::Postprocessor::evaluate_vector_field(
+  const DataPostprocessorInputs::Vector<dim> &inputs,
   std::vector<Vector<double> > &computed_quantities) const
 {
-  const unsigned int n_quadrature_points = uh.size();
-
-  Assert(computed_quantities.size() == n_quadrature_points,
-    ExcInternalError());
-
-  Assert(uh[0].size() == n_components,
-    ExcInternalError());
-
-    Assert(computed_quantities[0].size() == dim + 1, ExcInternalError());
+  const unsigned int n_quadrature_points = inputs.solution_values.size();
 
   for (unsigned int q = 0; q < n_quadrature_points; ++q)
   {
