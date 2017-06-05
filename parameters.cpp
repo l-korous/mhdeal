@@ -1,4 +1,5 @@
 #include "parameters.h"
+#include "equationsEuler.h"
 #include "equationsMhd.h"
 
 template <int dim>
@@ -16,7 +17,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   // - and corner B which should be the farthest one from corner A
   this->corner_b = Point<dim>(10.0, 10.0, 20.0);
   // Refinements in x-, y-, and z- coordinates.
-  this->refinements = { 6, 6, 1 };
+  this->refinements = { 6, 6, 6 };
   // deal.II function that takes the above attributes and returns the triangulation (the first parameter, passed by reference).
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b);
 
