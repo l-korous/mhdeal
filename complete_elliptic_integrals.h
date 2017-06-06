@@ -7,10 +7,10 @@
 //    Complete_Elliptic_Integral_Modulus                                      //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include <math.h>       // required for fabs(), fabsl(), sqrtl(), and M_PI_2
-#include <float.h>      // required for LDBL_EPSILON, DBL_MAX
+#include <cmath>       // required for fabs(), fabsl(), sqrtl(), and M_PI_2
+#include <cfloat>      // required for LDBL_EPSILON, DBL_MAX
 
-static const long double PI_2 =  1.5707963267948966192313216916397514L; // pi/2
+//static const long double PI_2 =  1.5707963267948966192313216916397514L; // pi/2
 static const long double PI_4 = 0.7853981633974483096156608458198757L; // pi/4
 
 ////////////////////////////////////////////////////////////////////////////////

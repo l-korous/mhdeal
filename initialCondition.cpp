@@ -75,10 +75,10 @@ TitovDemoulinIC<equationsType, dim>::TitovDemoulinIC(Parameters<dim> &parameters
     R_t=4.0;
   
     // Submerging of torus main axis in units of R_t
-    d2R_t=0.5;
+    d2R_t=2.0/R_t;
 
     // Distance of magnetic charges from x=0 plane in units of R_t
-    L2R_t=0.5;
+    L2R_t=2.0/R_t;
       
     
     //======================= Calculate dependent TD model parameters
@@ -142,13 +142,13 @@ void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p,
     double P[6][3];
     double dP[3][3];
     
-    // calculate vector potentil in 6 close points
-    for(unsigned int i=0;i<6;i++){
+    // calculate vector potentil in 6 close points (+dx,-dx,+dy,-dy,+dz,-dz)
+    for(unsigned int i=0;i<6;++i){
       df[i][0]=df[i][1]=df[i][2]=0.0;
       df[i][int(i/2)]=double(1-2*int(i%2))*dd;
     }
     
-    for(unsigned int i=0;i<6;i++){
+    for(unsigned int i=0;i<6;++i){
       double x=xx+df[i][0];
       double y=yy+df[i][1];
       double z=zz+df[i][2];
@@ -200,7 +200,7 @@ void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p,
     }
     
     // calculate derivatives of vector potential
-    for(unsigned int i=0;i<3;i++){
+    for(unsigned int i=0;i<3;++i){
       dP[i][0]=(P[2*i][0]-P[2*i+1][0])*idd;
       dP[i][1]=(P[2*i][1]-P[2*i+1][1])*idd;
       dP[i][2]=(P[2*i][2]-P[2*i+1][2])*idd;

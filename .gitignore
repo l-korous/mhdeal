@@ -1,5 +1,6 @@
 *.gnuplot
 *.inst
+mhdeal
 
 CMake.vars
 *.h2d
@@ -18,6 +19,9 @@ tutorial.*
 *.user
 *make*
 *.bak
+*.vtu
+*.pvtu
+*.visit
 
 # top-level files
 CMake.vars
