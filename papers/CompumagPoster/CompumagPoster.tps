@@ -10,15 +10,15 @@ MinPos.y=-1
 MaxPos.x=-1
 MaxPos.y=-1
 NormalPos.left=4
-NormalPos.top=36
-NormalPos.right=3116
-NormalPos.bottom=1524
+NormalPos.top=26
+NormalPos.right=1242
+NormalPos.bottom=597
 Class=LaTeXView
 Document=CompumagPoster.tex
 
 [Frame0_View0,0]
 TopLine=0
-Cursor=1038
+Cursor=0
 
 [SessionInfo]
 FrameCount=1

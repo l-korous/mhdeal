@@ -71,6 +71,10 @@ where $\mrPsi$ is the \textit{state vector}, $\mrF_i,\ i = 1, 2, 3$ are the \tex
 Here, $\rho$ is the plasma density, $\pi_1, \pi_2, \pi_3$ are the $x-, y-,$ and $z-$ momentum components respectively. $U$ is the total energy, $B_1, B_2, B_3$ are the three components of magnetic field. Remaining quantities are $p$ - plasma pressure, $U_k$ - kinetic energy, $U_m$ - magnetic energy, and $\bfg$ gravitational acceleration with components $g_1, g_2, g_3$.
 }
 
+\headerbox{\textbf{FE Spaces}}{name=2,column=0,row=0,span=2,below=2}{
+Since typically, interesting phenomena that we would like to model exhibit rapid changes in density, pressure, and velocity, it is beneficial to allow for discontinuities in these components of the solution - Discontinuous Galerkin method is very promising for this. Magnetic field can potentially change rapidly as well, but as we need to to account for Gauss law $\mathrm{div} B = 0$, we shall be looking for the magnetic field component in a smaller space than that of functions arbitrarily discontinuous on element boundaries - we will use the \textit{Hdiv} space - where continuity of normal component holds also across element boundaries.
+}
+
 \headerbox{\textbf{DG Formulation}}{name=3,column=2,row=0,span=2}{
 DG formulation of the resulting space-discretized problem reads
 \begin{eqnarray}
@@ -125,12 +129,12 @@ First one is the selection of numerical flux $\mrH\lo{\mrPsi_h}|_{ij}, {\mrPsi_h
 Another aspect of the solution, which occurs both in continuous and discontinuous FE simulations of the MHD system are spurious (nonphysical) oscillations appearing in the solution near discontinuities or sharp fronts. Here, in DG, the problem is much smaller than in the continuous case, as the instabilities occur only in regions adjacent to the sharp fronts.
 \ \\
 \ \\
-Our goal is to build a software package that should give a reasonable and physically correct solution to all sorts of problems, a suitable method to handle discontinuities must not change the physics (as is the case in e.g. artificial diffusion) and must not require fine-tuning parameters for it to work. Therefore we chose a parameter-less method of post-processing nature (which does not change the equations being solved). Such a method is the \textit{Vertex-based limiter} developed by D. Kuzmin, and successfully applied to DG for advection-diffusion problems in existing work.
+Our goal is to build a software package that should give a reasonable and physically correct solution to all sorts of problems, a suitable method to handle discontinuities must not change the physics (as is the case in e.g. artificial diffusion) and must not require fine-tuning parameters for it to work. Therefore we chose a parameter-less method of post-processing nature (which does not change the equations being solved). Such a method is the \textit{Vertex-based limiter} developed by D. Kuzmin.
 }
 
 
 \headerbox{\textbf{Numerical example}}{name=6,column=4,row=0,span=2,below=5}{
-We present results from one benchmark - MHD Blast - designed at \itshape{www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html}.
+We present results from one benchmark - MHD Blast - designed at \itshape www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html \normalfont.
 
 The figures below are performed with a standard set of basis functions for DG - i.e. not with the exactly divergence free basis we want to use - that is a work-in-progress currently and it shall only stabilize and qualitatively improve the results.
 
