@@ -76,6 +76,11 @@
 //     printf("K(m) = %12.6f where m = %12.6f\n",K, m);                       //
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifndef M_PI_2
+#define M_PI_2     1.57079632679489661923
+#endif
+
+
 double Complete_Elliptic_Integral_First_Kind(char arg, double x)
 {
    long double k;          // modulus

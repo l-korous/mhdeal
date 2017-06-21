@@ -16,9 +16,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   boundary_conditions(boundary_conditions),
   mapping(),
   // Creating the FE system - first spaces for density & momentum, then for the mag field, and lastly for the energy.
-  fe(FE_DGQ<dim>(parameters.polynomial_order_dg), 4,
+  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 4,
     FE_RaviartThomas<dim>(1), 1,
-    FE_DGQ<dim>(parameters.polynomial_order_dg), 1),
+    FE_DGT<dim>(parameters.polynomial_order_dg), 1),
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
