@@ -23,11 +23,19 @@ private:
 
 
 template <EquationsType equationsType, int dim>
-class MHDBlastIC : public InitialCondition<equationsType,dim>
+class TaylorBasisTestIC : public InitialCondition<equationsType, dim>
+{
+public:
+  TaylorBasisTestIC(Parameters<dim>&);
+  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+};
+
+template <EquationsType equationsType, int dim>
+class MHDBlastIC : public InitialCondition<equationsType, dim>
 {
 public:
   MHDBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >& , std::vector<Vector<double> >&) const;
+  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
 };
 
 

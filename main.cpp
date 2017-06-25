@@ -58,7 +58,9 @@ int main(int argc, char *argv[])
         break;
       case 1:
         initial_condition = new TitovDemoulinIC<EQUATIONS, DIMENSION>(parameters);
-      default:
+        break;
+      case 2:
+        initial_condition = new TaylorBasisTestIC<EQUATIONS, DIMENSION>(parameters);
         break;
     }
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp

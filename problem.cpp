@@ -224,7 +224,6 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
           const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
@@ -236,6 +235,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+
             W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
           }
 
@@ -302,6 +302,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
             * fe_v.JxW(q);
 
+          if (this->parameters.debug && q == 0)
+          {
+            std::cout << "DOF: " << i << " - COMP: " << component_i << std::endl;
+          }
+
           if (!parameters.initial_step)
           {
             for (unsigned int d = 0; d < dim; d++)
@@ -321,6 +326,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
           if (parameters.is_stationary == false)
             val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+
+          if (this->parameters.debug && q == 0)
+          {
+            std::cout << "DOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
+          }
 
           if (!parameters.initial_step)
           {
@@ -445,7 +455,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
         }
 
-        if (this->parameters.theta > 0.) {
+        if (this->parameters.theta > 0. && !this->parameters.initial_step) {
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
@@ -477,6 +487,16 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int k = 0; k < dofs_per_cell; ++k)
         cell_matrix(i, k) += R_i.fastAccessDx(k);
+
+
+      if (std::isnan(R_i.val()))
+      {
+        std::cout << "isnan: " << R_i.val() << std::endl;
+        std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+        std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
+        for (int j = 0; j < 8; j++)
+          std::cout << "W [" << j << "]: " << W[0][j] << ", F [" << j << "]: " << flux[0][j][0] << ", " << flux[0][j][1] << ", " << flux[0][j][2] << std::endl;
+      }
 
       cell_rhs(i) -= R_i.val();
     }
@@ -724,6 +744,17 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             R_i += (1.0 - parameters.theta) * normal_fluxes[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+          }
+
+          if (std::isnan(R_i.val()))
+          {
+            equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
+            std::cout << "isnan: " << R_i.val() << std::endl;
+            std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+            std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
+            std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
+            for (int j = 0; j < 8; j++)
+              std::cout << "W+ [" << j << "]: " << Wplus[q][j] << ", W- [" << j << "]: " << Wminus[q][j] << ", F [" << j << "]: " << normal_fluxes[q][j] << std::endl;
           }
         }
 

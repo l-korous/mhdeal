@@ -19,20 +19,44 @@ Parameters<dim>& InitialCondition<equationsType, dim>::getParams() const
   return parameters;
 }
 
-
- /***************************************************************************
-          MHD Blast initial condition
-  ***************************************************************************/
 template <EquationsType equationsType, int dim>
-MHDBlastIC<equationsType, dim>::MHDBlastIC(Parameters<dim>& parameters) : 
-                                           InitialCondition<equationsType,dim>(parameters)
+TaylorBasisTestIC<equationsType, dim>::TaylorBasisTestIC(Parameters<dim>& parameters) :
+  InitialCondition<equationsType, dim>(parameters)
 {
 };
 
- 
+template <EquationsType equationsType, int dim>
+void TaylorBasisTestIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
+  std::vector<Vector<double> > &result) const
+{
+  // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
+  for (unsigned int i = 0; i < points.size(); ++i)
+  {
+    result[i][0] = 1.;
+    result[i][1] = 0.;
+    result[i][2] = 0.;
+    result[i][3] = 0.;
+    result[i][4] = 0.;
+    result[i][5] = 0.;
+    result[i][6] = 0.;
+    result[i][7] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5;
+  }
+}
+
+
+/***************************************************************************
+MHD Blast initial condition
+***************************************************************************/
+template <EquationsType equationsType, int dim>
+MHDBlastIC<equationsType, dim>::MHDBlastIC(Parameters<dim>& parameters) :
+  InitialCondition<equationsType, dim>(parameters)
+{
+};
+
+
 template <EquationsType equationsType, int dim>
 void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-                                                  std::vector<Vector<double> > &result) const
+  std::vector<Vector<double> > &result) const
 {
   // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
   for (unsigned int i = 0; i < points.size(); ++i)
@@ -45,9 +69,9 @@ void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> >
     result[i][5] = 1.0 / std::sqrt(2.);
     result[i][6] = 0.;
     if (points[i].norm() < 0.1)
-        result[i][7] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5;
+      result[i][7] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5;
     else
-        result[i][7] = 0.1 / (this->getParams().gas_gamma - 1.0) + 0.5;
+      result[i][7] = 0.1 / (this->getParams().gas_gamma - 1.0) + 0.5;
   }
 }
 
@@ -297,5 +321,6 @@ void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p,
 }
 
 template class InitialCondition<EquationsTypeMhd, 3>;
+template class TaylorBasisTestIC<EquationsTypeMhd, 3>;
 template class MHDBlastIC<EquationsTypeMhd, 3>;
 template class TitovDemoulinIC<EquationsTypeMhd, 3>;
