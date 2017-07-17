@@ -1,4 +1,4 @@
-SET(TARGET "test-02-euler-keep-state")
+SET(TARGET "test-02-euler-simple")
 
 # Declare all source files the target consists of. Here, this is only
 # the one step-X.cc file, but as you expand your project you may wish

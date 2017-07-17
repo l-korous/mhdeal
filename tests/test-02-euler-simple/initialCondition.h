@@ -18,6 +18,8 @@ public:
   Parameters<dim>& getParams() const;
 
 private:
+  double compute_energy_from_given_pressure(const dealii::Vector<double>& W, double pressure) const;
+
   Parameters<dim>& parameters;
 };
 

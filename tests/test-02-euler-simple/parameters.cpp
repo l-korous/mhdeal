@@ -21,7 +21,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   // deal.II function that takes the above attributes and returns the triangulation (the first parameter, passed by reference).
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b, true);
 
-  this->time_step = 5e-3;
+  this->time_step = 5e-2;
   this->final_time = 10.;
 
   this->theta = 0.0;

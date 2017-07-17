@@ -17,7 +17,7 @@ public:
   void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus) const;
 
   template <typename InputVector>
-  typename InputVector::value_type compute_energy_given_pressure(const InputVector &W, double pressure) const;
+  typename InputVector::value_type compute_energy_from_given_pressure(const InputVector &W, double pressure) const;
 
   // Passed as a constructor parameter
   Parameters<dim>& parameters;

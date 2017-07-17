@@ -1,5 +1,6 @@
 #include "complete_elliptic_integrals.h"
 #include "initialCondition.h"
+#include "boundaryConditions.h"
 #include "equationsMhd.h"
 
 template <EquationsType equationsType, int dim>
@@ -20,8 +21,14 @@ void InitialCondition<equationsType, dim>::vector_value(const std::vector<Point<
     result[i][4] = 0.;
     result[i][5] = 0.;
     result[i][6] = 0.;
-    result[i][7] = 2.5;
+    result[i][7] = compute_energy_from_given_pressure(result[i], 10.);
   }
+}
+
+template <EquationsType equationsType, int dim>
+double InitialCondition<equationsType, dim>::compute_energy_from_given_pressure(const dealii::Vector<double>& W, double pressure) const
+{
+  return ((1. / (this->parameters.gas_gamma - 1.0)) * pressure) + Equations<equationsType, dim>::compute_kinetic_energy(W) + Equations<equationsType, dim>::compute_magnetic_energy(W);
 }
 
 template <EquationsType equationsType, int dim>

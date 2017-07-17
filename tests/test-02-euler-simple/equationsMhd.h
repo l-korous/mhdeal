@@ -19,7 +19,7 @@ public:
   static const unsigned int energy_component = 2 * dim + 1;
 
   template <typename InputVector>
-  typename InputVector::value_type compute_energy_given_pressure(const InputVector &W, double pressure) const;
+  typename InputVector::value_type compute_energy_from_given_pressure(const InputVector &W, double pressure) const;
 
   template <typename InputVector>
   static typename InputVector::value_type compute_kinetic_energy(const InputVector &W);
