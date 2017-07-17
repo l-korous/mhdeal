@@ -842,7 +842,7 @@ void Problem<equationsType, dim>::output_results() const
   data_out.add_data_vector(subdomain, "subdomain");
 #endif
 
-  data_out.build_patches(4);
+  data_out.build_patches(1);
 
   static unsigned int output_file_number = 0;
 
