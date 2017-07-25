@@ -766,6 +766,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
+      dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> Wminus_old_q = Wminus_old[q];
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
@@ -810,7 +811,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         // Boundary values handling.
         // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
         Vector<double> boundary_values(Equations<equationsType, dim>::n_components);
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q]);
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old_q, Wplus_old[q]);
       }
 
 
@@ -911,6 +912,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
+      dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> Wminus_q = Wminus[q];
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
@@ -953,7 +955,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         // Boundary values handling.
         // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
         Vector<double> boundary_values(Equations<equationsType, dim>::n_components);
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus[q], Wplus[q]);
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
       }
 
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
