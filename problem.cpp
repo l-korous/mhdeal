@@ -22,7 +22,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
-  verbose_cout(std::cout, false)
+  verbose_cout(std::cout, false),
+  initial_step(true),
+  assemble_just_rhs(false)
 {
 }
 
@@ -48,6 +50,212 @@ void Problem<equationsType, dim>::setup_system()
   system_rhs.reinit(locally_owned_dofs, mpi_communicator);
   system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
 }
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::postprocess()
+{
+  // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
+  const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
+
+  // DOF indices both on the currently assembled element and the neighbor.
+  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+  std::vector<types::global_dof_index> dof_indices_neighbor(dofs_per_cell);
+
+  // What values we need for the assembly.
+  const UpdateFlags update_flags = update_values;
+
+  // DOF indices both on the currently assembled element and the neighbor.
+  FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
+  FEValues<dim> fe_v_neighbor(mapping, fe, quadrature, update_flags);
+
+  int cell_count = 0;
+  // Loop through all cells.
+  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+  {
+    std::cout << "cell: " << ++cell_count << std::endl;
+    if (!cell->is_locally_owned())
+      continue;
+
+    std::set<unsigned int> visited_faces;
+
+    bool u_c_set[5] = { false, false, false, false, false };
+    double u_c[5];
+    std::vector<unsigned int> lambda_indices_to_multiply[5];
+
+    fe_v.reinit(cell);
+    cell->get_dof_indices(dof_indices);
+
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    {
+      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+      if (component_i != 1)
+      {
+        const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+        if (!u_c_set[component_ii == 7 ? 4 : component_ii])
+        {
+          u_c[component_ii == 7 ? 4 : component_ii] = current_solution(dof_indices[i]);
+          u_c_set[component_ii == 7 ? 4 : component_ii] = true;
+        }
+        else
+        {
+          lambda_indices_to_multiply[component_ii == 7 ? 4 : component_ii].push_back(dof_indices[i]);
+        }
+      }
+    }
+
+    double alpha_e[5] = { 1., 1., 1., 1., 1. };
+
+    // For all vertices -> v_i
+    for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
+    {
+      unsigned int v_i = cell->vertex_index(i);
+      bool is_boundary_vertex = false;
+      // For all faces, such that the face contains the vertex
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+      {
+        if (cell->at_boundary(face_no) && !boundary_conditions.should_limit_this_boundary_id(cell->face(face_no)->boundary_id()))
+        {
+          TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
+          for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
+          {
+            if (face->vertex_index(face_i) == v_i)
+            {
+              is_boundary_vertex = true;
+              break;
+            }
+          }
+          if (is_boundary_vertex)
+            break;
+        }
+      }
+      if (is_boundary_vertex)
+        continue;
+
+      // (!!!) Find out u_i
+      double u_i[5];
+      Vector<double> vec_to_retrieve_value(8);
+      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), vec_to_retrieve_value);
+      u_i[0] = vec_to_retrieve_value[0];
+      u_i[1] = vec_to_retrieve_value[1];
+      u_i[2] = vec_to_retrieve_value[2];
+      u_i[3] = vec_to_retrieve_value[3];
+      u_i[4] = vec_to_retrieve_value[7];
+
+      // Init u_i_min, u_i_max
+      double u_i_min[5];
+      double u_i_max[5];
+      for (int k = 0; k < 5; k++)
+      {
+        u_i_min[k] = u_c[k];
+        u_i_max[k] = u_c[k];
+      }
+      // For all faces, such that the face contains the vertex
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+      {
+        if (visited_faces.find(cell->face_index(face_no)) != visited_faces.end())
+          continue;
+
+        visited_faces.insert(cell->face_index(face_no));
+
+        // Look at the right neighbor (h-adaptivity)
+        // (!!!) Assuming there is no division at this point (no adaptivity)
+        if (cell->at_boundary(face_no))
+          continue;
+        
+        visited_faces.insert(cell->face_index(face_no));
+
+        TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
+        bool is_relevant_face = false;
+        for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
+        {
+          if (face->vertex_index(face_i) == v_i)
+            is_relevant_face = true;
+        }
+        if (is_relevant_face)
+        {
+          // Update u_i_min, u_i_max
+          const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+          fe_v_neighbor.reinit(neighbor);
+          neighbor->get_dof_indices(dof_indices_neighbor);
+
+          bool u_i_extrema_set[5] = { false, false, false, false, false };
+          for (unsigned int dof = 0; dof < dofs_per_cell; ++dof)
+          {
+            const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
+            if (component_i != 1)
+            {
+              const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
+              if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
+              {
+                u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
+              }
+            }
+          }
+
+          // From the right neighbor, look at all faces, such that the face contains the vertex
+          for (unsigned int neighbor_face_no = 0; neighbor_face_no < GeometryInfo<dim>::faces_per_cell; ++neighbor_face_no)
+          {
+            if (visited_faces.find(neighbor->face_index(neighbor_face_no)) != visited_faces.end())
+              continue;
+
+            visited_faces.insert(neighbor->face_index(neighbor_face_no));
+
+            if (neighbor->at_boundary(neighbor_face_no))
+              continue;
+
+            // Look at the right neighbor's neighbor (h-adaptivity)
+            // (!!!) Assuming there is no division at this point (no adaptivity)
+            TriaIterator<TriaAccessor<dim - 1, dim, dim> > neighbor_face = neighbor->face(neighbor_face_no);
+            bool is_neighbor_relevant_face = false;
+            for (unsigned int neighbor_face_i = 0; neighbor_face_i < GeometryInfo<dim>::vertices_per_face; ++neighbor_face_i)
+            {
+              if (neighbor_face->vertex_index(neighbor_face_i) == v_i)
+                is_neighbor_relevant_face = true;
+            }
+            if (is_neighbor_relevant_face)
+            {
+              // Update u_i_min, u_i_max
+              const typename DoFHandler<dim>::cell_iterator neighbor_neighbor = neighbor->neighbor(neighbor_face_no);
+              fe_v_neighbor.reinit(neighbor_neighbor);
+              neighbor_neighbor->get_dof_indices(dof_indices_neighbor);
+
+              bool u_i_extrema_set[5] = { false, false, false, false, false };
+              for (unsigned int dof = 0; dof < dofs_per_cell; ++dof)
+              {
+                const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
+                if (component_i != 1)
+                {
+                  const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
+                  if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
+                  {
+                    u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (!is_boundary_vertex)
+      {
+        // Based on u_i_min, u_i_max, u_i, get alpha_e
+        for (int k = 0; k < 5; k++)
+          if ((std::abs(u_c[k]) > 1e-8) && (std::abs((u_c[k] - u_i[k]) / u_c[k]) > 1e-6))
+            alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
+      }
+    }
+
+    for (int k = 0; k < 5; k++)
+      for (int i = 0; i < lambda_indices_to_multiply[k].size(); i++)
+        current_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
+  }
+}
+
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::assemble_system()
@@ -84,7 +292,8 @@ void Problem<equationsType, dim>::assemble_system()
     if (!cell->is_locally_owned())
       continue;
 
-    cell_matrix = 0;
+    if (!assemble_just_rhs)
+      cell_matrix = 0;
     cell_rhs = 0;
 
     fe_v.reinit(cell);
@@ -97,11 +306,12 @@ void Problem<equationsType, dim>::assemble_system()
     assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
 
     // Assemble the face integrals - ONLY if this is not the initial step (where we do the projection of the initial condition).
-    if (!parameters.initial_step)
+    if (!initial_step)
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        cell_matrix_neighbor = 0;
+        if (!assemble_just_rhs)
+          cell_matrix_neighbor = 0;
         cell_rhs_neighbor = 0;
 
         // Boundary face - here we pass the boundary id
@@ -133,6 +343,10 @@ void Problem<equationsType, dim>::assemble_system()
               assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
               constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+              if (assemble_just_rhs)
+                constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
+              else
+                constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
             }
           }
           // Here the neighbor face is less split than the current one, there is some transformation needed.
@@ -154,7 +368,10 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            if (assemble_just_rhs)
+              constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
+            else
+              constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
           // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
           // This is the only face assembly case performed without adaptivity.
@@ -168,16 +385,23 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            if (assemble_just_rhs)
+              constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
+            else
+              constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
         }
       }
     }
 
-    constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
+    if (assemble_just_rhs)
+      constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
+    else
+      constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
   }
 
-  system_matrix.compress(VectorOperation::add);
+  if (!assemble_just_rhs)
+    system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
 }
 
@@ -199,7 +423,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
         W_old[q][c] = 0;
-        if (this->parameters.needs_gradients)
+        if (parameters.needs_gradients)
         {
           for (unsigned int d = 0; d < dim; ++d)
             grad_W_old[q][c][d] = 0;
@@ -209,12 +433,12 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     const FEValuesExtractors::Vector mag(dim + 1);
 
-    if (parameters.initial_step)
+    if (initial_step)
     {
       std::vector<Vector<double> > initial_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
       initial_condition.vector_value(fe_v.get_quadrature_points(), initial_values);
       for (unsigned int q = 0; q < n_q_points; ++q)
-        for (unsigned int i = 0; i < this->equations.n_components; ++i)
+        for (unsigned int i = 0; i < equations.n_components; ++i)
           W_old[q][i] = initial_values[q][i];
     }
     else
@@ -235,11 +459,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           else
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-
             W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
           }
 
-          if (parameters.theta > 0. && this->parameters.needs_gradients)
+          if (parameters.theta > 0. && parameters.needs_gradients)
           {
             for (unsigned int d = 0; d < dim; d++)
               grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
@@ -282,7 +505,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         std::cout << std::endl;
       }
       equations.compute_forcing_vector(W_old[q], forcing_old[q]);
-      if (this->parameters.needs_gradients)
+      if (parameters.needs_gradients)
         equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
     }
 
@@ -302,21 +525,21 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
             * fe_v.JxW(q);
 
-          if (this->parameters.debug && q == 0)
+          if (parameters.debug && q == 0)
           {
             std::cout << "DOF: " << i << " - COMP: " << component_i << std::endl;
           }
 
-          if (!parameters.initial_step)
+          if (!initial_step)
           {
             for (unsigned int d = 0; d < dim; d++)
               val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
-            if (this->parameters.needs_gradients)
+            if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
                 val += (1.0 - parameters.theta) * (jacobian_addition_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
-            if (this->parameters.needs_forcing)
+            if (parameters.needs_forcing)
               val -= (1.0 - parameters.theta) * (forcing_old[q][4] * fe_v[mag].value(i, q)[0] + forcing_old[q][5] * fe_v[mag].value(i, q)[1] + forcing_old[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
         }
@@ -327,21 +550,21 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           if (parameters.is_stationary == false)
             val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
 
-          if (this->parameters.debug && q == 0)
+          if (parameters.debug && q == 0)
           {
             std::cout << "DOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
           }
 
-          if (!parameters.initial_step)
+          if (!initial_step)
           {
             for (unsigned int d = 0; d < dim; d++)
               val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
 
-            if (this->parameters.needs_gradients)
+            if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
                 val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
-            if (this->parameters.needs_forcing)
+            if (parameters.needs_forcing)
               val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
           }
         }
@@ -379,7 +602,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
         W[q][c] = 0;
-        if (this->parameters.needs_gradients)
+        if (parameters.needs_gradients)
         {
           for (unsigned int d = 0; d < dim; ++d)
             grad_W[q][c][d] = 0;
@@ -409,7 +632,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           W[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
         }
 
-        if (parameters.theta > 0. && this->parameters.needs_gradients)
+        if (parameters.theta > 0. && parameters.needs_gradients)
         {
           for (unsigned int d = 0; d < dim; d++)
             grad_W[q][component_i][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, component_i)[d];
@@ -422,13 +645,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     // This is for e.g. stabilization for Euler, it is any addition to the jacobian that is not a part of the flux.
     std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
 
-    if (this->parameters.theta > 0.)
+    if (parameters.theta > 0.)
     {
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
         equations.compute_flux_matrix(W[q], flux[q]);
         equations.compute_forcing_vector(W[q], forcing[q]);
-        if (this->parameters.needs_gradients)
+        if (parameters.needs_gradients)
           equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W[q], jacobian_addition[q]);
       }
     }
@@ -455,18 +678,18 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
         }
 
-        if (this->parameters.theta > 0. && !this->parameters.initial_step) {
+        if (parameters.theta > 0. && !initial_step) {
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             for (unsigned int d = 0; d < dim; d++)
               R_i -= parameters.theta * (flux[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
-            if (this->parameters.needs_gradients)
+            if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
                 R_i += parameters.theta * (jacobian_addition[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
-            if (this->parameters.needs_forcing)
+            if (parameters.needs_forcing)
               R_i -= parameters.theta * (forcing[q][4] * fe_v[mag].value(i, q)[0] + forcing[q][5] * fe_v[mag].value(i, q)[1] + forcing[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
           // For the other components (spaces), we go by each component.
@@ -475,19 +698,19 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             for (unsigned int d = 0; d < dim; d++)
               R_i -= parameters.theta * flux[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
-            if (this->parameters.needs_gradients)
+            if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
                 R_i += parameters.theta * jacobian_addition[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
 
-            if (this->parameters.needs_forcing)
+            if (parameters.needs_forcing)
               R_i -= parameters.theta * forcing[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
           }
         }
       }
 
-      for (unsigned int k = 0; k < dofs_per_cell; ++k)
-        cell_matrix(i, k) += R_i.fastAccessDx(k);
-
+      if (!assemble_just_rhs)
+        for (unsigned int k = 0; k < dofs_per_cell; ++k)
+          cell_matrix(i, k) += R_i.fastAccessDx(k);
 
       if (std::isnan(R_i.val()))
       {
@@ -517,12 +740,6 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 {
   const unsigned int n_q_points = fe_v.n_quadrature_points;
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
-
-  // Boundary values handling.
-  // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
-  std::vector<Vector<double> > boundary_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
-  if (external_face)
-    boundary_conditions.bc_vector_value(boundary_id, fe_v.get_quadrature_points(), boundary_values);
 
   // This is for the explicit case.
   if (parameters.theta < 1.)
@@ -579,7 +796,13 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
       // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values.
       if (external_face)
-        equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus_old[q], boundary_values[q], Wminus_old[q]);
+      {
+        // Boundary values handling.
+        // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
+        Vector<double> boundary_values(Equations<equationsType, dim>::n_components);
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q]);
+      }
+
 
       // Once we have the states on both sides of the face, we need to calculate the numerical flux.
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
@@ -716,7 +939,12 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         }
       }
       if (external_face)
-        equations.compute_Wminus(boundary_conditions.kind[boundary_id], fe_v.normal_vector(q), Wplus[q], boundary_values[q], Wminus[q]);
+      {
+        // Boundary values handling.
+        // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
+        Vector<double> boundary_values(Equations<equationsType, dim>::n_components);
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus[q], Wplus[q]);
+      }
 
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
     }
@@ -758,16 +986,19 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
 
-        for (unsigned int k = 0; k < dofs_per_cell; ++k)
-          cell_matrix(i, k) += R_i.fastAccessDx(k);
-
-        // We only add contribution to the matrix entries corresponding to a neighbor cell if there is any - and there is none there if we are dealing with an external face.
-        if (external_face == false)
-        {
+        if (!assemble_just_rhs)
           for (unsigned int k = 0; k < dofs_per_cell; ++k)
-            cell_matrix_neighbor(i, k) += R_i.fastAccessDx(dofs_per_cell + k);
-        }
+            cell_matrix(i, k) += R_i.fastAccessDx(k);
 
+        if (!assemble_just_rhs)
+        {
+          // We only add contribution to the matrix entries corresponding to a neighbor cell if there is any - and there is none there if we are dealing with an external face.
+          if (external_face == false)
+          {
+            for (unsigned int k = 0; k < dofs_per_cell; ++k)
+              cell_matrix_neighbor(i, k) += R_i.fastAccessDx(dofs_per_cell + k);
+          }
+        }
         cell_rhs(i) -= R_i.val();
       }
     }
@@ -821,7 +1052,7 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::output_results() const
+void Problem<equationsType, dim>::output_results(const char* prefix) const
 {
   typename Equations<equationsType, dim>::Postprocessor postprocessor(equations);
 
@@ -842,12 +1073,12 @@ void Problem<equationsType, dim>::output_results() const
   data_out.add_data_vector(subdomain, "subdomain");
 #endif
 
-  data_out.build_patches(1);
+  data_out.build_patches(2);
 
   static unsigned int output_file_number = 0;
 
 #ifdef HAVE_MPI
-  const std::string filename_base = "solution-" + Utilities::int_to_string(output_file_number, 3);
+  const std::string filename_base = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3);
 
   const std::string filename = (filename_base + "-" + Utilities::int_to_string(triangulation.locally_owned_subdomain(), 4));
 
@@ -867,7 +1098,7 @@ void Problem<equationsType, dim>::output_results() const
     data_out.write_pvtu_record(visit_master_output, filenames);
   }
 #else
-  std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
+  std::string filename = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
   data_out.write_vtk(output);
 #endif
@@ -886,6 +1117,34 @@ void Problem<equationsType, dim>::setup_initial_solution()
   old_solution = 0;
   current_solution = old_solution;
   newton_initial_guess = old_solution;
+}
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step, int newton_step) const
+{
+  std::ofstream m;
+  std::stringstream ssm;
+  if (newton_step >= 0)
+    ssm << time_step << "-" << newton_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
+  else
+    ssm << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
+  m.open(ssm.str());
+  mat.print(m);
+  m.close();
+}
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step, int newton_step) const
+{
+  std::ofstream n;
+  std::stringstream ssn;
+  if (newton_step >= 0)
+    ssn << time_step << "-" << newton_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
+  else
+    ssn << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
+  n.open(ssn.str());
+  vec.print(n, 10, false, false);
+  n.close();
 }
 
 template <EquationsType equationsType, int dim>
@@ -915,74 +1174,69 @@ void Problem<equationsType, dim>::run()
     // Preparation for the Newton loop.
     unsigned int newton_iter = 0;
     current_solution = newton_initial_guess;
+    current_limited_solution = newton_initial_guess;
+    current_unlimited_solution = newton_initial_guess;
     while (true)
     {
+      if (!(initial_step && (newton_iter == 0)))
+      {
+        assemble_just_rhs = true;
+        system_rhs = 0;
+        assemble_system();
+        // L2 norm of the residual - to check Newton convergence
+        const double res_norm = system_rhs.l2_norm();
+        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+        {
+          if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
+            std::printf("   %-16.3e (converged)\n\n", res_norm);
+          else
+            std::printf("   %-16.3e\n", res_norm);
+
+          if (std::isnan(res_norm))
+          {
+            output_results();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+            exit(1);
+          }
+        }
+        current_solution = current_limited_solution;
+
+        // If we are below threshold for the L2 residual norm, break the loop and go to next time step
+        if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
+          break;
+      }
+
       // Assemble.
+      assemble_just_rhs = false;
       system_matrix = 0;
       system_rhs = 0;
       assemble_system();
 
       // Outputs of algebraic stuff (optional - possible to be set in the Parameters class).
       if (parameters.output_matrix)
-      {
-        std::ofstream m;
-        std::stringstream ssm;
-        ssm << time_step << "-" << newton_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".matrix";
-        m.open(ssm.str());
-        system_matrix.print(m);
-        m.close();
-      }
+        output_matrix(system_matrix, "matrix", time_step, newton_iter);
       if (parameters.output_rhs)
+        output_vector(system_rhs, "rhs", time_step, newton_iter);
+      if (parameters.output_solution)
+        output_vector(newton_update, "newton_update", time_step, newton_iter);
+
+      solve(newton_update);
+
+      if (parameters.theta > 0.)
+        newton_update *= parameters.newton_damping;
+
+      // Update the unlimited solution, and make solution equal.
+      current_unlimited_solution += newton_update;
+      current_solution = current_unlimited_solution;
+      current_limited_solution = current_solution;
+
+      // Postprocess (change solution), and store into limited solution
+      if (parameters.polynomial_order_dg > 0)
       {
-        std::ofstream r;
-        std::stringstream ssr;
-        ssr << time_step << "-" << newton_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".rhs";
-        r.open(ssr.str());
-        system_rhs.print(r, 10, false, false);
-        r.close();
-      }
-
-      // L2 norm of the residual - to check Newton convergence
-      const double res_norm = system_rhs.l2_norm();
-      if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-      {
-        if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
-          std::printf("   %-16.3e (converged)\n\n", res_norm);
-        else
-          std::printf("   %-16.3e\n", res_norm);
-      }
-
-      // If we are below threshold for the L2 residual norm, break the loop and go to next time step
-      if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
-        break;
-      // Otherwise, solve the Newton' iteration, optionally output the solution.
-      else
-      {
-        newton_update = 0;
-        solve(newton_update);
-        if (parameters.output_solution)
-        {
-          std::ofstream n;
-          std::stringstream ssn;
-          ssn << time_step << "-" << newton_iter << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".newton_update";
-          n.open(ssn.str());
-          newton_update.print(n, 10, false, false);
-          n.close();
-        }
-        // If we have an implicit problem, we may use some damping factor (settable in Parameters).
-        if (parameters.theta > 0.)
-          newton_update *= parameters.newton_damping;
-
-        // Update the solution using the Newton's solution (which is just a difference).
-        current_solution += newton_update;
-
-        // If the residual norm is NaN, output results - give it some time - and quit.
-        if (std::isnan(res_norm))
-        {
-          output_results();
-          std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-          exit(1);
-        }
+        postprocess();
+        current_limited_solution = current_solution;
+        // Put solution back to the unlimited one for residual calculation.
+        current_solution = current_unlimited_solution;
       }
 
       ++newton_iter;
@@ -991,14 +1245,7 @@ void Problem<equationsType, dim>::run()
 
     // Output solution vector optionally and move on to the next time step.
     if (parameters.output_solution)
-    {
-      std::ofstream s;
-      std::stringstream sss;
-      sss << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << ".current_solution";
-      s.open(sss.str());
-      current_solution.print(s, 10, false, false);
-      s.close();
-    }
+      output_vector(newton_update, "current_solution", time_step);
 
     ++time_step;
     time += parameters.time_step;
@@ -1013,7 +1260,7 @@ void Problem<equationsType, dim>::run()
 
     newton_initial_guess = current_solution;
     old_solution = current_solution;
-    this->parameters.initial_step = false;
+    initial_step = false;
   }
 }
 

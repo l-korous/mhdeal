@@ -48,23 +48,21 @@ int main(int argc, char *argv[])
 #else
     Triangulation<DIMENSION> triangulation;
 #endif    
-    
+
     // Initialization of parameters. See parameters.h for description of the individual parameters, set up values in parameters.cpp
     Parameters<DIMENSION> parameters(triangulation);
     // Set up of initial condition. See initialCondition.h for description of methods, set up the specific function in initialCondition.cpp
-    switch(parameters.initCond){
-      case 0:
-        initial_condition = new MHDBlastIC<EQUATIONS, DIMENSION>(parameters);
-        break;
-      case 1:
-        initial_condition = new TitovDemoulinIC<EQUATIONS, DIMENSION>(parameters);
-        break;
-      case 2:
-        initial_condition = new TaylorBasisTestIC<EQUATIONS, DIMENSION>(parameters);
-        break;
+    switch (parameters.initCond) {
+    case 0:
+      initial_condition = new MHDBlastIC<EQUATIONS, DIMENSION>(parameters);
+      break;
+    case 1:
+    default:
+      initial_condition = new TitovDemoulinIC<EQUATIONS, DIMENSION>(parameters);
+      break;
     }
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions;
+    BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations(parameters);
     // Put together the problem.
@@ -99,6 +97,6 @@ int main(int argc, char *argv[])
   };
 
   delete initial_condition;
-  
+
   return 0;
 }

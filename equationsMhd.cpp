@@ -29,7 +29,7 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
 
 template <int dim>
 template <typename InputVector>
-typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W) const
+typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W)
 {
   typename InputVector::value_type kinetic_energy = 0.;
 
@@ -54,7 +54,7 @@ double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const
 
 template <>
 template <typename InputVector>
-typename InputVector::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W) const
+typename InputVector::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W)
 {
   return 0.5 *
     (
@@ -525,29 +525,6 @@ void Equations<EquationsTypeMhd, dim>::compute_forcing_vector(const InputVector 
 {
   for (unsigned int c = 0; c < n_components; ++c)
     forcing[c] = 0.;
-}
-
-template <int dim>
-template <typename DataVector>
-void Equations<EquationsTypeMhd, dim>::compute_Wminus(const BoundaryKind(&boundary_kind)[n_components],
-  const Tensor<1, dim> &normal_vector,
-  const DataVector     &Wplus,
-  const Vector<double> &boundary_values,
-  const DataVector     &Wminus) const
-{
-  for (unsigned int c = 0; c < n_components; c++)
-  {
-    switch (boundary_kind[c])
-    {
-    case inflow_boundary:
-      Wminus[c] = boundary_values(c);
-      break;
-    case outflow_boundary:
-    default:
-      Wminus[c] = Wplus[c];
-      break;
-    }
-  }
 }
 
 template <int dim>
