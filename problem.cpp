@@ -1124,6 +1124,8 @@ void Problem<equationsType, dim>::setup_initial_solution()
 {
   old_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
 
   old_solution = 0;
