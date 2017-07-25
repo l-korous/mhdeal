@@ -91,6 +91,7 @@ public:
 
   // Debugging purposes
   bool debug;
+  bool debug_limiter;
 };
 
 #endif

@@ -75,11 +75,6 @@ void Problem<equationsType, dim>::postprocess()
     if (!cell->is_locally_owned())
       continue;
 
-    if (parameters.debug)
-      std::cout << "cell: " << ++cell_count << std::endl;
-    
-    std::set<unsigned int> visited_faces;
-
     bool u_c_set[5] = { false, false, false, false, false };
     double u_c[5];
     std::vector<unsigned int> lambda_indices_to_multiply[5];
@@ -105,12 +100,16 @@ void Problem<equationsType, dim>::postprocess()
       }
     }
 
+    if (parameters.debug_limiter)
+      std::cout << "cell: " << ++cell_count << " - center: " << cell->center() << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
+
     double alpha_e[5] = { 1., 1., 1., 1., 1. };
 
     // For all vertices -> v_i
     for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
     {
       unsigned int v_i = cell->vertex_index(i);
+
       bool is_boundary_vertex = false;
       // For all faces, such that the face contains the vertex
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
@@ -133,6 +132,8 @@ void Problem<equationsType, dim>::postprocess()
       if (is_boundary_vertex)
         continue;
 
+      std::set<unsigned int> visited_faces;
+
       // (!!!) Find out u_i
       double u_i[5];
       Vector<double> vec_to_retrieve_value(8);
@@ -143,6 +144,8 @@ void Problem<equationsType, dim>::postprocess()
       u_i[3] = vec_to_retrieve_value[3];
       u_i[4] = vec_to_retrieve_value[7];
 
+      if (this->parameters.debug_limiter)
+        std::cout << "\tv_i: " << cell->vertex(i) << ", values: " << u_i[0] << ", " << u_i[1] << ", " << u_i[2] << ", " << u_i[3] << ", " << u_i[4] << std::endl;
       // Init u_i_min, u_i_max
       double u_i_min[5];
       double u_i_max[5];
@@ -187,6 +190,13 @@ void Problem<equationsType, dim>::postprocess()
               const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
               if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
               {
+                if (this->parameters.debug_limiter)
+                {
+                  if ((double)current_solution(dof_indices_neighbor[dof]) < u_i_min[component_ii == 7 ? 4 : component_ii])
+                    std::cout << "\tdecreasing u_i_min to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
+                  if ((double)current_solution(dof_indices_neighbor[dof]) > u_i_max[component_ii == 7 ? 4 : component_ii])
+                    std::cout << "\tincreasing u_i_max to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
+                }
                 u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
                 u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
                 u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
