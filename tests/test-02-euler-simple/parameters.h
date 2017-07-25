@@ -66,8 +66,6 @@ public:
 
   // Global - obvious, theta ~ Theta-scheme for time-discretization
   double time_step, final_time, theta;
-  // Flag whether this is initial step (using InitialCondition class for getting data), or not
-  bool initial_step;
   // Flag whether this is a stationary problem.
   bool is_stationary;
   // Polynomial order for the flow part.

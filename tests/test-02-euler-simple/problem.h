@@ -29,6 +29,9 @@ private:
   // Performs a single global assembly.
   void assemble_system();
 
+  // Performs a single global assembly.
+  void postprocess();
+
   // Performs a local assembly for all volumetric contributions on the local cell.
   void assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& local_dofs, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs);
   
@@ -39,7 +42,9 @@ private:
     Vector<double>& cell_rhs, FullMatrix<double>& cell_matrix_neighbor, Vector<double>& cell_rhs_neighbor);
   
   // Output
-  void output_results() const;
+  void output_results(const char* prefix = "") const;
+  void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step, int newton_step = -1) const;
+  void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step, int newton_step = -1) const;
 
   // Solves the assembled system
   void solve(TrilinosWrappers::MPI::Vector &newton_update);
@@ -76,6 +81,8 @@ private:
 
   // Currently sought solution, the previous one, and the initial solution for newton's loop on the current time level.
   TrilinosWrappers::MPI::Vector     current_solution;
+  TrilinosWrappers::MPI::Vector     current_limited_solution;
+  TrilinosWrappers::MPI::Vector     current_unlimited_solution;
   TrilinosWrappers::MPI::Vector     old_solution;
   TrilinosWrappers::MPI::Vector newton_initial_guess;
   
@@ -91,4 +98,7 @@ private:
   const MappingQ1<dim> mapping;
 
   MPI_Comm mpi_communicator;
+
+  bool initial_step;
+  bool assemble_just_rhs;
 };
