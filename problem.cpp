@@ -72,10 +72,12 @@ void Problem<equationsType, dim>::postprocess()
   // Loop through all cells.
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
   {
-    std::cout << "cell: " << ++cell_count << std::endl;
     if (!cell->is_locally_owned())
       continue;
 
+    if (parameters.debug)
+      std::cout << "cell: " << ++cell_count << std::endl;
+    
     std::set<unsigned int> visited_faces;
 
     bool u_c_set[5] = { false, false, false, false, false };
@@ -162,8 +164,6 @@ void Problem<equationsType, dim>::postprocess()
         if (cell->at_boundary(face_no))
           continue;
         
-        visited_faces.insert(cell->face_index(face_no));
-
         TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
         bool is_relevant_face = false;
         for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
