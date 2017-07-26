@@ -68,6 +68,9 @@ void Problem<equationsType, dim>::postprocess()
   FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
   FEValues<dim> fe_v_neighbor(mapping, fe, quadrature, update_flags);
 
+  // This is what we return.
+  current_limited_solution = current_solution;
+
   int cell_count = 0;
   // Loop through all cells.
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
@@ -90,7 +93,7 @@ void Problem<equationsType, dim>::postprocess()
         const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
         if (!u_c_set[component_ii == 7 ? 4 : component_ii])
         {
-          u_c[component_ii == 7 ? 4 : component_ii] = current_solution(dof_indices[i]);
+          u_c[component_ii == 7 ? 4 : component_ii] = current_limited_solution(dof_indices[i]);
           u_c_set[component_ii == 7 ? 4 : component_ii] = true;
         }
         else
@@ -137,7 +140,7 @@ void Problem<equationsType, dim>::postprocess()
       // (!!!) Find out u_i
       double u_i[5];
       Vector<double> vec_to_retrieve_value(8);
-      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), vec_to_retrieve_value);
+      VectorTools::point_value(dof_handler, current_limited_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), vec_to_retrieve_value);
       u_i[0] = vec_to_retrieve_value[0];
       u_i[1] = vec_to_retrieve_value[1];
       u_i[2] = vec_to_retrieve_value[2];
@@ -192,13 +195,13 @@ void Problem<equationsType, dim>::postprocess()
               {
                 if (this->parameters.debug_limiter)
                 {
-                  if ((double)current_solution(dof_indices_neighbor[dof]) < u_i_min[component_ii == 7 ? 4 : component_ii])
-                    std::cout << "\tdecreasing u_i_min to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
-                  if ((double)current_solution(dof_indices_neighbor[dof]) > u_i_max[component_ii == 7 ? 4 : component_ii])
-                    std::cout << "\tincreasing u_i_max to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
+                  if ((double)current_limited_solution(dof_indices_neighbor[dof]) < u_i_min[component_ii == 7 ? 4 : component_ii])
+                    std::cout << "\tdecreasing u_i_min to: " << (double)current_limited_solution(dof_indices_neighbor[dof]) << std::endl;
+                  if ((double)current_limited_solution(dof_indices_neighbor[dof]) > u_i_max[component_ii == 7 ? 4 : component_ii])
+                    std::cout << "\tincreasing u_i_max to: " << (double)current_limited_solution(dof_indices_neighbor[dof]) << std::endl;
                 }
-                u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
+                u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
                 u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
               }
             }
@@ -240,8 +243,8 @@ void Problem<equationsType, dim>::postprocess()
                   const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
                   if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
                   {
-                    u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                    u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
+                    u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
                     u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
                   }
                 }
@@ -262,7 +265,7 @@ void Problem<equationsType, dim>::postprocess()
 
     for (int k = 0; k < 5; k++)
       for (int i = 0; i < lambda_indices_to_multiply[k].size(); i++)
-        current_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
+        current_limited_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
   }
 }
 
@@ -1124,13 +1127,12 @@ void Problem<equationsType, dim>::setup_initial_solution()
 {
   old_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
 
   old_solution = 0;
   current_solution = old_solution;
-  current_limited_solution = old_solution;
   current_unlimited_solution = old_solution;
   newton_initial_guess = old_solution;
 }
@@ -1190,14 +1192,10 @@ void Problem<equationsType, dim>::run()
     // Preparation for the Newton loop.
     unsigned int newton_iter = 0;
     current_solution = newton_initial_guess;
-    current_limited_solution = newton_initial_guess;
-    current_unlimited_solution = newton_initial_guess;
     while (true)
     {
       if (!(initial_step && (newton_iter == 0)))
       {
-        // Put solution back to the unlimited one for residual calculation.
-        current_solution = current_unlimited_solution;
         assemble_just_rhs = true;
         system_rhs = 0;
         assemble_system();
@@ -1217,7 +1215,6 @@ void Problem<equationsType, dim>::run()
             exit(1);
           }
         }
-        current_solution = current_limited_solution;
 
         // If we are below threshold for the L2 residual norm, break the loop and go to next time step
         if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
@@ -1225,6 +1222,7 @@ void Problem<equationsType, dim>::run()
       }
 
       // Assemble.
+      current_solution = current_limited_solution;
       assemble_just_rhs = false;
       system_matrix = 0;
       system_rhs = 0;
@@ -1244,20 +1242,19 @@ void Problem<equationsType, dim>::run()
         newton_update *= parameters.newton_damping;
 
       // Update the unlimited solution, and make solution equal.
-      current_unlimited_solution += newton_update;
-      current_solution = current_unlimited_solution;
-      current_limited_solution = current_solution;
+      current_solution += newton_update;
+      current_unlimited_solution = current_solution;
 
-      // Postprocess (change solution), and store into limited solution
+      // Postprocess, and store into limited solution (keep current_solution intact)
       if (parameters.polynomial_order_dg > 0)
-      {
         postprocess();
-        current_limited_solution = current_solution;
-      }
 
       ++newton_iter;
       AssertThrow(newton_iter <= parameters.newton_max_iterations, ExcMessage("No convergence in nonlinear solver"));
     }
+
+    // Make current_solution point to the limited one.
+    current_solution = current_limited_solution;
 
     // Output solution vector optionally and move on to the next time step.
     if (parameters.output_solution)
