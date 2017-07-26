@@ -1130,6 +1130,8 @@ void Problem<equationsType, dim>::setup_initial_solution()
 
   old_solution = 0;
   current_solution = old_solution;
+  current_limited_solution = old_solution;
+  current_unlimited_solution = old_solution;
   newton_initial_guess = old_solution;
 }
 
@@ -1194,6 +1196,8 @@ void Problem<equationsType, dim>::run()
     {
       if (!(initial_step && (newton_iter == 0)))
       {
+        // Put solution back to the unlimited one for residual calculation.
+        current_solution = current_unlimited_solution;
         assemble_just_rhs = true;
         system_rhs = 0;
         assemble_system();
@@ -1249,8 +1253,6 @@ void Problem<equationsType, dim>::run()
       {
         postprocess();
         current_limited_solution = current_solution;
-        // Put solution back to the unlimited one for residual calculation.
-        current_solution = current_unlimited_solution;
       }
 
       ++newton_iter;
