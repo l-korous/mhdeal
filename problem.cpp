@@ -70,6 +70,7 @@ void Problem<equationsType, dim>::postprocess()
 
   // This is what we return.
   current_limited_solution = current_solution;
+  constraints.distribute(current_limited_solution);
 
   int cell_count = 0;
   // Loop through all cells.
@@ -93,7 +94,7 @@ void Problem<equationsType, dim>::postprocess()
         const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
         if (!u_c_set[component_ii == 7 ? 4 : component_ii])
         {
-          u_c[component_ii == 7 ? 4 : component_ii] = current_limited_solution(dof_indices[i]);
+          u_c[component_ii == 7 ? 4 : component_ii] = current_solution(dof_indices[i]);
           u_c_set[component_ii == 7 ? 4 : component_ii] = true;
         }
         else
@@ -140,7 +141,7 @@ void Problem<equationsType, dim>::postprocess()
       // (!!!) Find out u_i
       double u_i[5];
       Vector<double> vec_to_retrieve_value(8);
-      VectorTools::point_value(dof_handler, current_limited_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), vec_to_retrieve_value);
+      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), vec_to_retrieve_value);
       u_i[0] = vec_to_retrieve_value[0];
       u_i[1] = vec_to_retrieve_value[1];
       u_i[2] = vec_to_retrieve_value[2];
@@ -195,13 +196,13 @@ void Problem<equationsType, dim>::postprocess()
               {
                 if (this->parameters.debug_limiter)
                 {
-                  if ((double)current_limited_solution(dof_indices_neighbor[dof]) < u_i_min[component_ii == 7 ? 4 : component_ii])
-                    std::cout << "\tdecreasing u_i_min to: " << (double)current_limited_solution(dof_indices_neighbor[dof]) << std::endl;
-                  if ((double)current_limited_solution(dof_indices_neighbor[dof]) > u_i_max[component_ii == 7 ? 4 : component_ii])
-                    std::cout << "\tincreasing u_i_max to: " << (double)current_limited_solution(dof_indices_neighbor[dof]) << std::endl;
+                  if ((double)current_solution(dof_indices_neighbor[dof]) < u_i_min[component_ii == 7 ? 4 : component_ii])
+                    std::cout << "\tdecreasing u_i_min to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
+                  if ((double)current_solution(dof_indices_neighbor[dof]) > u_i_max[component_ii == 7 ? 4 : component_ii])
+                    std::cout << "\tincreasing u_i_max to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
                 }
-                u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
-                u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
+                u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
                 u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
               }
             }
@@ -243,8 +244,8 @@ void Problem<equationsType, dim>::postprocess()
                   const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
                   if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
                   {
-                    u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
-                    u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_limited_solution(dof_indices_neighbor[dof]));
+                    u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
                     u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
                   }
                 }
