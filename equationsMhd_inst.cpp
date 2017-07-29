@@ -1,6 +1,8 @@
 // 3D & double
 template typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_kinetic_energy(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W);
 
+template typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W);
+
 template typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W) const;
 
 template typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W, const typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type& Uk, const typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type& Um) const;
@@ -22,6 +24,8 @@ void Equations<EquationsTypeMhd, 3>::Q_inv<dealii::internal::TableBaseAccessors:
 
 // 3D & Sacado::Fad::DFad<double>
 template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_kinetic_energy(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W);
+
+template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W);
 
 template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_pressure(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W) const;
 
