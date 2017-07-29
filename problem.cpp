@@ -814,7 +814,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
       // - it simply must fill the other (minus) state.
       if (external_face)
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q]);
+      {
+        dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>& Wminus_old_q = Wminus_old[q];
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old_q, Wplus_old[q]);
+      }
 
       // Once we have the states on both sides of the face, we need to calculate the numerical flux.
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
@@ -955,7 +958,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
         // - it simply must fill the other (minus) state.
         if (external_face)
-          boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus[q], Wplus[q]);
+        {
+          dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>& Wminus_q = Wminus[q];
+          boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
+        }
 
         equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
       }
