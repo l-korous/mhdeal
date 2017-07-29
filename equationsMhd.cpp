@@ -121,7 +121,7 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
 
   for (unsigned int d = 0; d < dim; ++d)
   {
-    flux[energy_component][d] = (W[energy_component] + pressure + magnetic_energy) * W[first_momentum_component + d];
+    flux[energy_component][d] = (W[energy_component] + pressure + magnetic_energy) * W[first_momentum_component + d] / W[density_component];
     for (unsigned int e = 0; e < dim; ++e)
       flux[energy_component][d] -= (W[first_magnetic_flux_component + d] * W[first_momentum_component + e] * W[first_magnetic_flux_component + e]) / W[density_component];
   }
