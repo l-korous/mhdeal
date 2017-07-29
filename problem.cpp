@@ -170,7 +170,7 @@ void Problem<equationsType, dim>::postprocess()
         // (!!!) Assuming there is no division at this point (no adaptivity)
         if (cell->at_boundary(face_no))
           continue;
-        
+
         TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
         bool is_relevant_face = false;
         for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
@@ -770,54 +770,51 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> Wminus_old_q = Wminus_old[q];
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
-        if (component_i == 1)
+        if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
         {
-          Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-          Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-          Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
-        }
-        // For the other components (spaces), we go by each component.
-        else
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-        }
+          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
-        if (!external_face)
-        {
-          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-
-          // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
-          if (component_i_neighbor == 1)
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+          if (component_i == 1)
           {
-            Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
-            Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
-            Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+            Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
           }
           // For the other components (spaces), we go by each component.
           else
           {
-            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-            Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+          }
+
+          if (!external_face)
+          {
+            const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+
+            // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+            if (component_i_neighbor == 1)
+            {
+              Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+              Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+              Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+            }
+            // For the other components (spaces), we go by each component.
+            else
+            {
+              const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+              Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+            }
           }
         }
       }
 
-      // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values.
+      // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
+      // - it simply must fill the other (minus) state.
       if (external_face)
-      {
-        // Boundary values handling.
-        // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
-        Vector<double> boundary_values(Equations<equationsType, dim>::n_components);
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old_q, Wplus_old[q]);
-      }
-
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q]);
 
       // Once we have the states on both sides of the face, we need to calculate the numerical flux.
       equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
@@ -916,53 +913,52 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
-      dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> Wminus_q = Wminus[q];
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
-        if (component_i == 1)
+        if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
         {
-          Wplus[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
-          Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
-          Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
-        }
-        // For the other components (spaces), we go by each component.
-        else
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          Wplus[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
-        }
+          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
 
-        if (!external_face)
-        {
-          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-
-          // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
-          if (component_i_neighbor == 1)
+          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+          if (component_i == 1)
           {
-            Wminus[q][4] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
-            Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
-            Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
+            Wplus[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
+            Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
+            Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
           }
           // For the other components (spaces), we go by each component.
           else
           {
-            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-            Wminus[q][component_ii_neighbor] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+            Wplus[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
+          }
+
+          if (!external_face)
+          {
+            const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+
+            // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+            if (component_i_neighbor == 1)
+            {
+              Wminus[q][4] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
+              Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
+              Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
+            }
+            // For the other components (spaces), we go by each component.
+            else
+            {
+              const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+              Wminus[q][component_ii_neighbor] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+            }
           }
         }
-      }
-      if (external_face)
-      {
-        // Boundary values handling.
-        // If we have an external face, we need to get the actual values from the provided BoundaryConditions class using its method bc_vector_value().
-        Vector<double> boundary_values(Equations<equationsType, dim>::n_components);
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
-      }
+        // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
+        // - it simply must fill the other (minus) state.
+        if (external_face)
+          boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus[q], Wplus[q]);
 
-      equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
+        equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
+      }
     }
 
     std::vector<double> residual_derivatives(dofs_per_cell);
@@ -1112,7 +1108,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-  }
+}
 #else
   std::string filename = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
