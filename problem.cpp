@@ -815,8 +815,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       // - it simply must fill the other (minus) state.
       if (external_face)
       {
-        dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>& Wminus_old_q = Wminus_old[q];
+        dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> Wminus_old_q = Wminus_old[q];
         boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old_q, Wplus_old[q]);
+        for (unsigned int di = 0; di < this->equations.n_components; ++di)
+          Wminus_old[q][di] = Wminus_old_q[di];
       }
 
       // Once we have the states on both sides of the face, we need to calculate the numerical flux.
@@ -959,8 +961,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         // - it simply must fill the other (minus) state.
         if (external_face)
         {
-          dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>& Wminus_q = Wminus[q];
+          dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> Wminus_q = Wminus[q];
           boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
+          for (unsigned int di = 0; di < this->equations.n_components; ++di)
+            Wminus[q][di] = Wminus_q[di];
         }
 
         equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
