@@ -437,7 +437,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
         W_old[q][c] = 0;
-        if (parameters.needs_gradients)
+        if (parameters.needs_gradients && !initial_step)
         {
           for (unsigned int d = 0; d < dim; ++d)
             grad_W_old[q][c][d] = 0;
@@ -490,37 +490,40 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     // LK: This is for e.g. stabilization for Euler
     std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition_old(n_q_points);
 
-    for (unsigned int q = 0; q < n_q_points; ++q)
+    if (!initial_step)
     {
-      equations.compute_flux_matrix(W_old[q], flux_old[q]);
-
-      if (parameters.debug)
+      for (unsigned int q = 0; q < n_q_points; ++q)
       {
-        std::cout << "point_i: " << q << std::endl;
-        std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
-        std::cout << "W: ";
-        for (unsigned int i = 0; i < 8; i++)
-          std::cout << W_old[q][i] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
+        equations.compute_flux_matrix(W_old[q], flux_old[q]);
 
-        std::cout << "F[x]: ";
-        for (unsigned int i = 0; i < 8; i++)
-          std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
+        if (parameters.debug)
+        {
+          std::cout << "point_i: " << q << std::endl;
+          std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
+          std::cout << "W: ";
+          for (unsigned int i = 0; i < 8; i++)
+            std::cout << W_old[q][i] << (i < 7 ? ", " : "");
+          std::cout << std::endl;
 
-        std::cout << "F[y]: ";
-        for (unsigned int i = 0; i < 8; i++)
-          std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
+          std::cout << "F[x]: ";
+          for (unsigned int i = 0; i < 8; i++)
+            std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
+          std::cout << std::endl;
 
-        std::cout << "F[z]: ";
-        for (unsigned int i = 0; i < 8; i++)
-          std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
+          std::cout << "F[y]: ";
+          for (unsigned int i = 0; i < 8; i++)
+            std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
+          std::cout << std::endl;
+
+          std::cout << "F[z]: ";
+          for (unsigned int i = 0; i < 8; i++)
+            std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
+          std::cout << std::endl;
+        }
+        equations.compute_forcing_vector(W_old[q], forcing_old[q]);
+        if (parameters.needs_gradients)
+          equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
       }
-      equations.compute_forcing_vector(W_old[q], forcing_old[q]);
-      if (parameters.needs_gradients)
-        equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
     }
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
@@ -616,7 +619,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
         W[q][c] = 0;
-        if (parameters.needs_gradients)
+        if (parameters.needs_gradients && !initial_step)
         {
           for (unsigned int d = 0; d < dim; ++d)
             grad_W[q][c][d] = 0;
@@ -646,7 +649,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           W[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
         }
 
-        if (parameters.theta > 0. && parameters.needs_gradients)
+        if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
         {
           for (unsigned int d = 0; d < dim; d++)
             grad_W[q][component_i][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, component_i)[d];
@@ -659,7 +662,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     // This is for e.g. stabilization for Euler, it is any addition to the jacobian that is not a part of the flux.
     std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
 
-    if (parameters.theta > 0.)
+    if (parameters.theta > 0. && !initial_step)
     {
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
@@ -1141,6 +1144,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
   old_solution = 0;
   current_solution = old_solution;
   current_unlimited_solution = old_solution;
+  current_limited_solution = old_solution;
   newton_initial_guess = old_solution;
 }
 
@@ -1255,6 +1259,8 @@ void Problem<equationsType, dim>::run()
       // Postprocess, and store into limited solution (keep current_solution intact)
       if (parameters.polynomial_order_dg > 0)
         postprocess();
+      else
+        current_limited_solution = current_solution;
 
       ++newton_iter;
       AssertThrow(newton_iter <= parameters.newton_max_iterations, ExcMessage("No convergence in nonlinear solver"));
