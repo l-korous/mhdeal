@@ -960,18 +960,18 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             }
           }
         }
-        // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
-        // - it simply must fill the other (minus) state.
-        if (external_face)
-        {
-          dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> Wminus_q = Wminus[q];
-          boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
-          for (unsigned int di = 0; di < this->equations.n_components; ++di)
-            Wminus[q][di] = Wminus_q[di];
-        }
-
-        equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
       }
+      // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
+      // - it simply must fill the other (minus) state.
+      if (external_face)
+      {
+        dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> Wminus_q = Wminus[q];
+        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
+        for (unsigned int di = 0; di < this->equations.n_components; ++di)
+          Wminus[q][di] = Wminus_q[di];
+      }
+
+      equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
     }
 
     std::vector<double> residual_derivatives(dofs_per_cell);
@@ -1001,7 +1001,6 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
           if (std::isnan(R_i.val()))
           {
-            equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
             std::cout << "isnan: " << R_i.val() << std::endl;
             std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
@@ -1121,7 +1120,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -1257,7 +1256,7 @@ void Problem<equationsType, dim>::run()
       current_unlimited_solution = current_solution;
 
       // Postprocess, and store into limited solution (keep current_solution intact)
-      if (parameters.polynomial_order_dg > 0)
+      if (parameters.polynomial_order_dg > 0 && parameters.postprocess_in_newton_loop)
         postprocess();
       else
         current_limited_solution = current_solution;
@@ -1267,6 +1266,9 @@ void Problem<equationsType, dim>::run()
     }
 
     // Make current_solution point to the limited one.
+    if (parameters.polynomial_order_dg > 0 && !parameters.postprocess_in_newton_loop)
+      postprocess();
+
     current_solution = current_limited_solution;
 
     // Output solution vector optionally and move on to the next time step.
