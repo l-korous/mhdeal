@@ -593,7 +593,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
         std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
         for (int j = 0; j < 8; j++)
-          std::cout << "W [" << j << "]: " << W_old[0][j] << ", F [" << j << "]: " << flux_old[0][j][0] << ", " << flux_old[0][j][1] << ", " << flux_old[0][j][2] << std::endl;
+          std::cout << "W [" << j << "]: " << (double)W_old[0][j] << ", F [" << j << "]: " << (double)flux_old[0][j][0] << ", " << (double)flux_old[0][j][1] << ", " << (double)flux_old[0][j][2] << std::endl;
       }
 
       cell_rhs(i) -= val;
@@ -735,7 +735,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
         std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
         for (int j = 0; j < 8; j++)
-          std::cout << "W [" << j << "]: " << W[0][j] << ", F [" << j << "]: " << flux[0][j][0] << ", " << flux[0][j][1] << ", " << flux[0][j][2] << std::endl;
+          std::cout << "W [" << j << "]: " << (double)W[0][j].val() << ", F [" << j << "]: " << (double)flux[0][j][0].val() << ", " << (double)flux[0][j][1].val() << ", " << (double)flux[0][j][2].val() << std::endl;
       }
 
       cell_rhs(i) -= R_i.val();
@@ -882,7 +882,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
             std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
             for (int j = 0; j < 8; j++)
-              std::cout << "W+ [" << j << "]: " << Wplus_old[q][j] << ", W- [" << j << "]: " << Wminus_old[q][j] << ", F [" << j << "]: " << normal_fluxes_old[q][j] << std::endl;
+              std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
           }
         }
 
@@ -1006,7 +1006,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
             std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
             for (int j = 0; j < 8; j++)
-              std::cout << "W+ [" << j << "]: " << Wplus[q][j] << ", W- [" << j << "]: " << Wminus[q][j] << ", F [" << j << "]: " << normal_fluxes[q][j] << std::endl;
+              std::cout << "W+ [" << j << "]: " << (double)Wplus[q][j].val() << ", W- [" << j << "]: " << (double)Wminus[q][j].val() << ", F [" << j << "]: " << (double)normal_fluxes[q][j].val() << std::endl;
           }
         }
 
