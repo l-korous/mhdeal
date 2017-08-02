@@ -1236,12 +1236,7 @@ void Problem<equationsType, dim>::save()
 
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
   sol_trans.prepare_serialization(this->current_solution);
-  this->triangulation.save("triangulationTemp");
-  this->triangulation.load("triangulationTemp");
-  parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans_test(dof_handler);
-  sol_trans_test.deserialize(this->current_solution);
-  remove("triangulation");
-  rename("triangulationTemp.info", "triangulation.info");
+  this->triangulation.save("triangulation");
 #endif
 }
 
