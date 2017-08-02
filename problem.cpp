@@ -1228,9 +1228,10 @@ void Problem<equationsType, dim>::save()
 {
 #ifdef HAVE_MPI
   std::ofstream history("history");
-  history << this->time << this->time_step;
+  history << this->time << " " << this->time_step;
   for(int i = 0; i < dim; i++)
-    history << this->parameters.corner_a[i] << this->parameters.corner_b[i] << this->parameters.refinements[i] << std::endl;
+    history << " " << this->parameters.corner_a[i] << " " << this->parameters.corner_b[i] << " " << this->parameters.refinements[i];
+  history << std::endl
   history.close();
 
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
@@ -1240,7 +1241,7 @@ void Problem<equationsType, dim>::save()
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans_test(dof_handler);
   sol_trans_test.deserialize(this->current_solution);
   remove("triangulation");
-  rename("triangulationTemp", "triangulation");
+  rename("triangulationTemp.info", "triangulation.info");
 #endif
 }
 
