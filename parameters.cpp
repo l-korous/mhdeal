@@ -25,9 +25,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->time_step = 1.e-3;
   this->final_time = 10.;
 
-  this->theta = 0.5;
-  this->postprocess_in_newton_loop = false;
-
+  this->theta = 0.0;
+  this->postprocess_in_newton_loop = true;
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 1;
 

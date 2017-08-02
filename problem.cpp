@@ -1231,7 +1231,7 @@ void Problem<equationsType, dim>::save()
   history << this->time << " " << this->time_step;
   for(int i = 0; i < dim; i++)
     history << " " << this->parameters.corner_a[i] << " " << this->parameters.corner_b[i] << " " << this->parameters.refinements[i];
-  history << std::endl
+  history << std::endl;
   history.close();
 
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
