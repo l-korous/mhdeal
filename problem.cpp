@@ -24,7 +24,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   face_quadrature(parameters.quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
-  assemble_just_rhs(false)
+  assemble_only_rhs(false),
+  last_output_time(0.), last_snapshot_time(0.), time(0.),
+  time_step(0)
 {
 }
 
@@ -272,8 +274,10 @@ void Problem<equationsType, dim>::postprocess()
 
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::assemble_system()
+void Problem<equationsType, dim>::assemble_system(bool only_rhs)
 {
+  this->assemble_only_rhs = only_rhs;
+
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
@@ -306,7 +310,7 @@ void Problem<equationsType, dim>::assemble_system()
     if (!cell->is_locally_owned())
       continue;
 
-    if (!assemble_just_rhs)
+    if (!assemble_only_rhs)
       cell_matrix = 0;
     cell_rhs = 0;
 
@@ -324,7 +328,7 @@ void Problem<equationsType, dim>::assemble_system()
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        if (!assemble_just_rhs)
+        if (!assemble_only_rhs)
           cell_matrix_neighbor = 0;
         cell_rhs_neighbor = 0;
 
@@ -357,7 +361,7 @@ void Problem<equationsType, dim>::assemble_system()
               assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
               constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
-              if (assemble_just_rhs)
+              if (assemble_only_rhs)
                 constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
               else
                 constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
@@ -382,7 +386,7 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            if (assemble_just_rhs)
+            if (assemble_only_rhs)
               constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
             else
               constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
@@ -399,7 +403,7 @@ void Problem<equationsType, dim>::assemble_system()
 
             assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            if (assemble_just_rhs)
+            if (assemble_only_rhs)
               constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
             else
               constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
@@ -408,13 +412,13 @@ void Problem<equationsType, dim>::assemble_system()
       }
     }
 
-    if (assemble_just_rhs)
+    if (assemble_only_rhs)
       constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
     else
       constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
   }
 
-  if (!assemble_just_rhs)
+  if (!assemble_only_rhs)
     system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
 }
@@ -725,7 +729,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         }
       }
 
-      if (!assemble_just_rhs)
+      if (!assemble_only_rhs)
         for (unsigned int k = 0; k < dofs_per_cell; ++k)
           cell_matrix(i, k) += R_i.fastAccessDx(k);
 
@@ -1010,11 +1014,11 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
 
-        if (!assemble_just_rhs)
+        if (!assemble_only_rhs)
           for (unsigned int k = 0; k < dofs_per_cell; ++k)
             cell_matrix(i, k) += R_i.fastAccessDx(k);
 
-        if (!assemble_just_rhs)
+        if (!assemble_only_rhs)
         {
           // We only add contribution to the matrix entries corresponding to a neighbor cell if there is any - and there is none there if we are dealing with an external face.
           if (external_face == false)
@@ -1140,7 +1144,49 @@ void Problem<equationsType, dim>::setup_initial_solution()
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
 
-  old_solution = 0;
+  bool should_load_from_file = false;
+  std::ifstream history("history");
+  if (history.is_open())
+  {
+    std::string line;
+    double corner_a_test[3];
+    double corner_b_test[3];
+    int ref_test[3];
+    while (getline(history, line))
+    {
+      std::istringstream ss(line);
+      ss >> this->time >> this->time_step;
+      if (!should_load_from_file)
+      {
+        bool dimensions_match = true;
+        for (int i = 0; i < dim; i++)
+          ss >> corner_a_test[i] >> corner_b_test[i] >> ref_test[i];
+        for (int i = 0; i < dim; i++)
+        {
+          if (this->parameters.corner_a[i] != corner_a_test[i])
+            dimensions_match = false;
+          if (this->parameters.corner_b[i] != corner_b_test[i])
+            dimensions_match = false;
+          if (this->parameters.refinements[i] != ref_test[i])
+            dimensions_match = false;
+        }
+        if (dimensions_match)
+          should_load_from_file = true;
+      }
+    }
+    history.close();
+  }
+  
+  if (should_load_from_file)
+  {
+    load();
+  }
+  else {
+    old_solution = 0;
+    remove("triangulation");
+    remove("history");
+  }
+
   current_solution = old_solution;
   current_unlimited_solution = old_solution;
   current_limited_solution = old_solution;
@@ -1176,17 +1222,39 @@ void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& v
 }
 
 template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::save()
+{
+  std::ofstream history("history");
+  history << this->time << this->time_step;
+  for(int i = 0; i < dim; i++)
+    history << this->parameters.corner_a[i] << this->parameters.corner_b[i] << this->parameters.refinements[i] << std::endl;
+  history.close();
+
+  parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
+  sol_trans.prepare_serialization(this->current_solution);
+  this->triangulation.save("triangulationTemp");
+  this->triangulation.load("triangulationTemp");
+  parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans_test(dof_handler);
+  sol_trans_test.deserialize(this->current_solution);
+  remove("triangulation");
+  rename("triangulationTemp", "triangulation");
+}
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::load()
+{
+  this->triangulation.load("triangulation");
+  parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
+  sol_trans.deserialize(this->old_solution);
+}
+
+template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::run()
 {
   // Preparations.
   setup_system();
   setup_initial_solution();
   TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
-
-  // More preparations.
-  double time = 0;
-  int time_step = 0;
-  double next_output = time + parameters.output_step;
 
   // Time loop.
   while (time < parameters.final_time)
@@ -1201,14 +1269,13 @@ void Problem<equationsType, dim>::run()
 
     // Preparation for the Newton loop.
     unsigned int newton_iter = 0;
-    current_solution = newton_initial_guess;
+    current_solution = old_solution;//newton_initial_guess;
     while (true)
     {
       if (!(initial_step && (newton_iter == 0)))
       {
-        assemble_just_rhs = true;
         system_rhs = 0;
-        assemble_system();
+        assemble_system(true);
         // L2 norm of the residual - to check Newton convergence
         const double res_norm = system_rhs.l2_norm();
         if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
@@ -1217,13 +1284,6 @@ void Problem<equationsType, dim>::run()
             std::printf("   %-16.3e (converged)\n\n", res_norm);
           else
             std::printf("   %-16.3e\n", res_norm);
-
-          if (std::isnan(res_norm))
-          {
-            output_results();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-            exit(1);
-          }
         }
 
         // If we are below threshold for the L2 residual norm, break the loop and go to next time step
@@ -1233,10 +1293,9 @@ void Problem<equationsType, dim>::run()
 
       // Assemble.
       current_solution = current_limited_solution;
-      assemble_just_rhs = false;
       system_matrix = 0;
       system_rhs = 0;
-      assemble_system();
+      assemble_system(false);
 
       // Outputs of algebraic stuff (optional - possible to be set in the Parameters class).
       if (parameters.output_matrix)
@@ -1270,26 +1329,33 @@ void Problem<equationsType, dim>::run()
       postprocess();
 
     current_solution = current_limited_solution;
-
-    // Output solution vector optionally and move on to the next time step.
-    if (parameters.output_solution)
-      output_vector(newton_update, "current_solution", time_step);
-
-    ++time_step;
-    time += parameters.time_step;
-
-    if (parameters.output_step < 0)
-      output_results();
-    else if (time >= next_output)
-    {
-      output_results();
-      next_output += parameters.output_step;
-    }
-
     newton_initial_guess = current_solution;
     old_solution = current_solution;
     initial_step = false;
   }
+}
+
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::move_time_step_handle_outputs()
+{
+  if (parameters.output_solution)
+    output_vector(current_solution, "current_solution", time_step);
+
+  if ((parameters.output_step < 0) || (time - last_output_time >= parameters.output_step))
+  {
+    output_results();
+    last_output_time = time;
+  }
+
+  if ((parameters.snapshot_step < 0) || (time - last_snapshot_time >= parameters.snapshot_step))
+  {
+    save();
+    last_snapshot_time = time;
+  }
+
+  ++time_step;
+  time += parameters.time_step;
 }
 
 template class Problem<EquationsTypeMhd, 3>;

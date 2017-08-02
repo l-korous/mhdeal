@@ -27,7 +27,7 @@ private:
   void setup_initial_solution();
 
   // Performs a single global assembly.
-  void assemble_system();
+  void assemble_system(bool only_rhs);
 
   // Performs a single global assembly.
   void postprocess();
@@ -49,12 +49,17 @@ private:
   // Solves the assembled system
   void solve(TrilinosWrappers::MPI::Vector &newton_update);
 
+  void move_time_step_handle_outputs();
+
   // Triangulation - passed as a constructor parameter
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation;
 #else
   Triangulation<dim>& triangulation;
 #endif
+
+  void save();
+  void load();
 
   // Equations - passed as a constructor parameter
   Equations<equationsType, dim>& equations;
@@ -100,5 +105,8 @@ private:
   MPI_Comm mpi_communicator;
 
   bool initial_step;
-  bool assemble_just_rhs;
+  bool assemble_only_rhs;
+
+  double last_output_time, last_snapshot_time, time;
+  int time_step;
 };

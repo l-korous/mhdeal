@@ -24,7 +24,7 @@ public:
   bool postprocess_in_newton_loop;
 
   // Output step - either < 0 (output all steps), or > 0 (time difference between two outputs)
-  double output_step;
+  double output_step, snapshot_step;
 
   // Output matrix after assemble_system() in Problem::run().
   bool output_matrix;

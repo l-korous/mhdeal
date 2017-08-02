@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <stdio.h>
 #include <memory>
 #include <chrono>
 #include <thread>

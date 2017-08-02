@@ -39,6 +39,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->output_solution = false;
 
   this->output_step = -1.;
+  this->snapshot_step = -1.;
 
   this->solver = gmres;
   this->linear_residual = 1e-10;
