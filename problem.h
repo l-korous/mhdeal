@@ -89,7 +89,6 @@ private:
   TrilinosWrappers::MPI::Vector     current_limited_solution;
   TrilinosWrappers::MPI::Vector     current_unlimited_solution;
   TrilinosWrappers::MPI::Vector     old_solution;
-  TrilinosWrappers::MPI::Vector newton_initial_guess;
   
   // The system being assembled.
   TrilinosWrappers::MPI::Vector system_rhs;

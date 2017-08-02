@@ -1142,8 +1142,8 @@ void Problem<equationsType, dim>::setup_initial_solution()
   current_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  newton_initial_guess.reinit(locally_owned_dofs, mpi_communicator);
 
+#ifdef HAVE_MPI
   bool should_load_from_file = false;
   std::ifstream history("history");
   if (history.is_open())
@@ -1186,11 +1186,13 @@ void Problem<equationsType, dim>::setup_initial_solution()
     remove("triangulation");
     remove("history");
   }
+#else
+  old_solution = 0;
+#endif
 
   current_solution = old_solution;
   current_unlimited_solution = old_solution;
   current_limited_solution = old_solution;
-  newton_initial_guess = old_solution;
 }
 
 template <EquationsType equationsType, int dim>
@@ -1224,6 +1226,7 @@ void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& v
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::save()
 {
+#ifdef HAVE_MPI
   std::ofstream history("history");
   history << this->time << this->time_step;
   for(int i = 0; i < dim; i++)
@@ -1238,14 +1241,17 @@ void Problem<equationsType, dim>::save()
   sol_trans_test.deserialize(this->current_solution);
   remove("triangulation");
   rename("triangulationTemp", "triangulation");
+#endif
 }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::load()
 {
+#ifdef HAVE_MPI
   this->triangulation.load("triangulation");
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
   sol_trans.deserialize(this->old_solution);
+#endif
 }
 
 template <EquationsType equationsType, int dim>
@@ -1269,7 +1275,7 @@ void Problem<equationsType, dim>::run()
 
     // Preparation for the Newton loop.
     unsigned int newton_iter = 0;
-    current_solution = old_solution;//newton_initial_guess;
+    current_solution = old_solution;
     while (true)
     {
       if (!(initial_step && (newton_iter == 0)))
@@ -1328,10 +1334,7 @@ void Problem<equationsType, dim>::run()
     if (parameters.polynomial_order_dg > 0 && !parameters.postprocess_in_newton_loop)
       postprocess();
 
-    current_solution = current_limited_solution;
-    newton_initial_guess = current_solution;
-    old_solution = current_solution;
-    initial_step = false;
+    move_time_step_handle_outputs();
   }
 }
 
@@ -1356,6 +1359,10 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
 
   ++time_step;
   time += parameters.time_step;
+
+  current_solution = current_limited_solution;
+  old_solution = current_solution;
+  initial_step = false;
 }
 
 template class Problem<EquationsTypeMhd, 3>;
