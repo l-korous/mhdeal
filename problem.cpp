@@ -1145,6 +1145,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
 
 #ifdef HAVE_MPI
   bool should_load_from_file = false;
+  double _time, _time_step;
   std::ifstream history("history");
   if (history.is_open())
   {
@@ -1155,7 +1156,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
     while (getline(history, line))
     {
       std::istringstream ss(line);
-      ss >> this->time >> this->time_step;
+      ss >> _time >> _time_step;
       if (!should_load_from_file)
       {
         bool dimensions_match = true;
@@ -1179,6 +1180,10 @@ void Problem<equationsType, dim>::setup_initial_solution()
   
   if (should_load_from_file)
   {
+    this->time = _time;
+    this->last_output_time = _time;
+    this->last_snapshot_time = _time;
+    this->time_step = _time_step;
     load();
   }
   else {
