@@ -1189,6 +1189,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
   else {
     old_solution = 0;
     remove("triangulation");
+    remove("triangulation.info");
     remove("history");
   }
 #else
