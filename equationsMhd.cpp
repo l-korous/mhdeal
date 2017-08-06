@@ -278,7 +278,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // If we use HLLD
   if (this->parameters.num_flux_type == Parameters<dim>::hlld)
   {
-    typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, Um, E2, E3, Sl, Sr, pml, pmr, B, B2, cl, cm, cr, ptl, ptr;
+    typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, E2, E3, Sl, Sr, pml, pmr, B, B2, cl, cm, cr, ptl, ptr;
     typename InputVector::value_type sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
 
     std_cxx11::array<typename InputVector::value_type, n_components> Fl;
@@ -299,42 +299,41 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     B = 0.5*(QedWminus[4] + QedWplus[4]);
     B2 = B*B;
 
+    // Magnetic pressure
+    pml = 0.5*((QedWplus[4] * QedWplus[4]) + (QedWplus[5] * QedWplus[5]) + (QedWplus[6] * QedWplus[6]));
+    pmr = 0.5*((QedWminus[4] * QedWminus[4]) + (QedWminus[5] * QedWminus[5]) + (QedWminus[6] * QedWminus[6]));
+
     // Calculate left flux
     hl[0] = 1.0 / QedWplus[0];
     Uk = compute_kinetic_energy(QedWplus);
-    Um = compute_magnetic_energy(QedWplus);
-    hl[1] = compute_pressure(QedWplus, Uk, Um);
+    hl[1] = compute_pressure(QedWplus, Uk, pml);
     E2 = hl[0] * (QedWplus[1] * QedWplus[6] - QedWplus[3] * QedWplus[4]);
     E3 = hl[0] * (QedWplus[2] * QedWplus[4] - QedWplus[1] * QedWplus[5]);
 
     Fl[0] = QedWplus[1];
-    Fl[1] = hl[0] * QedWplus[1] * QedWplus[1] - QedWplus[4] * QedWplus[4] + Um + hl[1];
+    Fl[1] = hl[0] * QedWplus[1] * QedWplus[1] - QedWplus[4] * QedWplus[4] + pml + hl[1];
     Fl[2] = hl[0] * QedWplus[1] * QedWplus[2] - QedWplus[4] * QedWplus[5];
     Fl[3] = hl[0] * QedWplus[1] * QedWplus[3] - QedWplus[4] * QedWplus[6];
     Fl[4] = 0.0;
     Fl[5] = -E3;
     Fl[6] = E2;
-    Fl[7] = hl[0] * QedWplus[1] * (hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedWplus[6] - E3*QedWplus[5]);
+    Fl[7] = hl[0] * QedWplus[1] * ((hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0)) + Uk) - hl[0] * QedWplus[4] * (QedWplus[1] * QedWplus[4] + QedWplus[2] * QedWplus[5] + QedWplus[3] * QedWplus[6]);
 
     // Calculate right flux
     hr[0] = 1.0 / QedWminus[0];
     Uk = compute_kinetic_energy(QedWminus);
-    Um = compute_magnetic_energy(QedWminus);
-    hr[1] = compute_pressure(QedWminus, Uk, Um);
+    hr[1] = compute_pressure(QedWminus, Uk, pmr);
     E2 = hr[0] * (QedWminus[1] * QedWminus[6] - QedWminus[3] * QedWminus[4]);
     E3 = hr[0] * (QedWminus[2] * QedWminus[4] - QedWminus[1] * QedWminus[5]);
 
     Fr[0] = QedWminus[1];
-    Fr[1] = hr[0] * QedWminus[1] * QedWminus[1] - QedWminus[4] * QedWminus[4] + Um + hr[1];
+    Fr[1] = hr[0] * QedWminus[1] * QedWminus[1] - QedWminus[4] * QedWminus[4] + pmr + hr[1];
     Fr[2] = hr[0] * QedWminus[1] * QedWminus[2] - QedWminus[4] * QedWminus[5];
     Fr[3] = hr[0] * QedWminus[1] * QedWminus[3] - QedWminus[4] * QedWminus[6];
     Fr[4] = 0.0;
     Fr[5] = -E3;
     Fr[6] = E2;
-    Fr[7] = hr[0] * QedWminus[1] * (hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedWminus[6] - E3*QedWminus[5]);
-
-    pml = 0.5*((QedWplus[4] * QedWplus[4]) + (QedWplus[5] * QedWplus[5]) + (QedWplus[6] * QedWplus[6]));
-    pmr = 0.5*((QedWminus[4] * QedWminus[4]) + (QedWminus[5] * QedWminus[5]) + (QedWminus[6] * QedWminus[6]));
+    Fr[7] = hr[0] * QedWminus[1] * ((hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0)) + Uk) - hr[0] * QedWminus[4] * (QedWminus[1] * QedWminus[4] + QedWminus[2] * QedWminus[5] + QedWminus[3] * QedWminus[6]);
 
     // fast magnetoacoustic speed
     cl = parameters.gas_gamma*hl[1] + 2.0*pml;
