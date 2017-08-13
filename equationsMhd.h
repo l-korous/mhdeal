@@ -38,6 +38,10 @@ public:
   template <typename InputVector>
   void compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const;
 
+  // Compute one MHD flux vector.
+  template <typename InputVector>
+  void compute_flux_vector(const int derivative, const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components > &flux) const;
+
   // Compute jacobian addition - for grad grad | grad div | grad rot terms
   template <typename InputVector, typename ValueType>
   void compute_jacobian_addition(double cell_diameter, const InputVector& grad_W, std_cxx11::array <std_cxx11::array <ValueType, dim>, n_components > &jacobian_addition) const;
@@ -46,6 +50,18 @@ public:
   template <typename InputVector>
   void numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
     std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const;
+
+  template <typename InputVector>
+  typename InputVector::value_type smallest_eigenvalue(const InputVector &W) const;
+
+  template <typename InputVector>
+  typename InputVector::value_type largest_eigenvalue(const InputVector &W) const;
+
+  template <typename InputVector>
+  typename InputVector::value_type left_signal_speed(const InputVector &WL, const InputVector &WR) const;
+
+  template <typename InputVector>
+  typename InputVector::value_type right_signal_speed(const InputVector &WL, const InputVector &WR) const;
 
   // Helper used in numerical_normal_flux
   // Rotational matrix taking any normal, and rotating the solution so that the new x-coordinate is in the direction of the normal.

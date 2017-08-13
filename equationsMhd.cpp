@@ -80,6 +80,16 @@ typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_press
 
 template <int dim>
 template <typename InputVector>
+void Equations<EquationsTypeMhd, dim>::compute_flux_vector(const int derivative, const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components > &flux) const
+{
+  std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > flux_matrix;
+  compute_flux_matrix(W, flux_matrix);
+  for (unsigned int d = 0; d < n_components; ++d)
+    flux[d] = flux_matrix[d][derivative];
+}
+
+template <int dim>
+template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const
 {
   const typename InputVector::value_type pressure = compute_pressure(W);
@@ -254,6 +264,50 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
 
 template <int dim>
 template <typename InputVector>
+typename InputVector::value_type Equations<EquationsTypeMhd, dim>::smallest_eigenvalue(const InputVector &W) const
+{
+  return std::sqrt(
+    (0.5 / W[0]) * (
+    (this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))
+      - std::sqrt(
+      ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))) * ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W)))
+        - (4. * this->parameters.gas_gamma * this->compute_pressure(W) * W[4] * W[4])
+      )
+      )
+  );
+}
+
+template <int dim>
+template <typename InputVector>
+typename InputVector::value_type Equations<EquationsTypeMhd, dim>::largest_eigenvalue(const InputVector &W) const
+{
+  return std::sqrt(
+    (0.5 / W[0]) * (
+    (this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))
+      + std::sqrt(
+      ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))) * ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W)))
+        - (4. * this->parameters.gas_gamma * this->compute_pressure(W) * W[4] * W[4])
+      )
+      )
+  );
+}
+
+template <int dim>
+template <typename InputVector>
+typename InputVector::value_type Equations<EquationsTypeMhd, dim>::left_signal_speed(const InputVector &WL, const InputVector &WR) const
+{
+  return std::min(smallest_eigenvalue(WL), smallest_eigenvalue(WR));
+}
+
+template <int dim>
+template <typename InputVector>
+typename InputVector::value_type Equations<EquationsTypeMhd, dim>::right_signal_speed(const InputVector &WL, const InputVector &WR) const
+{
+  return std::max(largest_eigenvalue(WL), largest_eigenvalue(WR));
+}
+
+template <int dim>
+template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const
 {
@@ -278,242 +332,141 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // If we use HLLD
   if (this->parameters.num_flux_type == Parameters<dim>::hlld)
   {
-    typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, E2, E3, Sl, Sr, pml, pmr, B, B2, cl, cm, cr, ptl, ptr;
-    typename InputVector::value_type sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
+    typename InputVector::value_type S_L, S_R;
+    std_cxx11::array<typename InputVector::value_type, n_components> QedWL, QedWR;
 
-    std_cxx11::array<typename InputVector::value_type, n_components> Fl;
-    std_cxx11::array<typename InputVector::value_type, n_components> Fr;
-    std_cxx11::array<typename InputVector::value_type, n_components> Udl;
-    std_cxx11::array<typename InputVector::value_type, n_components> Udr;
-    std_cxx11::array<typename InputVector::value_type, n_components> Ul;
-    std_cxx11::array<typename InputVector::value_type, n_components> Ur;
+    Q(QedWL, Wplus, normal);
+    Q(QedWR, Wminus, normal);
 
-    std_cxx11::array<typename InputVector::value_type, n_components> QedWminus;
-    std_cxx11::array<typename InputVector::value_type, n_components> QedWplus;
-
-
-    Q(QedWplus, Wplus, normal);
-    Q(QedWminus, Wminus, normal);
-
-    // Simple average of mag. field in direction of normal vector
-    B = 0.5*(QedWminus[4] + QedWplus[4]);
-    B2 = B*B;
-
-    // Magnetic pressure
-    pml = 0.5*((QedWplus[4] * QedWplus[4]) + (QedWplus[5] * QedWplus[5]) + (QedWplus[6] * QedWplus[6]));
-    pmr = 0.5*((QedWminus[4] * QedWminus[4]) + (QedWminus[5] * QedWminus[5]) + (QedWminus[6] * QedWminus[6]));
-
-    // Calculate left flux
-    hl[0] = 1.0 / QedWplus[0];
-    Uk = compute_kinetic_energy(QedWplus);
-    hl[1] = compute_pressure(QedWplus, Uk, pml);
-    E2 = hl[0] * (QedWplus[1] * QedWplus[6] - QedWplus[3] * QedWplus[4]);
-    E3 = hl[0] * (QedWplus[2] * QedWplus[4] - QedWplus[1] * QedWplus[5]);
-
-    Fl[0] = QedWplus[1];
-    Fl[1] = hl[0] * QedWplus[1] * QedWplus[1] - QedWplus[4] * QedWplus[4] + pml + hl[1];
-    Fl[2] = hl[0] * QedWplus[1] * QedWplus[2] - QedWplus[4] * QedWplus[5];
-    Fl[3] = hl[0] * QedWplus[1] * QedWplus[3] - QedWplus[4] * QedWplus[6];
-    Fl[4] = 0.0;
-    Fl[5] = -E3;
-    Fl[6] = E2;
-    Fl[7] = hl[0] * QedWplus[1] * ((hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0)) + Uk) - hl[0] * QedWplus[4] * (QedWplus[1] * QedWplus[4] + QedWplus[2] * QedWplus[5] + QedWplus[3] * QedWplus[6]);
-
-    // Calculate right flux
-    hr[0] = 1.0 / QedWminus[0];
-    Uk = compute_kinetic_energy(QedWminus);
-    hr[1] = compute_pressure(QedWminus, Uk, pmr);
-    E2 = hr[0] * (QedWminus[1] * QedWminus[6] - QedWminus[3] * QedWminus[4]);
-    E3 = hr[0] * (QedWminus[2] * QedWminus[4] - QedWminus[1] * QedWminus[5]);
-
-    Fr[0] = QedWminus[1];
-    Fr[1] = hr[0] * QedWminus[1] * QedWminus[1] - QedWminus[4] * QedWminus[4] + pmr + hr[1];
-    Fr[2] = hr[0] * QedWminus[1] * QedWminus[2] - QedWminus[4] * QedWminus[5];
-    Fr[3] = hr[0] * QedWminus[1] * QedWminus[3] - QedWminus[4] * QedWminus[6];
-    Fr[4] = 0.0;
-    Fr[5] = -E3;
-    Fr[6] = E2;
-    Fr[7] = hr[0] * QedWminus[1] * ((hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0)) + Uk) - hr[0] * QedWminus[4] * (QedWminus[1] * QedWminus[4] + QedWminus[2] * QedWminus[5] + QedWminus[3] * QedWminus[6]);
-
-    // fast magnetoacoustic speed
-    cl = parameters.gas_gamma*hl[1] + 2.0*pml;
-    cl = sqrt(0.5*hl[0] * (cl + sqrt(cl*cl - (4.0*parameters.gas_gamma*hl[1] * QedWplus[4] * QedWplus[4]))));
-    cr = parameters.gas_gamma*hr[1] + 2.0*pmr;
-    cr = sqrt(0.5*hr[0] * (cr + sqrt(cr*cr - (4.0*parameters.gas_gamma*hr[1] * QedWminus[4] * QedWminus[4]))));
-
-    // total pressure
-    ptl = hl[1] + pml;
-    ptr = hr[1] + pmr;
-
-    // maximum of fast magnetoacoustic speeds L/R
-    sp[0] = std::min(QedWplus[1] * hl[0] - cl, QedWminus[1] * hr[0] - cr);
-    sp[4] = std::max(QedWplus[1] * hl[0] + cl, QedWminus[1] * hr[0] + cr);
-
-    // Upwind flux in the case of supersonic flow
-    if (sp[0] >= 0.0)
+    // Edge states.
+    S_L = this->left_signal_speed(QedWL, QedWR);
+    if (S_L >= 0.)
     {
-      // use F_L
-      Q_inv<InputVector>(normal_flux, Fl, normal);
-      return;
-    }
-    if (sp[4] <= 0.0)
-    {
-      // use F_R
-      Q_inv<InputVector>(normal_flux, Fr, normal);
-      return;
-    }
-
-    // Determine Alfven and middle speeds
-    Sl = sp[0] - QedWplus[1] * hl[0];
-    Sr = sp[4] - QedWminus[1] * hr[0];
-    sp[2] = (QedWminus[1] * Sr - QedWplus[1] * Sl - ptr + ptl) / (QedWminus[0] * Sr - QedWplus[0] * Sl);
-    sml = sp[0] - sp[2];
-    smr = sp[4] - sp[2];
-
-    // Density
-    Ul[0] = QedWplus[0] * Sl / sml;
-    Ur[0] = QedWminus[0] * Sr / smr;
-
-    Ul[4] = Udl[4] = QedWplus[4];
-    Ur[4] = Udr[4] = QedWminus[4];
-
-    srdl = sqrt(Ul[0]);
-    srdr = sqrt(Ur[0]);
-
-    // Sl*
-    sp[1] = sp[2] - fabs(Ul[4]) / srdl;
-    // Sr*
-    sp[3] = sp[2] + fabs(Ur[4]) / srdr;
-
-    ptst = ptl + QedWplus[0] * Sl*(Sl - sml);
-    ptstr = ptr + QedWminus[0] * Sr*(Sr - smr);
-
-    // F*_L
-    Ul[1] = Ul[0] * sp[2];
-
-    cl = QedWplus[0] * Sl*sml - Ul[4] * Ul[4];
-    if (fabs(cl) < 1e-8 * ptst)
-    {
-      Ul[2] = Ul[0] * QedWplus[2] * hl[0];
-      Ul[3] = Ul[0] * QedWplus[3] * hl[0];
-      Ul[5] = QedWplus[5];
-      Ul[6] = QedWplus[6];
-    }
-    else
-    {
-      cl = 1.0 / cl;
-      cm = Ul[4] * (Sl - sml)*cl;
-      Ul[2] = Ul[0] * (QedWplus[2] * hl[0] - QedWplus[5] * cm);
-      Ul[3] = Ul[0] * (QedWplus[3] * hl[0] - QedWplus[6] * cm);
-      cm = (QedWplus[0] * Sl*Sl - Ul[4] * Ul[4])*cl;
-      Ul[5] = QedWplus[5] * cm;
-      Ul[6] = QedWplus[6] * cm;
-    }
-
-    vbstl = (Ul[1] * Ul[4] + Ul[2] * Ul[5] + Ul[3] * Ul[6]) / Ul[0];
-
-    Ul[7] = (Sl*QedWplus[7] - ptl*QedWplus[1] * hl[0] + ptst*sp[2] + Ul[4] *
-      ((QedWplus[1] * QedWplus[4] + QedWplus[2] * QedWplus[5] + QedWplus[3] * QedWplus[6])*hl[0] - vbstl)) / sml;
-
-    // F*_R
-    Ur[1] = Ur[0] * sp[2];
-    cl = QedWminus[0] * Sr*smr - Ur[4] * Ur[4];
-    if (fabs(cl) < 1e-8*ptstr)
-    {
-      Ur[2] = Ur[0] * QedWminus[2] * hr[0];
-      Ur[3] = Ur[0] * QedWminus[3] * hr[0];
-      Ur[5] = QedWminus[5];
-      Ur[6] = QedWminus[6];
-    }
-    else
-    {
-      cl = 1.0 / cl;
-      cm = Ur[4] * (Sr - smr)*cl;
-      Ur[2] = Ur[0] * (QedWminus[2] * hr[0] - QedWminus[5] * cm);
-      Ur[3] = Ur[0] * (QedWminus[3] * hr[0] - QedWminus[6] * cm);
-      cm = (QedWminus[0] * Sr*Sr - Ur[4] * Ur[4])*cl;
-      Ur[5] = QedWminus[5] * cm;
-      Ur[6] = QedWminus[6] * cm;
-    }
-
-    vbstr = (Ur[1] * Ur[4] + Ur[2] * Ur[5] + Ur[3] * Ur[6]) / Ur[0];
-
-    Ur[7] = (Sr*QedWminus[7] - ptr*QedWminus[1] * hr[0] + ptstr*sp[2] + Ur[4] *
-      ((QedWminus[1] * QedWminus[4] + QedWminus[2] * QedWminus[5] + QedWminus[3] * QedWminus[6])*hr[0] - vbstr)) / smr;
-
-    if (sp[1] >= 0.0)
-    {
-      for (register int j = 0; j < n_components; j++)
-        normal_flux[j] = Fl[j] + sp[0] * (Ul[j] - QedWplus[j]);
-      Q_inv<InputVector>(normal_flux, normal_flux, normal);
-      return;
-    }
-    if (sp[3] <= 0.0 && sp[2] < 0.0)
-    {
-      for (register int j = 0; j < n_components; j++)
-        normal_flux[j] = Fr[j] + sp[4] * (Ur[j] - QedWminus[j]);
+      this->compute_flux_vector(0, QedWL, normal_flux);
       Q_inv<InputVector>(normal_flux, normal_flux, normal);
       return;
     }
 
-    // F**_L and F**_R
-    if (B2 < 1e-8*(ptst + ptstr))
+    S_R = this->right_signal_speed(QedWL, QedWR);
+    if (S_R <= 0.)
     {
-      for (register int j = 0; j < n_components; j++)
+      this->compute_flux_vector(0, QedWR, normal_flux);
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
+      return;
+    }
+
+    // Now we need to calculate S_M & all other stuff.
+    typename InputVector::value_type u_L, u_R, rho_L, rho_R, p_L, p_R, p_T_R, p_T_L, S_M, B_x, psT;
+    rho_L = QedWL[0];
+    u_L = QedWL[1] / QedWL[0];
+    p_L = this->compute_pressure(QedWL);
+    p_T_L = p_L + this->compute_magnetic_energy(QedWL);
+    rho_R = QedWR[0];
+    u_R = QedWR[1] / QedWR[0];
+    p_R = this->compute_pressure(QedWR);
+    p_T_R = p_R + this->compute_magnetic_energy(QedWR);
+    S_M = (((S_R - u_R) * (rho_R * u_R)) - ((S_L - u_L) * (rho_L * u_L)) - (p_T_R) + (p_T_L)) / (((S_R - u_R) * rho_R) - ((S_L - u_L) * rho_L));
+    B_x = 0.5 * (QedWL[4] + QedWR[4]);
+    psT = (((S_R - u_R) * (rho_R * p_T_L)) - ((S_L - u_L) * (rho_L * p_T_R)) + ((rho_L * rho_R) * (S_R - u_R) * (S_L - u_L) * (u_R - u_L))) / (((S_R - u_R) * rho_R) - ((S_L - u_L) * rho_L));
+
+    std_cxx11::array<typename InputVector::value_type, n_components> Us_L;
+    {
+      Us_L[0] = rho_L * (S_L - u_L) / (S_L - S_M);
+      Us_L[1] = Us_L[0] * S_M;
+      Us_L[2] = Us_L[0] * (QedWL[2] / rho_L) - (B_x * QedWL[5] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (B_x * B_x))));
+      Us_L[3] = Us_L[0] * (QedWL[3] / rho_L) - (B_x * QedWL[6] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (B_x * B_x))));
+      // ???
+      Us_L[4] = B_x;
+      Us_L[5] = QedWL[5] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (B_x * B_x)) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (B_x * B_x));
+      Us_L[6] = QedWL[6] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (B_x * B_x)) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (B_x * B_x));
+      Us_L[7] = (((S_L - u_L) * QedWL[7]) - (p_T_L * u_L) + (psT * S_M) + (B_x * (((QedWL[1] * QedWL[4] + QedWL[2] * QedWL[5] + QedWL[3] * QedWL[6]) / rho_L) - ((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[3] * Us_L[6]) / Us_L[0])))) / (S_L - S_M);
+    }
+
+    std_cxx11::array<typename InputVector::value_type, n_components> Us_R;
+    {
+      Us_R[0] = rho_R * (S_R - u_R) / (S_R - S_M);
+      Us_R[1] = Us_R[0] * S_M;
+      Us_R[2] = Us_R[0] * (QedWR[2] / rho_R) - (B_x * QedWR[5] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (B_x * B_x))));
+      Us_R[3] = Us_R[0] * (QedWR[3] / rho_R) - (B_x * QedWR[6] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (B_x * B_x))));
+      // ???
+      Us_R[4] = B_x;
+      Us_R[5] = QedWR[5] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (B_x * B_x)) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (B_x * B_x));
+      Us_R[6] = QedWR[6] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (B_x * B_x)) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (B_x * B_x));
+      Us_R[7] = (((S_R - u_R) * QedWR[7]) - (p_T_R * u_R) + (psT * S_M) + (B_x * (((QedWR[1] * QedWR[4] + QedWR[2] * QedWR[5] + QedWR[3] * QedWR[6]) / rho_R) - ((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[3] * Us_R[6]) / Us_R[0])))) / (S_R - S_M);
+    }
+
+    typename InputVector::value_type Ss_L = S_M - (std::abs(B_x) / std::sqrt(Us_L[0]));
+    typename InputVector::value_type Ss_R = S_M + (std::abs(B_x) / std::sqrt(Us_R[0]));
+
+    // Fs_L, Fss_L
+    if (S_M >= 0.)
+    {
+      std_cxx11::array<typename InputVector::value_type, n_components> F_L;
+      this->compute_flux_vector(0, QedWL, F_L);
+      // THIS is different to RIGHT state.
+      if (Ss_L >= 0.)
       {
-        Udl[j] = Ul[j];
-        Udr[j] = Ur[j];
+        std_cxx11::array<typename InputVector::value_type, n_components> Fs_L;
+        for (int k = 0; k < n_components; k++)
+          Fs_L[k] = F_L[k] + S_L * (Us_L[k] - QedWL[k]);
+        Q_inv<InputVector>(normal_flux, Fs_L, normal);
+        return;
+      }
+      else
+      {
+        std_cxx11::array<typename InputVector::value_type, n_components> Uss_L;
+        Uss_L[0] = Us_L[0];
+        Uss_L[1] = Us_L[1];
+        Uss_L[2] = Uss_L[0] * (std::sqrt(Us_L[0]) * (Us_L[2] / Us_L[0]) + std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + ((Us_R[5] - Us_L[5]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        Uss_L[3] = Uss_L[0] * (std::sqrt(Us_L[0]) * (Us_L[3] / Us_L[0]) + std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + ((Us_R[6] - Us_L[6]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        // ???
+        Uss_L[4] = B_x;
+        Uss_L[5] = ((std::sqrt(Us_L[0]) * Us_L[5]) + (std::sqrt(Us_R[0]) * Us_R[5]) + std::sqrt(Us_L[0] * Us_R[0]) * (((Us_R[2] / Us_R[0]) - (Us_L[2] / Us_L[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        Uss_L[6] = ((std::sqrt(Us_L[0]) * Us_L[6]) + (std::sqrt(Us_R[0]) * Us_R[6]) + std::sqrt(Us_L[0] * Us_R[0]) * (((Us_R[3] / Us_R[0]) - (Us_L[3] / Us_L[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        // THIS is different to RIGHT state.
+        Uss_L[7] = Us_L[7] - (std::sqrt(Us_L[0]) * (((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[2] * Us_L[6]) / Us_L[0]) - ((Uss_L[1] * Uss_L[4] + Uss_L[2] * Uss_L[5] + Uss_L[2] * Uss_L[6]) / Uss_L[0])) * (B_x > 0. ? 1. : -1.));
+
+        std_cxx11::array<typename InputVector::value_type, n_components> Fss_L;
+        for (int k = 0; k < n_components; k++)
+          Fss_L[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * QedWL[k]);
+        Q_inv<InputVector>(normal_flux, Fss_L, normal);
+        return;
       }
     }
+    // Fs_R, Fss_R
     else
     {
-      invsumd = 1.0 / (srdl + srdr);
-      Bsgnl = (Ul[4] > 0.0) ? 1.0 : -1.0;
-      Bsgnr = (Ur[4] > 0.0) ? 1.0 : -1.0;
+      std_cxx11::array<typename InputVector::value_type, n_components> F_R;
+      this->compute_flux_vector(0, QedWR, F_R);
+      // THIS is different to LEFT state.
+      if (Ss_R <= 0.)
+      {
+        std_cxx11::array<typename InputVector::value_type, n_components> Fs_R;
+        for (int k = 0; k < n_components; k++)
+          Fs_R[k] = F_R[k] + S_R * (Us_R[k] - QedWR[k]);
+        Q_inv<InputVector>(normal_flux, Fs_R, normal);
+        return;
+      }
+      else
+      {
+        std_cxx11::array<typename InputVector::value_type, n_components> Uss_R;
+        Uss_R[0] = Us_R[0];
+        Uss_R[1] = Us_R[1];
+        Uss_R[2] = Uss_R[0] * (std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + ((Us_R[5] - Us_R[5]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        Uss_R[3] = Uss_R[0] * (std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + ((Us_R[6] - Us_R[6]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        // ???
+        Uss_R[4] = B_x;
+        Uss_R[5] = ((std::sqrt(Us_R[0]) * Us_R[5]) + (std::sqrt(Us_R[0]) * Us_R[5]) + std::sqrt(Us_R[0] * Us_R[0]) * (((Us_R[2] / Us_R[0]) - (Us_R[2] / Us_R[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        Uss_R[6] = ((std::sqrt(Us_R[0]) * Us_R[6]) + (std::sqrt(Us_R[0]) * Us_R[6]) + std::sqrt(Us_R[0] * Us_R[0]) * (((Us_R[3] / Us_R[0]) - (Us_R[3] / Us_R[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        // THIS is different to RIGHT state.
+        Uss_R[7] = Us_R[7] + (std::sqrt(Us_R[0]) * (((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[2] * Us_R[6]) / Us_R[0]) - ((Uss_R[1] * Uss_R[4] + Uss_R[2] * Uss_R[5] + Uss_R[2] * Uss_R[6]) / Uss_R[0])) * (B_x > 0. ? 1. : -1.));
 
-      Udl[0] = Ul[0];
-      Udr[0] = Ur[0];
-
-      Udl[1] = Ul[1];
-      Udr[1] = Ur[1];
-
-      cm = invsumd*(srdl*Ul[2] / Ul[0] + srdr*Ur[2] / Ur[0]);
-      cl = invsumd*(Ur[5] - Ul[5]);
-      Udl[2] = Ul[0] * (cm + Bsgnl*cl);
-      Udr[2] = Ur[0] * (cm + Bsgnr*cl);
-
-      cm = invsumd*(srdl*Ul[3] / Ul[0] + srdr*Ur[3] / Ur[0]);
-      cl = invsumd*(Ur[6] - Ul[6]);
-      Udl[3] = Ul[0] * (cm + Bsgnl*cl);
-      Udr[3] = Ur[0] * (cm + Bsgnr*cl);
-
-      cm = invsumd*(srdl*Ur[5] + srdr*Ul[5]);
-      cl = invsumd*srdl*srdr*(Ur[2] / Ur[0] - Ul[2] / Ul[0]);
-      Udl[5] = cm + Bsgnl*cl;
-      Udr[5] = cm + Bsgnr*cl;
-
-      cm = invsumd*(srdl*Ur[6] + srdr*Ul[6]);
-      cl = invsumd*srdl*srdr*(Ur[3] / Ur[0] - Ul[3] / Ul[0]);
-      Udl[6] = cm + Bsgnl*cl;
-      Udr[6] = cm + Bsgnr*cl;
-
-      Udl[7] = Ul[7] - srdl*Bsgnl*(vbstl - sp[2] * Ul[4] - (Udl[2] * Udl[5] + Udl[3] * Udl[6]) / Udl[0]);
-      Udr[7] = Ur[7] + srdr*Bsgnr*(vbstr - sp[2] * Ur[4] - (Udr[2] * Udr[5] + Udr[3] * Udr[6]) / Udr[0]);
-    }
-
-    if (sp[2] >= 0.0)
-    {
-      cm = sp[1] - sp[0];
-      for (register int j = 0; j < n_components; j++)
-        normal_flux[j] = Fl[j] + sp[1] * Udl[j] - sp[0] * QedWplus[j] - cm*Ul[j];
-      Q_inv<InputVector>(normal_flux, normal_flux, normal);
-    }
-    else
-    {
-      cm = sp[3] - sp[4];
-      for (register int j = 0; j < n_components; j++)
-        normal_flux[j] = Fr[j] + sp[3] * Udr[j] - sp[4] * QedWminus[j] - cm*Ur[j];
-      Q_inv<InputVector>(normal_flux, normal_flux, normal);
+        std_cxx11::array<typename InputVector::value_type, n_components> Fss_R;
+        for (int k = 0; k < n_components; k++)
+          Fss_R[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * QedWR[k]);
+        Q_inv<InputVector>(normal_flux, Fss_R, normal);
+        return;
+      }
     }
   }
 }
