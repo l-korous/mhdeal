@@ -93,15 +93,16 @@ void Problem<equationsType, dim>::postprocess()
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
       if (component_i != 1)
       {
-        const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-        if (!u_c_set[component_ii == 7 ? 4 : component_ii])
+        unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+        component_ii = (component_ii == 7 ? 4 : component_ii);
+        if (!u_c_set[component_ii])
         {
-          u_c[component_ii == 7 ? 4 : component_ii] = current_solution(dof_indices[i]);
-          u_c_set[component_ii == 7 ? 4 : component_ii] = true;
+          u_c[component_ii] = current_solution(dof_indices[i]);
+          u_c_set[component_ii] = true;
         }
         else
         {
-          lambda_indices_to_multiply[component_ii == 7 ? 4 : component_ii].push_back(dof_indices[i]);
+          lambda_indices_to_multiply[component_ii].push_back(dof_indices[i]);
         }
       }
     }
@@ -193,21 +194,23 @@ void Problem<equationsType, dim>::postprocess()
             const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
             if (component_i != 1)
             {
-              const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-              if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
+              unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
+              component_ii = (component_ii == 7 ? 4 : component_ii);
+              if (!u_i_extrema_set[component_ii])
               {
+                double val = current_solution(dof_indices_neighbor[dof]);
                 if (this->parameters.debug_limiter)
                 {
-                  if ((double)current_solution(dof_indices_neighbor[dof]) < u_i_min[component_ii == 7 ? 4 : component_ii])
-                    std::cout << "\tdecreasing u_i_min to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
-                  if ((double)current_solution(dof_indices_neighbor[dof]) > u_i_max[component_ii == 7 ? 4 : component_ii])
-                    std::cout << "\tincreasing u_i_max to: " << (double)current_solution(dof_indices_neighbor[dof]) << std::endl;
+                  if (val < u_i_min[component_ii])
+                    std::cout << "\tdecreasing u_i_min to: " << val << std::endl;
+                  if (val > u_i_max[component_ii])
+                    std::cout << "\tincreasing u_i_max to: " << val << std::endl;
                 }
-                u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
+                u_i_min[component_ii] = std::min(u_i_min[component_ii], val);
+                u_i_max[component_ii] = std::max(u_i_max[component_ii], val);
+                u_i_extrema_set[component_ii] = true;
               }
-            }
+            } 
           }
 
           // From the right neighbor, look at all faces, such that the face contains the vertex
@@ -243,12 +246,13 @@ void Problem<equationsType, dim>::postprocess()
                 const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
                 if (component_i != 1)
                 {
-                  const unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-                  if (!u_i_extrema_set[component_ii == 7 ? 4 : component_ii])
+                  unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
+                  component_ii = (component_ii == 7 ? 4 : component_ii);
+                  if (!u_i_extrema_set[component_ii])
                   {
-                    u_i_min[component_ii == 7 ? 4 : component_ii] = std::min(u_i_min[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                    u_i_max[component_ii == 7 ? 4 : component_ii] = std::max(u_i_max[component_ii == 7 ? 4 : component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                    u_i_extrema_set[component_ii == 7 ? 4 : component_ii] = true;
+                    u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_extrema_set[component_ii] = true;
                   }
                 }
               }
@@ -261,8 +265,11 @@ void Problem<equationsType, dim>::postprocess()
       {
         // Based on u_i_min, u_i_max, u_i, get alpha_e
         for (int k = 0; k < 5; k++)
-          if ((std::abs(u_c[k]) > 1e-8) && (std::abs((u_c[k] - u_i[k]) / u_c[k]) > 1e-6))
+          if ((std::abs(u_c[k]) > 1e-12) && (std::abs((u_c[k] - u_i[k]) / u_c[k]) > 1e-8))
+          {
             alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
+            std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
+          }
       }
     }
 
@@ -1344,6 +1351,10 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
+  current_solution = current_limited_solution;
+  old_solution = current_solution;
+  initial_step = false;
+
   if (parameters.output_solution)
     output_vector(current_solution, "current_solution", time_step);
 
@@ -1361,10 +1372,6 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
 
   ++time_step;
   time += parameters.time_step;
-
-  current_solution = current_limited_solution;
-  old_solution = current_solution;
-  initial_step = false;
 }
 
 template class Problem<EquationsTypeMhd, 3>;

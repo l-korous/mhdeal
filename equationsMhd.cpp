@@ -375,7 +375,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       Us_L[1] = Us_L[0] * S_M;
       Us_L[2] = Us_L[0] * (QedWL[2] / rho_L) - (QedWL[4] * QedWL[5] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]))));
       Us_L[3] = Us_L[0] * (QedWL[3] / rho_L) - (QedWL[4] * QedWL[6] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]))));
-      // ???
       Us_L[4] = QedWL[4];
       Us_L[5] = QedWL[5] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (QedWL[4] * QedWL[4])) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]));
       Us_L[6] = QedWL[6] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (QedWL[4] * QedWL[4])) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]));
@@ -388,7 +387,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       Us_R[1] = Us_R[0] * S_M;
       Us_R[2] = Us_R[0] * (QedWR[2] / rho_R) - (QedWR[4] * QedWR[5] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]))));
       Us_R[3] = Us_R[0] * (QedWR[3] / rho_R) - (QedWR[4] * QedWR[6] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]))));
-      // ???
       Us_R[4] = QedWR[4];
       Us_R[5] = QedWR[5] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (QedWR[4] * QedWR[4])) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]));
       Us_R[6] = QedWR[6] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (QedWR[4] * QedWR[4])) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]));
@@ -417,14 +415,13 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         std_cxx11::array<typename InputVector::value_type, n_components> Uss_L;
         Uss_L[0] = Us_L[0];
         Uss_L[1] = Us_L[1];
-        Uss_L[2] = Uss_L[0] * (std::sqrt(Us_L[0]) * (Us_L[2] / Us_L[0]) + std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + ((Us_R[5] - Us_L[5]) * (QedWL[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
-        Uss_L[3] = Uss_L[0] * (std::sqrt(Us_L[0]) * (Us_L[3] / Us_L[0]) + std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + ((Us_R[6] - Us_L[6]) * (QedWL[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
-        // ???
+        Uss_L[2] = Uss_L[0] * (std::sqrt(Us_L[0]) * (Us_L[2] / Us_L[0]) + std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + ((Us_R[5] - Us_L[5]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        Uss_L[3] = Uss_L[0] * (std::sqrt(Us_L[0]) * (Us_L[3] / Us_L[0]) + std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + ((Us_R[6] - Us_L[6]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
         Uss_L[4] = QedWL[4];
-        Uss_L[5] = ((std::sqrt(Us_L[0]) * Us_L[5]) + (std::sqrt(Us_R[0]) * Us_R[5]) + std::sqrt(Us_L[0] * Us_R[0]) * (((Us_R[2] / Us_R[0]) - (Us_L[2] / Us_L[0])) * (QedWL[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
-        Uss_L[6] = ((std::sqrt(Us_L[0]) * Us_L[6]) + (std::sqrt(Us_R[0]) * Us_R[6]) + std::sqrt(Us_L[0] * Us_R[0]) * (((Us_R[3] / Us_R[0]) - (Us_L[3] / Us_L[0])) * (QedWL[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        Uss_L[5] = ((std::sqrt(Us_L[0]) * Us_L[5]) + (std::sqrt(Us_R[0]) * Us_R[5]) + std::sqrt(Us_L[0] * Us_R[0]) * (((Us_R[2] / Us_R[0]) - (Us_L[2] / Us_L[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
+        Uss_L[6] = ((std::sqrt(Us_L[0]) * Us_L[6]) + (std::sqrt(Us_R[0]) * Us_R[6]) + std::sqrt(Us_L[0] * Us_R[0]) * (((Us_R[3] / Us_R[0]) - (Us_L[3] / Us_L[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_L[0]) + std::sqrt(Us_R[0]));
         // THIS is different to RIGHT state.
-        Uss_L[7] = Us_L[7] - (std::sqrt(Us_L[0]) * (((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[2] * Us_L[6]) / Us_L[0]) - ((Uss_L[1] * Uss_L[4] + Uss_L[2] * Uss_L[5] + Uss_L[2] * Uss_L[6]) / Uss_L[0])) * (QedWL[4] > 0. ? 1. : -1.));
+        Uss_L[7] = Us_L[7] - (std::sqrt(Us_L[0]) * (((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[2] * Us_L[6]) / Us_L[0]) - ((Uss_L[1] * Uss_L[4] + Uss_L[2] * Uss_L[5] + Uss_L[2] * Uss_L[6]) / Uss_L[0])) * (B_x > 0. ? 1. : -1.));
 
         std_cxx11::array<typename InputVector::value_type, n_components> Fss_L;
         for (int k = 0; k < n_components; k++)
@@ -452,14 +449,13 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         std_cxx11::array<typename InputVector::value_type, n_components> Uss_R;
         Uss_R[0] = Us_R[0];
         Uss_R[1] = Us_R[1];
-        Uss_R[2] = Uss_R[0] * (std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + ((Us_R[5] - Us_R[5]) * (QedWR[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
-        Uss_R[3] = Uss_R[0] * (std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + ((Us_R[6] - Us_R[6]) * (QedWR[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
-        // ???
-        Uss_R[4] = QedWR[4];
-        Uss_R[5] = ((std::sqrt(Us_R[0]) * Us_R[5]) + (std::sqrt(Us_R[0]) * Us_R[5]) + std::sqrt(Us_R[0] * Us_R[0]) * (((Us_R[2] / Us_R[0]) - (Us_R[2] / Us_R[0])) * (QedWR[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
-        Uss_R[6] = ((std::sqrt(Us_R[0]) * Us_R[6]) + (std::sqrt(Us_R[0]) * Us_R[6]) + std::sqrt(Us_R[0] * Us_R[0]) * (((Us_R[3] / Us_R[0]) - (Us_R[3] / Us_R[0])) * (QedWR[4] > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        Uss_R[2] = Uss_R[0] * (std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + std::sqrt(Us_R[0]) * (Us_R[2] / Us_R[0]) + ((Us_R[5] - Us_R[5]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        Uss_R[3] = Uss_R[0] * (std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + std::sqrt(Us_R[0]) * (Us_R[3] / Us_R[0]) + ((Us_R[6] - Us_R[6]) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+         Uss_R[4] = QedWR[4];
+        Uss_R[5] = ((std::sqrt(Us_R[0]) * Us_R[5]) + (std::sqrt(Us_R[0]) * Us_R[5]) + std::sqrt(Us_R[0] * Us_R[0]) * (((Us_R[2] / Us_R[0]) - (Us_R[2] / Us_R[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
+        Uss_R[6] = ((std::sqrt(Us_R[0]) * Us_R[6]) + (std::sqrt(Us_R[0]) * Us_R[6]) + std::sqrt(Us_R[0] * Us_R[0]) * (((Us_R[3] / Us_R[0]) - (Us_R[3] / Us_R[0])) * (B_x > 0. ? 1. : -1.))) / (std::sqrt(Us_R[0]) + std::sqrt(Us_R[0]));
         // THIS is different to RIGHT state.
-        Uss_R[7] = Us_R[7] + (std::sqrt(Us_R[0]) * (((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[2] * Us_R[6]) / Us_R[0]) - ((Uss_R[1] * Uss_R[4] + Uss_R[2] * Uss_R[5] + Uss_R[2] * Uss_R[6]) / Uss_R[0])) * (QedWR[4] > 0. ? 1. : -1.));
+        Uss_R[7] = Us_R[7] + (std::sqrt(Us_R[0]) * (((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[2] * Us_R[6]) / Us_R[0]) - ((Uss_R[1] * Uss_R[4] + Uss_R[2] * Uss_R[5] + Uss_R[2] * Uss_R[6]) / Uss_R[0])) * (B_x > 0. ? 1. : -1.));
 
         std_cxx11::array<typename InputVector::value_type, n_components> Fss_R;
         for (int k = 0; k < n_components; k++)
