@@ -81,7 +81,7 @@ private:
 
   const FESystem<dim> fe;
   DoFHandler<dim> dof_handler;
-  const QGauss<dim> quadrature;
+  const QGauss<dim> quadrature, initial_quadrature;
   const QGauss<dim - 1> face_quadrature;
 
   // Currently sought solution, the previous one, and the initial solution for newton's loop on the current time level.

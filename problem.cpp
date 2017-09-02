@@ -22,6 +22,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
+  initial_quadrature(2 * parameters.quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
   assemble_only_rhs(false),
@@ -268,7 +269,8 @@ void Problem<equationsType, dim>::postprocess()
           if ((std::abs(u_c[k]) > 1e-12) && (std::abs((u_c[k] - u_i[k]) / u_c[k]) > 1e-8))
           {
             alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
-            std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
+            if (this->parameters.debug_limiter)
+              std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
           }
       }
     }
@@ -298,7 +300,7 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
   const UpdateFlags neighbor_face_update_flags = update_q_points | update_values;
 
   // DOF indices both on the currently assembled element and the neighbor.
-  FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
+  FEValues<dim> fe_v(mapping, fe, this->initial_step ? initial_quadrature : quadrature, update_flags);
   FEFaceValues<dim> fe_v_face(mapping, fe, face_quadrature, face_update_flags);
   FESubfaceValues<dim> fe_v_subface(mapping, fe, face_quadrature, face_update_flags);
   FEFaceValues<dim> fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags);
