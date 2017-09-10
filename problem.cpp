@@ -283,9 +283,63 @@ void Problem<equationsType, dim>::postprocess()
 
 
 template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::calculate_cfl_condition()
+{
+  cfl_time_step = 1.e10;
+
+  // Number of DOFs pere cell - we assume uniform polynomial order (we will only do h-adaptivity)
+  const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
+
+  // DOF indices both on the currently assembled element and the neighbor.
+  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+
+  // What values we need for the assembly.
+  const UpdateFlags update_flags = update_values;
+
+  // DOF indices both on the currently assembled element and the neighbor.
+  FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
+
+  // Loop through all cells.
+  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+  {
+    if (!cell->is_locally_owned())
+      continue;
+
+    std::vector<bool> u_c_set(8);
+    for (int a = 0; a < 8; a++)
+      u_c_set[a] = false;
+    std::vector<double> u_c(8);
+
+    fe_v.reinit(cell);
+    cell->get_dof_indices(dof_indices);
+
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    {
+      {
+        unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+        if (!u_c_set[component_ii])
+        {
+          u_c[component_ii] = current_solution(dof_indices[i]);
+          u_c_set[component_ii] = true;
+        }
+      }
+    }
+    
+    double kinetic_energy = 0.5 * (u_c[1] * u_c[1] + u_c[2] * u_c[2] + u_c[3] * u_c[3]) / u_c[0];
+    double magnetic_energy = 0.5 * (u_c[4] * u_c[4] + u_c[5] * u_c[5] + u_c[6] * u_c[6]);
+    double pressure = (this->parameters.gas_gamma - 1.0) * (u_c[7] - kinetic_energy - magnetic_energy);
+    double total_pressure = (parameters.gas_gamma * pressure) + (2. * magnetic_energy);
+    double cf = std::sqrt(total_pressure / u_c[0]);
+    cfl_time_step = std::min(cfl_time_step, parameters.cfl_constant * GridTools::minimal_cell_diameter(this->triangulation) / ((std::max(std::abs(u_c[1]), std::max(std::abs(u_c[2]), std::abs(u_c[3]))) / u_c[0]) + cf));
+  }
+}
+
+
+template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::assemble_system(bool only_rhs)
 {
   this->assemble_only_rhs = only_rhs;
+  this->cfl_time_step = 1.e6;
 
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
@@ -1244,7 +1298,7 @@ void Problem<equationsType, dim>::save()
 #ifdef HAVE_MPI
   std::ofstream history("history");
   history << this->time << " " << this->time_step;
-  for(int i = 0; i < dim; i++)
+  for (int i = 0; i < dim; i++)
     history << " " << this->parameters.corner_a[i] << " " << this->parameters.corner_b[i] << " " << this->parameters.refinements[i];
   history << std::endl;
   history.close();
@@ -1279,8 +1333,9 @@ void Problem<equationsType, dim>::run()
     // Some output.
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
-      std::cout << "T=" << time << std::endl << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl
-        << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
+      std::cout << "T: " << time << std::endl;
+      if (initial_step)
+        std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
@@ -1345,6 +1400,8 @@ void Problem<equationsType, dim>::run()
     if (parameters.polynomial_order_dg > 0 && !parameters.postprocess_in_newton_loop)
       postprocess();
 
+    if (!initial_step)
+      calculate_cfl_condition();
     move_time_step_handle_outputs();
   }
 }
@@ -1355,7 +1412,6 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
   current_solution = current_limited_solution;
   old_solution = current_solution;
-  initial_step = false;
 
   if (parameters.output_solution)
     output_vector(current_solution, "current_solution", time_step);
@@ -1372,8 +1428,13 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     last_snapshot_time = time;
   }
 
+  double global_cfl_time_step = dealii::Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
+  if (!initial_step)
+    parameters.time_step = global_cfl_time_step;
+
   ++time_step;
   time += parameters.time_step;
+  initial_step = false;
 }
 
 template class Problem<EquationsTypeMhd, 3>;

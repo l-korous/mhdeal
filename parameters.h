@@ -22,7 +22,7 @@ public:
   double lax_friedrich_stabilization_value;
 
   bool postprocess_in_newton_loop;
-
+  
   // Output step - either < 0 (output all steps), or > 0 (time difference between two outputs)
   double output_step, snapshot_step;
 
@@ -67,7 +67,7 @@ public:
   double ilut_drop;
 
   // Global - obvious, theta ~ Theta-scheme for time-discretization
-  double time_step, final_time, theta;
+  double time_step, final_time, theta, cfl_constant;
   // Flag whether this is a stationary problem.
   bool is_stationary;
   // Polynomial order for the flow part.

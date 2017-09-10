@@ -1,6 +1,8 @@
 #include "util.h"
 #include "equationsMhd.h"
 
+#define NEGLIGIBLE 1e-12
+
 template <int dim>
 Equations<EquationsTypeMhd, dim>::Equations(Parameters<dim>& parameters) : parameters(parameters)
 {
@@ -154,9 +156,9 @@ void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::va
   typename InputVector::value_type b = asin(normal[2]);
   typename InputVector::value_type cb = cos(b);
   typename InputVector::value_type a;
-  if (std::abs(normal[0]) < 1e-8)
+  if (std::abs(normal[0]) < NEGLIGIBLE)
   {
-    if (std::abs(cb) < 1e-8)
+    if (std::abs(cb) < NEGLIGIBLE)
       a = 0.;
     else
       a = asin(normal[1] / cb);
@@ -212,9 +214,9 @@ void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVect
   typename InputVector::value_type b = asin(normal[2]);
   typename InputVector::value_type cb = cos(b);
   typename InputVector::value_type a;
-  if (std::abs(normal[0]) < 1e-8)
+  if (std::abs(normal[0]) < NEGLIGIBLE)
   {
-    if (std::abs(cb) < 1e-8)
+    if (std::abs(cb) < NEGLIGIBLE)
       a = 0.;
     else
       a = asin(normal[1] / cb);
@@ -266,30 +268,18 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::smallest_eigenvalue(const InputVector &W) const
 {
-  return (W[1] / W[0]) - std::sqrt(
-    (0.5 / W[0]) * (
-    (this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))
-      + std::sqrt(
-      ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))) * ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W)))
-        - (4. * this->parameters.gas_gamma * this->compute_pressure(W) * W[4] * W[4])
-      )
-      )
-  );
+  typename InputVector::value_type pressure = compute_pressure(W), magnetic_energy = compute_magnetic_energy(W);
+  typename InputVector::value_type total_pressure = (parameters.gas_gamma * pressure) + (2. * magnetic_energy);
+  return (W[1] / W[0]) - std::sqrt((0.5 / W[0]) * (total_pressure + std::sqrt(total_pressure * total_pressure - (4. * parameters.gas_gamma * pressure * W[4] * W[4]))));
 }
 
 template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::largest_eigenvalue(const InputVector &W) const
 {
-  return (W[1] / W[0]) + std::sqrt(
-    (0.5 / W[0]) * (
-    (this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))
-      + std::sqrt(
-      ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W))) * ((this->parameters.gas_gamma * this->compute_pressure(W)) + (2. * this->compute_magnetic_energy(W)))
-        - (4. * this->parameters.gas_gamma * this->compute_pressure(W) * W[4] * W[4])
-      )
-      )
-  );
+  typename InputVector::value_type pressure = compute_pressure(W), magnetic_energy = compute_magnetic_energy(W);
+  typename InputVector::value_type total_pressure = (parameters.gas_gamma * pressure) + (2. * magnetic_energy);
+  return (W[1] / W[0]) + std::sqrt((0.5 / W[0]) * (total_pressure + std::sqrt(total_pressure * total_pressure - (4. * parameters.gas_gamma * pressure * W[4] * W[4]))));
 }
 
 template <int dim>
@@ -311,8 +301,10 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const
 {
+  std_cxx11::array<typename InputVector::value_type, n_components> normal_flux_lf;
+
   // If we use Lax Friedrich's flux.
-  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  //if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
   {
     std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
 
@@ -321,11 +313,11 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
     for (unsigned int di = 0; di < n_components; ++di)
     {
-      normal_flux[di] = 0;
+      normal_flux_lf[di] = 0;
       for (unsigned int d = 0; d < dim; ++d)
-        normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
+        normal_flux_lf[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
 
-      normal_flux[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
+      normal_flux_lf[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
     }
   }
 
@@ -371,26 +363,66 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
     std_cxx11::array<typename InputVector::value_type, n_components> Us_L;
     {
-      Us_L[0] = rho_L * (S_L - u_L) / (S_L - S_M);
-      Us_L[1] = Us_L[0] * S_M;
-      Us_L[2] = Us_L[0] * (QedWL[2] / rho_L) - (QedWL[4] * QedWL[5] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]))));
-      Us_L[3] = Us_L[0] * (QedWL[3] / rho_L) - (QedWL[4] * QedWL[6] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]))));
-      Us_L[4] = QedWL[4];
-      Us_L[5] = QedWL[5] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (QedWL[4] * QedWL[4])) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]));
-      Us_L[6] = QedWL[6] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (QedWL[4] * QedWL[4])) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]));
-      Us_L[7] = (((S_L - u_L) * QedWL[7]) - (p_T_L * u_L) + (psT * S_M) + (QedWL[4] * (((QedWL[1] * QedWL[4] + QedWL[2] * QedWL[5] + QedWL[3] * QedWL[6]) / rho_L) - ((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[3] * Us_L[6]) / Us_L[0])))) / (S_L - S_M);
+        if (
+          (std::abs(S_M - u_L) < NEGLIGIBLE)
+          && (std::abs(S_L - u_L) < NEGLIGIBLE)
+          && (std::abs(QedWL[5]) < NEGLIGIBLE)
+          && (std::abs(QedWL[6]) < NEGLIGIBLE)
+          && ((QedWL[4] * QedWL[4]) - (this->parameters.gas_gamma * p_L) > NEGLIGIBLE)
+          )
+        {
+          Us_L[0] = rho_L * (S_L - u_L) / (S_L - S_M);
+          Us_L[1] = Us_L[0] * S_M;
+          Us_L[2] = QedWL[2];
+          Us_L[3] = QedWL[3];
+          Us_L[4] = QedWL[4];
+          Us_L[5] = QedWL[5];
+          Us_L[6] = QedWL[6];
+          Us_L[7] = (((S_L - u_L) * QedWL[7]) - (p_T_L * u_L) + (psT * S_M) + (QedWL[4] * (((QedWL[1] * QedWL[4] + QedWL[2] * QedWL[5] + QedWL[3] * QedWL[6]) / rho_L) - ((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[3] * Us_L[6]) / Us_L[0])))) / (S_L - S_M);
+        }
+        else
+        {
+          Us_L[0] = rho_L * (S_L - u_L) / (S_L - S_M);
+          Us_L[1] = Us_L[0] * S_M;
+          Us_L[2] = Us_L[0] * (QedWL[2] / rho_L) - (QedWL[4] * QedWL[5] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]))));
+          Us_L[3] = Us_L[0] * (QedWL[3] / rho_L) - (QedWL[4] * QedWL[6] * ((S_M - u_L) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]))));
+          Us_L[4] = QedWL[4];
+          Us_L[5] = QedWL[5] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (QedWL[4] * QedWL[4])) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]));
+          Us_L[6] = QedWL[6] * ((rho_L * (S_L - u_L) * (S_L - u_L)) - (QedWL[4] * QedWL[4])) / ((rho_L * (S_L - u_L) * (S_L - S_M)) - (QedWL[4] * QedWL[4]));
+          Us_L[7] = (((S_L - u_L) * QedWL[7]) - (p_T_L * u_L) + (psT * S_M) + (QedWL[4] * (((QedWL[1] * QedWL[4] + QedWL[2] * QedWL[5] + QedWL[3] * QedWL[6]) / rho_L) - ((Us_L[1] * Us_L[4] + Us_L[2] * Us_L[5] + Us_L[3] * Us_L[6]) / Us_L[0])))) / (S_L - S_M);
+        }
     }
 
     std_cxx11::array<typename InputVector::value_type, n_components> Us_R;
     {
-      Us_R[0] = rho_R * (S_R - u_R) / (S_R - S_M);
-      Us_R[1] = Us_R[0] * S_M;
-      Us_R[2] = Us_R[0] * (QedWR[2] / rho_R) - (QedWR[4] * QedWR[5] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]))));
-      Us_R[3] = Us_R[0] * (QedWR[3] / rho_R) - (QedWR[4] * QedWR[6] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]))));
-      Us_R[4] = QedWR[4];
-      Us_R[5] = QedWR[5] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (QedWR[4] * QedWR[4])) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]));
-      Us_R[6] = QedWR[6] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (QedWR[4] * QedWR[4])) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]));
-      Us_R[7] = (((S_R - u_R) * QedWR[7]) - (p_T_R * u_R) + (psT * S_M) + (QedWR[4] * (((QedWR[1] * QedWR[4] + QedWR[2] * QedWR[5] + QedWR[3] * QedWR[6]) / rho_R) - ((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[3] * Us_R[6]) / Us_R[0])))) / (S_R - S_M);
+      if (
+        (std::abs(S_M - u_R) < NEGLIGIBLE)
+        && (std::abs(S_R - u_R) < NEGLIGIBLE)
+        && (std::abs(QedWR[5]) < NEGLIGIBLE)
+        && (std::abs(QedWR[6]) < NEGLIGIBLE)
+        && ((QedWR[4] * QedWR[4]) - (this->parameters.gas_gamma * p_R) > NEGLIGIBLE)
+        )
+      {
+        Us_R[0] = rho_R * (S_R - u_R) / (S_R - S_M);
+        Us_R[1] = Us_R[0] * S_M;
+        Us_R[2] = QedWR[2];
+        Us_R[3] = QedWR[3];
+        Us_R[4] = QedWR[4];
+        Us_R[5] = QedWR[5];
+        Us_R[6] = QedWR[6];
+        Us_R[7] = (((S_R - u_R) * QedWR[7]) - (p_T_R * u_R) + (psT * S_M) + (QedWR[4] * (((QedWR[1] * QedWR[4] + QedWR[2] * QedWR[5] + QedWR[3] * QedWR[6]) / rho_R) - ((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[3] * Us_R[6]) / Us_R[0])))) / (S_R - S_M);
+      }
+      else
+      {
+        Us_R[0] = rho_R * (S_R - u_R) / (S_R - S_M);
+        Us_R[1] = Us_R[0] * S_M;
+        Us_R[2] = Us_R[0] * (QedWR[2] / rho_R) - (QedWR[4] * QedWR[5] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]))));
+        Us_R[3] = Us_R[0] * (QedWR[3] / rho_R) - (QedWR[4] * QedWR[6] * ((S_M - u_R) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]))));
+        Us_R[4] = QedWR[4];
+        Us_R[5] = QedWR[5] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (QedWR[4] * QedWR[4])) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]));
+        Us_R[6] = QedWR[6] * ((rho_R * (S_R - u_R) * (S_R - u_R)) - (QedWR[4] * QedWR[4])) / ((rho_R * (S_R - u_R) * (S_R - S_M)) - (QedWR[4] * QedWR[4]));
+        Us_R[7] = (((S_R - u_R) * QedWR[7]) - (p_T_R * u_R) + (psT * S_M) + (QedWR[4] * (((QedWR[1] * QedWR[4] + QedWR[2] * QedWR[5] + QedWR[3] * QedWR[6]) / rho_R) - ((Us_R[1] * Us_R[4] + Us_R[2] * Us_R[5] + Us_R[3] * Us_R[6]) / Us_R[0])))) / (S_R - S_M);
+      }
     }
 
     typename InputVector::value_type Ss_L = S_M - (std::abs(B_x) / std::sqrt(Us_L[0]));

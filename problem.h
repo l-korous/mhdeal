@@ -32,6 +32,9 @@ private:
   // Performs a single global assembly.
   void postprocess();
 
+  // Performs a single global assembly.
+  void calculate_cfl_condition();
+
   // Performs a local assembly for all volumetric contributions on the local cell.
   void assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& local_dofs, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs);
   
@@ -108,4 +111,5 @@ private:
 
   double last_output_time, last_snapshot_time, time;
   int time_step;
+  double cfl_time_step;
 };
