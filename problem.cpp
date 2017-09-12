@@ -305,32 +305,36 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
     if (!cell->is_locally_owned())
       continue;
 
-    std::vector<bool> u_c_set(8);
-    for (int a = 0; a < 8; a++)
-      u_c_set[a] = false;
-    std::vector<double> u_c(8);
+    const unsigned int n_q_points = fe_v.n_quadrature_points;
+    std::vector< std::vector<double> > u_c(n_q_points, std::vector<double>(8));
 
     fe_v.reinit(cell);
     cell->get_dof_indices(dof_indices);
+    const FEValuesExtractors::Vector mag(dim + 1);
 
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    for (unsigned int q = 0; q < n_q_points; ++q)
     {
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-        if (!u_c_set[component_ii])
+        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+        if (component_i == 1)
         {
-          u_c[component_ii] = current_solution(dof_indices[i]);
-          u_c_set[component_ii] = true;
+          for (int j = 0; j <= 2; j++)
+            u_c[q][j] = current_solution(dof_indices[i]) * fe_v[mag].value(i, q)[j];
+        }
+        else
+        {
+          unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          u_c[q][component_ii] = current_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
         }
       }
+      double kinetic_energy = 0.5 * (u_c[q][1] * u_c[q][1] + u_c[q][2] * u_c[q][2] + u_c[q][3] * u_c[q][3]) / u_c[q][0];
+      double magnetic_energy = 0.5 * (u_c[q][4] * u_c[q][4] + u_c[q][5] * u_c[q][5] + u_c[q][6] * u_c[q][6]);
+      double pressure = (this->parameters.gas_gamma - 1.0) * (u_c[q][7] - kinetic_energy - magnetic_energy);
+      double total_pressure = (parameters.gas_gamma * pressure) + (2. * magnetic_energy);
+      double cf = std::sqrt(total_pressure / u_c[q][0]);
+      cfl_time_step = std::min(cfl_time_step, parameters.cfl_constant * GridTools::minimal_cell_diameter(this->triangulation) / ((std::max(std::abs(u_c[q][1]), std::max(std::abs(u_c[q][2]), std::abs(u_c[q][3]))) / u_c[q][0]) + cf));
     }
-    
-    double kinetic_energy = 0.5 * (u_c[1] * u_c[1] + u_c[2] * u_c[2] + u_c[3] * u_c[3]) / u_c[0];
-    double magnetic_energy = 0.5 * (u_c[4] * u_c[4] + u_c[5] * u_c[5] + u_c[6] * u_c[6]);
-    double pressure = (this->parameters.gas_gamma - 1.0) * (u_c[7] - kinetic_energy - magnetic_energy);
-    double total_pressure = (parameters.gas_gamma * pressure) + (2. * magnetic_energy);
-    double cf = std::sqrt(total_pressure / u_c[0]);
-    cfl_time_step = std::min(cfl_time_step, parameters.cfl_constant * GridTools::minimal_cell_diameter(this->triangulation) / ((std::max(std::abs(u_c[1]), std::max(std::abs(u_c[2]), std::abs(u_c[3]))) / u_c[0]) + cf));
   }
 }
 
