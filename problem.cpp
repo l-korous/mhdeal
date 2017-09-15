@@ -298,6 +298,7 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
 
   // DOF indices both on the currently assembled element and the neighbor.
   FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
+  const unsigned int n_q_points = fe_v.n_quadrature_points;
 
   // Loop through all cells.
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
@@ -305,7 +306,6 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
     if (!cell->is_locally_owned())
       continue;
 
-    const unsigned int n_q_points = fe_v.n_quadrature_points;
     std::vector< std::vector<double> > u_c(n_q_points, std::vector<double>(8));
 
     fe_v.reinit(cell);
@@ -320,7 +320,7 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
         if (component_i == 1)
         {
           for (int j = 0; j <= 2; j++)
-            u_c[q][j] = current_solution(dof_indices[i]) * fe_v[mag].value(i, q)[j];
+            u_c[q][j + 4] = current_solution(dof_indices[i]) * fe_v[mag].value(i, q)[j];
         }
         else
         {
@@ -1406,6 +1406,7 @@ void Problem<equationsType, dim>::run()
 
     if (!initial_step)
       calculate_cfl_condition();
+
     move_time_step_handle_outputs();
   }
 }
