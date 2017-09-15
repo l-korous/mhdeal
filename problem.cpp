@@ -314,18 +314,21 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
+      for (int k = 0; k < 8; k++)
+        u_c[q][k] = 0.;
+      
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
         if (component_i == 1)
         {
           for (int j = 0; j <= 2; j++)
-            u_c[q][j + 4] = current_solution(dof_indices[i]) * fe_v[mag].value(i, q)[j];
+            u_c[q][j + 4] += current_solution(dof_indices[i]) * fe_v[mag].value(i, q)[j];
         }
         else
         {
           unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          u_c[q][component_ii] = current_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+          u_c[q][component_ii] += current_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
         }
       }
       double kinetic_energy = 0.5 * (u_c[q][1] * u_c[q][1] + u_c[q][2] * u_c[q][2] + u_c[q][3] * u_c[q][3]) / u_c[q][0];
