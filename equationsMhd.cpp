@@ -301,10 +301,8 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const
 {
-  std_cxx11::array<typename InputVector::value_type, n_components> normal_flux_lf;
-
   // If we use Lax Friedrich's flux.
-  //if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
   {
     std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
 
@@ -313,12 +311,14 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
     for (unsigned int di = 0; di < n_components; ++di)
     {
-      normal_flux_lf[di] = 0;
+      normal_flux[di] = 0;
       for (unsigned int d = 0; d < dim; ++d)
-        normal_flux_lf[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
+        normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
 
-      normal_flux_lf[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
+      normal_flux[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
     }
+
+    return;
   }
 
   // If we use HLLD
