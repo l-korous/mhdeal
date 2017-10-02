@@ -22,7 +22,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
-  initial_quadrature(2 * parameters.quadrature_order),
+  initial_quadrature(parameters.quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
   assemble_only_rhs(false),
@@ -281,66 +281,11 @@ void Problem<equationsType, dim>::postprocess()
   }
 }
 
-
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::calculate_cfl_condition()
 {
-  cfl_time_step = 1.e10;
-
-  // Number of DOFs pere cell - we assume uniform polynomial order (we will only do h-adaptivity)
-  const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-
-  // DOF indices both on the currently assembled element and the neighbor.
-  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
-
-  // What values we need for the assembly.
-  const UpdateFlags update_flags = update_values;
-
-  // DOF indices both on the currently assembled element and the neighbor.
-  FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
-  const unsigned int n_q_points = fe_v.n_quadrature_points;
-
-  // Loop through all cells.
-  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
-  {
-    if (!cell->is_locally_owned())
-      continue;
-
-    std::vector< std::vector<double> > u_c(n_q_points, std::vector<double>(8));
-
-    fe_v.reinit(cell);
-    cell->get_dof_indices(dof_indices);
-    const FEValuesExtractors::Vector mag(dim + 1);
-
-    for (unsigned int q = 0; q < n_q_points; ++q)
-    {
-      for (int k = 0; k < 8; k++)
-        u_c[q][k] = 0.;
-      
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-      {
-        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-        if (component_i == 1)
-        {
-          for (int j = 0; j <= 2; j++)
-            u_c[q][j + 4] += current_solution(dof_indices[i]) * fe_v[mag].value(i, q)[j];
-        }
-        else
-        {
-          unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          u_c[q][component_ii] += current_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-        }
-      }
-      double kinetic_energy = 0.5 * (u_c[q][1] * u_c[q][1] + u_c[q][2] * u_c[q][2] + u_c[q][3] * u_c[q][3]) / u_c[q][0];
-      double magnetic_energy = 0.5 * (u_c[q][4] * u_c[q][4] + u_c[q][5] * u_c[q][5] + u_c[q][6] * u_c[q][6]);
-      double pressure = (this->parameters.gas_gamma - 1.0) * (u_c[q][7] - kinetic_energy - magnetic_energy);
-      double total_pressure = (parameters.gas_gamma * pressure) + (2. * magnetic_energy);
-      double cf = std::sqrt(total_pressure / u_c[q][0]);
-      cfl_time_step = std::min(cfl_time_step, parameters.cfl_constant * GridTools::minimal_cell_diameter(this->triangulation) / ((std::max(std::abs(u_c[q][1]), std::max(std::abs(u_c[q][2]), std::abs(u_c[q][3]))) / u_c[q][0]) + cf));
-    }
-  }
+  cfl_time_step = parameters.cfl_constant * GridTools::minimal_cell_diameter(this->triangulation) / this->equations.max_signal_speed;
 }
-
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::assemble_system(bool only_rhs)

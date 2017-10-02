@@ -13,10 +13,6 @@ public:
 
   // Self-explanatory
   static const unsigned int n_components = 2 * dim + 2;
-  static const unsigned int first_momentum_component = 1;
-  static const unsigned int first_magnetic_flux_component = dim + 1;
-  static const unsigned int density_component = 0;
-  static const unsigned int energy_component = 2 * dim + 1;
 
   template <typename InputVector>
   static typename InputVector::value_type compute_kinetic_energy(const InputVector &W);
@@ -29,6 +25,10 @@ public:
   // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
   template <typename InputVector>
   typename InputVector::value_type compute_pressure(const InputVector &W) const;
+
+  // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
+  template <typename InputVector>
+  typename InputVector::value_type compute_total_pressure(const InputVector &W) const;
 
   // Compute pressure, and use the passed values of kinetic energy and magnetic energy.
   template <typename InputVector>
@@ -49,33 +49,15 @@ public:
   // Compute the values for the numerical flux
   template <typename InputVector>
   void numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
-    std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux) const;
-
-  template <typename InputVector>
-  typename InputVector::value_type smallest_eigenvalue(const InputVector &W) const;
-
-  template <typename InputVector>
-  typename InputVector::value_type largest_eigenvalue(const InputVector &W) const;
-
-  template <typename InputVector>
-  typename InputVector::value_type left_signal_speed(const InputVector &WL, const InputVector &WR) const;
-
-  template <typename InputVector>
-  typename InputVector::value_type right_signal_speed(const InputVector &WL, const InputVector &WR) const;
-
-  // Helper used in numerical_normal_flux
-  // Rotational matrix taking any normal, and rotating the solution so that the new x-coordinate is in the direction of the normal.
-  template <typename InputVector>
-  void Q(std_cxx11::array<typename InputVector::value_type, n_components> &result, const InputVector &W, const Tensor<1, dim> &normal) const;
-
-  // Helper used in numerical_normal_flux
-  // Inverse to Q()
-  template <typename InputVector>
-  void Q_inv(std_cxx11::array<typename InputVector::value_type, n_components> &result, std_cxx11::array<typename InputVector::value_type, n_components> &F, const Tensor<1, dim> &normal) const;
+    std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux);
 
   // Compute the values for forcing (source, absolute) term
   template <typename InputVector>
   void compute_forcing_vector(const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components> &forcing) const;
+
+  void store_max_signal_speed(double val);
+
+  void store_max_signal_speed(typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type val);
 
   // Passed as a constructor parameter
   Parameters<dim>& parameters;
@@ -109,6 +91,10 @@ public:
   };
 
   static std::vector<std::string> component_names();
+
+  // For CFL.
+  double max_signal_speed;
+
   static std::vector<DataComponentInterpretation::DataComponentInterpretation> component_interpretation();
 };
 
