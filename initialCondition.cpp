@@ -21,6 +21,34 @@ Parameters<dim>& InitialCondition<equationsType, dim>::getParams() const
 
 
 /***************************************************************************
+Simple initial condition
+***************************************************************************/
+template <EquationsType equationsType, int dim>
+SimpleIC<equationsType, dim>::SimpleIC(Parameters<dim>& parameters) :
+  InitialCondition<equationsType, dim>(parameters)
+{
+};
+
+
+template <EquationsType equationsType, int dim>
+void SimpleIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
+  std::vector<Vector<double> > &result) const
+{
+  for (unsigned int i = 0; i < points.size(); ++i)
+  {
+    result[i][0] = 1.;
+    result[i][1] = 0.;
+    result[i][2] = 0.;
+    result[i][3] = 0.;
+    result[i][4] = 0.;
+    result[i][5] = 0.;
+    result[i][6] = 0.;
+    result[i][7] = 5.;
+  }
+}
+
+
+/***************************************************************************
 MHD Blast initial condition
 ***************************************************************************/
 template <EquationsType equationsType, int dim>
@@ -299,3 +327,4 @@ void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p,
 template class InitialCondition<EquationsTypeMhd, 3>;
 template class MHDBlastIC<EquationsTypeMhd, 3>;
 template class TitovDemoulinIC<EquationsTypeMhd, 3>;
+template class SimpleIC<EquationsTypeMhd, 3>;

@@ -14,9 +14,9 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   // Two corners of the hyper-rectangle
   // - corner A
-  this->corner_a = Point<dim>(-.5, -.5, 0);
+  this->corner_a = Point<dim>(-0.4, -.4, 0.);
   // - and corner B which should be the farthest one from corner A
-  this->corner_b = Point<dim>(.5 , .5, .01);
+  this->corner_b = Point<dim>(.4 , .4, .01);
   // Refinements in x-, y-, and z- coordinates.
   this->refinements = { 100, 100, 1 };
   // deal.II function that takes the above attributes and returns the triangulation (the first parameter, passed by reference).
@@ -24,21 +24,23 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->time_step = 1.e-5;
   this->final_time = 10.;
-  this->cfl_constant = .8;
+  this->cfl_constant = .05;
 
   this->theta = 0.0;
   this->postprocess_in_newton_loop = true;
-  this->polynomial_order_dg = 1;
-  this->polynomial_order_hdiv = 1;
+  this->polynomial_order_dg = 0;
+  this->polynomial_order_hdiv = 0;
 
   this->quadrature_order = 6;
+
+  this->patches = 2;
 
   this->output_matrix = false;
   this->output = OutputType::quiet_solver;
   this->output_rhs = false;
   this->output_solution = false;
 
-  this->output_step = 1.e-3;
+  this->output_step = -1.e-3;
   this->snapshot_step = 1.; 
 
   this->solver = gmres;

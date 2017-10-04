@@ -1116,7 +1116,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
   data_out.add_data_vector(subdomain, "subdomain");
 #endif
 
-  data_out.build_patches(2);
+  data_out.build_patches(this->parameters.patches);
 
   static unsigned int output_file_number = 0;
 

@@ -179,7 +179,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux)
 {
   // If we use Lax Friedrich's flux.
-  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  //if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  std_cxx11::array<typename InputVector::value_type, n_components> normal_flux_lf;
   {
     std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
 
@@ -190,19 +191,20 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
       normal_flux[di] = 0;
       for (unsigned int d = 0; d < dim; ++d)
-        normal_flux[di] += 0.5*(iflux[di][d] + oflux[di][d]) * normal[d];
+        normal_flux[di] += 0.5 * (iflux[di][d] + oflux[di][d]) * normal[d];
 
-      normal_flux[di] += 0.5*this->parameters.lax_friedrich_stabilization_value*(Wplus[di] - Wminus[di]);
+      normal_flux[di] += 0.5 * this->parameters.lax_friedrich_stabilization_value * (Wplus[di] - Wminus[di]);
+      normal_flux_lf[di] = normal_flux[di];
     }
 
-    return;
+    //return;
   }
 
   // If we use HLLD
   if (this->parameters.num_flux_type == Parameters<dim>::hlld)
   {
     typename InputVector::value_type rho_L, rho_R, VelN_L, VelN_R, MagN_L, MagN_R;
-    int dir_abs = (std::abs(normal[0] - 1.) < NEGLIGIBLE ? 0 : (std::abs(normal[1] - 1.) < NEGLIGIBLE ? 1 : 2));
+    int dir_abs = (std::abs(std::abs(normal[0]) - 1.) < NEGLIGIBLE ? 0 : (std::abs(std::abs(normal[1]) - 1.) < NEGLIGIBLE ? 1 : 2));
     int dir_sign = normal[dir_abs] > 0. ? 1. : -1.;
     rho_L = Wplus[0], rho_R = Wminus[0];
     VelN_L = Wplus[1 + dir_abs] / rho_L, VelN_R = Wminus[1 + dir_abs] / rho_R;
@@ -236,12 +238,37 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     if (S_L > 0.)
     {
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
+      for (unsigned int di = 0; di < n_components; ++di)
+        normal_flux[di] = dir_sign * normal_flux[di];
+      for (unsigned int di = 0; di < n_components; ++di)
+      {
+        if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
+        {
+          if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
+          {
+            int a = 1;
+          }
+        }
+      }
       return;
     }
 
     if (S_R < 0.)
     {
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
+      for (unsigned int di = 0; di < n_components; ++di)
+        normal_flux[di] = dir_sign * normal_flux[di];
+
+      for (unsigned int di = 0; di < n_components; ++di)
+      {
+        if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
+        {
+          if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
+          {
+            int a = 1;
+          }
+        }
+      }
       return;
     }
 
@@ -260,22 +287,89 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
     psT = (((S_R - VelN_R) * (rho_R * p_T_L)) - ((S_L - VelN_L) * (rho_L * p_T_R)) + ((rho_L * rho_R) * (S_R - VelN_R) * (S_L - VelN_L) * (VelN_R - VelN_L))) / (((S_R - VelN_R) * rho_R) - ((S_L - VelN_L) * rho_L));
 
+    typename InputVector::value_type velxStarL, velyStarL, velzStarL, velxStarR, velyStarR, velzStarR, magxStarL, magyStarL, magzStarL, magxStarR, magyStarR, magzStarR, velxStar2, velyStar2, velzStar2, magxStar2, magyStar2, magzStar2, signumBn;
+
     std_cxx11::array<typename InputVector::value_type, n_components> Us_L;
     {
       Us_L[0] = rho_L * (S_L - VelN_L) / (S_L - S_M);
-      //////////////////////
-      //////////////////////
-      //////////////////////
-      //////////////////////
+      switch (dir_abs)
+      {
+      case 0:
+        magxStarL = B_x;
+        velxStarL = S_M;
+        magyStarL = Wplus[5] * scrch5L;
+        magzStarL = Wplus[6] * scrch5L;
+        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[4] * Wplus[5] * scrch4L;
+        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[4] * Wplus[6] * scrch4L;
+        break;
+      case 1:
+        magyStarL = B_x;
+        velyStarL = S_M;
+        magxStarL = Wplus[4] * scrch5L;
+        magzStarL = Wplus[6] * scrch5L;
+        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[5] * Wplus[4] * scrch4L;
+        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[5] * Wplus[6] * scrch4L;
+        break;
+      case 2:
+        magzStarL = B_x;
+        velzStarL = S_M;
+        magxStarL = Wplus[4] * scrch5L;
+        magyStarL = Wplus[5] * scrch5L;
+        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[6] * Wplus[4] * scrch4L;
+        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[6] * Wplus[5] * scrch4L;
+        break;
+      }
+
+      Us_L[1] = Us_L[0] * velxStarL;
+      Us_L[2] = Us_L[0] * velyStarL;
+      Us_L[3] = Us_L[0] * velzStarL;
+
+      Us_L[4] = magxStarL;
+      Us_L[5] = magyStarL;
+      Us_L[6] = magzStarL;
+      Us_L[7] = scrch1L * Wplus[7] - p_T_L * VelN_L + psT * S_M + B_x * (((Wplus[1] * Wplus[4] + Wplus[2] * Wplus[5] + Wplus[3] * Wplus[6]) / Wplus[0]) - velxStarL * Us_L[4] - velyStarL * Us_L[5] - velzStarL * Us_L[6]);
+      Us_L[7] = Us_L[7] / scrch2L;
     }
 
     std_cxx11::array<typename InputVector::value_type, n_components> Us_R;
     {
       Us_R[0] = rho_R * (S_R - VelN_R) / (S_R - S_M);
-      //////////////////////
-      //////////////////////
-      //////////////////////
-      //////////////////////
+      switch (dir_abs)
+      {
+      case 0:
+        magxStarR = B_x;
+        velxStarR = S_M;
+        magyStarR = Wminus[5] * scrch5R;
+        magzStarR = Wminus[6] * scrch5R;
+        velyStarR = (Wminus[1] / Wminus[0]) - Wminus[4] * Wminus[5] * scrch4R;
+        velzStarR = (Wminus[2] / Wminus[0]) - Wminus[4] * Wminus[6] * scrch4R;
+        break;
+      case 1:
+        magyStarR = B_x;
+        velyStarR = S_M;
+        magxStarR = Wminus[4] * scrch5R;
+        magzStarR = Wminus[6] * scrch5R;
+        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[5] * Wminus[4] * scrch4R;
+        velzStarR = (Wminus[2] / Wminus[0]) - Wminus[5] * Wminus[6] * scrch4R;
+        break;
+      case 2:
+        magzStarR = B_x;
+        velzStarR = S_M;
+        magxStarR = Wminus[4] * scrch5R;
+        magyStarR = Wminus[5] * scrch5R;
+        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[6] * Wminus[4] * scrch4R;
+        velyStarR = (Wminus[1] / Wminus[0]) - Wminus[6] * Wminus[5] * scrch4R;
+      }
+
+      Us_R[1] = Us_R[0] * velxStarR;
+      Us_R[2] = Us_R[0] * velyStarR;
+      Us_R[3] = Us_R[0] * velzStarR;
+
+      Us_R[4] = magxStarR;
+      Us_R[5] = magyStarR;
+      Us_R[6] = magzStarR;
+      Us_R[7] = scrch1R * Wminus[7] - p_T_R * VelN_R + psT * S_M + B_x * (((Wminus[1] * Wminus[4] + Wminus[2] * Wminus[5] + Wminus[3] * Wminus[6]) / Wminus[0]) - velxStarR * Us_R[4] - velyStarR * Us_R[5] - velzStarR * Us_R[6]);
+      Us_R[7] = Us_R[7] / scrch2R;
     }
 
     typename InputVector::value_type Ss_L = S_M - (std::abs(B_x) / std::sqrt(Us_L[0]));
@@ -284,51 +378,164 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     // Fs_L, Fss_L
     if (S_M >= 0.)
     {
-      std_cxx11::array<typename InputVector::value_type, n_components> F_L;
-      this->compute_flux_vector(dir_abs, Wplus, F_L);
       // THIS is different to RIGHT state.
       if (Ss_L >= 0.)
       {
+        std_cxx11::array<typename InputVector::value_type, n_components> F_L;
+        this->compute_flux_vector(dir_abs, Wplus, F_L);
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
-        return;
-      }
-      else
-      {
-        std_cxx11::array<typename InputVector::value_type, n_components> Uss_L;
-        Uss_L[0] = Us_L[0];
-        //////////////////////
-        //////////////////////
-        //////////////////////
-        //////////////////////
-        for (int k = 0; k < n_components; k++)
-          normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
+        for (unsigned int di = 0; di < n_components; ++di)
+          normal_flux[di] = dir_sign * normal_flux[di];
+
+        for (unsigned int di = 0; di < n_components; ++di)
+        {
+          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
+          {
+            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
+            {
+              int a = 1;
+            }
+          }
+        }
         return;
       }
     }
     // Fs_R, Fss_R
     else
     {
-      std_cxx11::array<typename InputVector::value_type, n_components> F_R;
-      this->compute_flux_vector(dir_abs, Wminus, F_R);
       // THIS is different to LEFT state.
       if (Ss_R <= 0.)
       {
+        std_cxx11::array<typename InputVector::value_type, n_components> F_R;
+        this->compute_flux_vector(dir_abs, Wminus, F_R);
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
+        for (unsigned int di = 0; di < n_components; ++di)
+          normal_flux[di] = dir_sign * normal_flux[di];
+
+        for (unsigned int di = 0; di < n_components; ++di)
+        {
+          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
+          {
+            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
+            {
+              int a = 1;
+            }
+          }
+        }
         return;
       }
-      else
+    }
+
+    scrch1L = sqrt(Us_L[0]);
+    scrch1R = sqrt(Us_R[0]);
+    scrch2L = 1. / (scrch1L + scrch1R);
+    scrch2R = scrch2L;
+
+    signumBn = (B_x > 0. ? 1. : -1.);
+
+    switch (dir_abs)
+    {
+    case 0:
+      velxStar2 = S_M;
+      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
+      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
+      magxStar2 = B_x;
+      magyStar2 = (scrch1L * magyStarR + scrch1R * magyStarL + scrch1L * scrch1R * (velyStarR - velyStarL) * signumBn) * scrch2L;
+      magzStar2 = (scrch1L * magzStarR + scrch1R * magzStarL + scrch1L * scrch1R * (velzStarR - velzStarL) * signumBn) * scrch2L;
+      break;
+    case 1:
+      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[4] - Us_L[4]) * signumBn) * scrch2L;
+      velyStar2 = S_M;
+      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
+      magxStar2 = (scrch1L * magxStarR + scrch1R * magxStarL + scrch1L * scrch1R * (velxStarR - velxStarL) * signumBn) * scrch2L;
+      magyStar2 = B_x;
+      magzStar2 = (scrch1L * magzStarR + scrch1R * magzStarL + scrch1L * scrch1R * (velzStarR - velzStarL) * signumBn) * scrch2L;
+      break;
+    case 2:
+      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[4] - Us_L[4]) * signumBn) * scrch2L;
+      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
+      velzStar2 = S_M;
+      magxStar2 = (scrch1L * magxStarR + scrch1R * magxStarL + scrch1L * scrch1R * (velxStarR - velxStarL) * signumBn) * scrch2L;
+      magyStar2 = (scrch1L * magyStarR + scrch1R * magyStarL + scrch1L * scrch1R * (velyStarR - velyStarL) * signumBn) * scrch2L;
+      magzStar2 = B_x;
+    }
+
+    // Fs_L, Fss_L
+    if (S_M >= 0.)
+    {
+      // THIS is different to RIGHT state.
+      if (Ss_L < 0.)
       {
+        std_cxx11::array<typename InputVector::value_type, n_components> F_L;
+        this->compute_flux_vector(dir_abs, Wplus, F_L);
+        std_cxx11::array<typename InputVector::value_type, n_components> Uss_L;
+        Uss_L[0] = Us_L[0];
+
+        Uss_L[1] = Uss_L[0] * velxStar2;
+        Uss_L[2] = Uss_L[0] * velyStar2;
+        Uss_L[3] = Uss_L[0] * velzStar2;
+
+        Uss_L[4] = magxStar2;
+        Uss_L[5] = magyStar2;
+        Uss_L[6] = magzStar2;
+        Uss_L[7] = Us_L[7] - sqrt(Us_L[0]) * signumBn * (velxStarL * Us_L[4] + velyStarL * Us_L[5] + velzStarL * Us_L[6] - velxStar2 * Uss_L[4] - velyStar2 * Uss_L[5] - velzStar2 * Uss_L[6]);
+
+        for (int k = 0; k < n_components; k++)
+          normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
+        for (unsigned int di = 0; di < n_components; ++di)
+          normal_flux[di] = dir_sign * normal_flux[di];
+
+        for (unsigned int di = 0; di < n_components; ++di)
+        {
+          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
+          {
+            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
+            {
+              int a = 1;
+            }
+          }
+        }
+        return;
+      }
+    }
+    // Fs_R, Fss_R
+    else
+    {
+      // THIS is different to LEFT state.
+      if (Ss_R > 0.)
+      {
+        std_cxx11::array<typename InputVector::value_type, n_components> F_R;
+        this->compute_flux_vector(dir_abs, Wminus, F_R);
+
         std_cxx11::array<typename InputVector::value_type, n_components> Uss_R;
         Uss_R[0] = Us_R[0];
 
-        //////////////////////
-        //////////////////////
-        //////////////////////
-        //////////////////////
+        Uss_R[1] = Uss_R[0] * velxStar2;
+        Uss_R[2] = Uss_R[0] * velyStar2;
+        Uss_R[3] = Uss_R[0] * velzStar2;
+
+        Uss_R[4] = magxStar2;
+        Uss_R[5] = magyStar2;
+        Uss_R[6] = magzStar2;
+        Uss_R[7] = Us_R[7] + sqrt(Us_R[0]) * signumBn * (velxStarR * Us_R[4] + velyStarR * Us_R[5] + velzStarR * Us_R[6] - velxStar2 * Uss_R[4] - velyStar2 * Uss_R[5] - velzStar2 * Uss_R[6]);
+
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
+        for (unsigned int di = 0; di < n_components; ++di)
+          normal_flux[di] = dir_sign * normal_flux[di];
+
+        for (unsigned int di = 0; di < n_components; ++di)
+        {
+          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
+          {
+            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
+            {
+              int a = 1;
+            }
+          }
+        }
         return;
       }
     }
@@ -373,9 +580,9 @@ void
 Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vector(
   const std::vector<Vector<double> > &uh,
   const std::vector<std::vector<Tensor<1, dim> > > &duh,
-  const std::vector<std::vector<Tensor<2, dim> > > &/*dduh*/,
-  const std::vector<Point<dim> > &/*normals*/,
-  const std::vector<Point<dim> > &/*evaluation_points*/,
+  const std::vector<std::vector<Tensor<2, dim> > > &,
+  const std::vector<Point<dim> > &,
+  const std::vector<Point<dim> > &,
   std::vector<Vector<double> > &computed_quantities) const
 {
   const unsigned int n_quadrature_points = uh.size();
