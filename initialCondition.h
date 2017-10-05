@@ -22,10 +22,18 @@ private:
 };
 
 template <EquationsType equationsType, int dim>
-class SimpleIC : public InitialCondition<equationsType, dim>
+class SimpleICEuler : public InitialCondition<equationsType, dim>
 {
 public:
-  SimpleIC(Parameters<dim>&);
+  SimpleICEuler(Parameters<dim>&);
+  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+};
+
+template <EquationsType equationsType, int dim>
+class SimpleICMHD : public InitialCondition<equationsType, dim>
+{
+public:
+  SimpleICMHD(Parameters<dim>&);
   void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
 };
 

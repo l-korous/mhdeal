@@ -19,19 +19,15 @@ Parameters<dim>& InitialCondition<equationsType, dim>::getParams() const
   return parameters;
 }
 
-
-/***************************************************************************
-Simple initial condition
-***************************************************************************/
 template <EquationsType equationsType, int dim>
-SimpleIC<equationsType, dim>::SimpleIC(Parameters<dim>& parameters) :
+SimpleICEuler<equationsType, dim>::SimpleICEuler(Parameters<dim>& parameters) :
   InitialCondition<equationsType, dim>(parameters)
 {
 };
 
 
 template <EquationsType equationsType, int dim>
-void SimpleIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
+void SimpleICEuler<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
   std::vector<Vector<double> > &result) const
 {
   for (unsigned int i = 0; i < points.size(); ++i)
@@ -40,23 +36,42 @@ void SimpleIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &
     result[i][1] = 0.;
     result[i][2] = 0.;
     result[i][3] = 0.;
-    result[i][4] = 0.;
+    result[i][4] = 5.;
     result[i][5] = 0.;
     result[i][6] = 0.;
-    result[i][7] = 5.;
+    result[i][7] = 0.;
   }
 }
 
+template <EquationsType equationsType, int dim>
+SimpleICMHD<equationsType, dim>::SimpleICMHD(Parameters<dim>& parameters) :
+  InitialCondition<equationsType, dim>(parameters)
+{
+};
 
-/***************************************************************************
-MHD Blast initial condition
-***************************************************************************/
+
+template <EquationsType equationsType, int dim>
+void SimpleICMHD<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
+  std::vector<Vector<double> > &result) const
+{
+  for (unsigned int i = 0; i < points.size(); ++i)
+  {
+    result[i][0] = 1.;
+    result[i][1] = 0.;
+    result[i][2] = 0.;
+    result[i][3] = 0.;
+    result[i][4] = 5.;
+    result[i][5] = 0.1;
+    result[i][6] = 0.1;
+    result[i][7] = 0.1;
+  }
+}
+
 template <EquationsType equationsType, int dim>
 MHDBlastIC<equationsType, dim>::MHDBlastIC(Parameters<dim>& parameters) :
   InitialCondition<equationsType, dim>(parameters)
 {
 };
-
 
 template <EquationsType equationsType, int dim>
 void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
@@ -69,20 +84,16 @@ void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> >
     result[i][1] = 0.;
     result[i][2] = 0.;
     result[i][3] = 0.;
-    result[i][4] = 1.0 / std::sqrt(2.);
-    result[i][5] = 1.0 / std::sqrt(2.);
-    result[i][6] = 0.;
     if (points[i].norm() < 0.1)
-      result[i][7] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5;
+      result[i][4] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5;
     else
-      result[i][7] = .1 / (this->getParams().gas_gamma - 1.0) + 0.5;
+      result[i][4] = .1 / (this->getParams().gas_gamma - 1.0) + 0.5;
+    result[i][5] = 1.0 / std::sqrt(2.);
+    result[i][6] = 1.0 / std::sqrt(2.);
+    result[i][7] = 0.;
   }
 }
 
-
- /***************************************************************************
-          Titov & Demoulin initial condition
-  ***************************************************************************/
 template <EquationsType equationsType, int dim>
 TitovDemoulinIC<equationsType, dim>::TitovDemoulinIC(Parameters<dim> &parameters) : 
                InitialCondition<equationsType,dim>(parameters)
@@ -309,22 +320,18 @@ void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p,
     result[1]=0.0;                    
     result[2]=0.0;                          // momentum density
     result[3]=0.0;
-    
-    result[4]=B_loc[0];
-    result[5]=B_loc[1];                  // magnetic field
-    result[6]=B_loc[2];
+
     // energy density
-    result[7]=pressure/(this->getParams().gas_gamma-1.0)+
-              result[4]*result[4]+result[5]*result[5]+result[6]*result[6];
-    
-//     v[8]=0.0;                    
-//     v[9]=0.0;                          // current density
-//     v[10]=0.0;
-//     
-//     v[11]=0.0; // eta
+    result[4] = pressure / (this->getParams().gas_gamma - 1.0) +
+      B_loc[0] * B_loc[0]  + B_loc[1] * B_loc[1] + B_loc[2] * B_loc[2];
+
+    result[5]=B_loc[0];
+    result[6]=B_loc[1];                  // magnetic field
+    result[7]=B_loc[2];
 }
 
 template class InitialCondition<EquationsTypeMhd, 3>;
 template class MHDBlastIC<EquationsTypeMhd, 3>;
 template class TitovDemoulinIC<EquationsTypeMhd, 3>;
-template class SimpleIC<EquationsTypeMhd, 3>;
+template class SimpleICMHD<EquationsTypeMhd, 3>;
+template class SimpleICEuler<EquationsTypeMhd, 3>;

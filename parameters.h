@@ -35,7 +35,7 @@ public:
 
   // initial conditions: 0 - MHD Blast, 1 - Titov&Demoulin flux rope
   // Number of patches
-  unsigned int initCond, patches;
+  unsigned int initCond, patches; 
   
   // Gas gamma value.
   double gas_gamma;

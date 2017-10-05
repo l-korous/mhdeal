@@ -60,8 +60,10 @@ int main(int argc, char *argv[])
       initial_condition = new TitovDemoulinIC<EQUATIONS, DIMENSION>(parameters);
       break;
     case 2:
-    default:
-      initial_condition = new SimpleIC<EQUATIONS, DIMENSION>(parameters);
+      initial_condition = new SimpleICEuler<EQUATIONS, DIMENSION>(parameters);
+      break;
+    case 3:
+      initial_condition = new SimpleICMHD<EQUATIONS, DIMENSION>(parameters);
       break;
     }
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp

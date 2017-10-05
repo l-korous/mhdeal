@@ -11,7 +11,7 @@ Equations<EquationsTypeMhd, dim>::Equations(Parameters<dim>& parameters) : param
 template <int dim>
 std::vector<std::string> Equations<EquationsTypeMhd, dim>::component_names()
 {
-  return{ "density", "momentum", "momentum", "momentum", "magnetic_field", "magnetic_field", "magnetic_field", "energy" };
+  return{ "density", "momentum", "momentum", "momentum", "energy", "magnetic_field", "magnetic_field", "magnetic_field" };
 }
 
 template <int dim>
@@ -22,10 +22,10 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
-  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   data_component_interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  data_component_interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
   return data_component_interpretation;
 }
 
@@ -42,7 +42,7 @@ double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const
   double divergence = 0.;
 
   for (unsigned int d = 0; d < dim; ++d)
-    divergence += W[d + 4][d];
+    divergence += W[d + 5][d];
 
   return divergence;
 }
@@ -51,14 +51,14 @@ template <>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W)
 {
-  return 0.5 * (W[4] * W[4] + W[5] * W[5] + W[6] * W[6]);
+  return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
 }
 
 template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
 {
-  return (this->parameters.gas_gamma - 1.0) * (W[7] - compute_kinetic_energy(W) - compute_magnetic_energy(W));
+  return (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W));
 }
 
 template <int dim>
@@ -73,7 +73,7 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const typename InputVector::value_type& Uk, const typename InputVector::value_type& Um) const
 {
-  return (this->parameters.gas_gamma - 1.0) * (W[7] - Uk - Um);
+  return (this->parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
 }
 
 template <int dim>
@@ -81,38 +81,38 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::compute_flux_vector(const int derivative, const InputVector &W, std_cxx11::array<typename InputVector::value_type, n_components > &flux) const
 {
   const typename InputVector::value_type total_pressure = compute_total_pressure(W);
-  typename InputVector::value_type energy_item[dim] = { W[1] * W[4], W[2] * W[5], W[3] * W[6] };
+  typename InputVector::value_type energy_item[dim] = { W[1] * W[5], W[2] * W[6], W[3] * W[7] };
 
   switch (derivative)
   {
   case 0:
     flux[0] = W[1];
-    flux[1] = (W[1] * W[1] / W[0]) - W[4] * W[4] + total_pressure;
-    flux[2] = W[1] * W[2] / W[0] - W[4] * W[5];
-    flux[3] = W[1] * W[3] / W[0] - W[4] * W[6];
-    flux[4] = (W[7] + total_pressure) * W[1] / W[0] - W[4] * energy_item[0];
+    flux[1] = (W[1] * W[1] / W[0]) - W[5] * W[5] + total_pressure;
+    flux[2] = (W[1] * W[2] / W[0]) - W[5] * W[6];
+    flux[3] = (W[1] * W[3] / W[0]) - W[5] * W[7];
+    flux[4] = (W[4] + total_pressure) * (W[1] / W[0]) - W[5] * energy_item[0];
     flux[5] = 0.0;
-    flux[6] = W[1] / W[0] * W[5] - W[2] / W[0] * W[4];
-    flux[7] = W[1] / W[0] * W[6] - W[3] / W[0] * W[4];
+    flux[6] = ((W[1] / W[0]) * W[6]) - ((W[2] / W[0]) * W[5]);
+    flux[7] = ((W[1] / W[0]) * W[7]) - ((W[3] / W[0]) * W[5]);
     break;
   case 1:
     flux[0] = W[2];
-    flux[1] = W[2] * W[1] / W[0] - W[5] * W[4];
-    flux[2] = W[2] * W[2] / W[0] - W[5] * W[5] + total_pressure;
-    flux[3] = W[2] * W[3] / W[0] - W[5] * W[6];
-    flux[4] = (W[7] + total_pressure) * W[2] / W[0] - W[5] * energy_item[1];
-    flux[5] = W[2] / W[0] * W[4] - W[1] / W[0] * W[5];
+    flux[1] = (W[2] * W[1] / W[0]) - W[6] * W[5];
+    flux[2] = (W[2] * W[2] / W[0]) - W[6] * W[6] + total_pressure;
+    flux[3] = (W[2] * W[3] / W[0]) - W[6] * W[7];
+    flux[4] = (W[4] + total_pressure) * (W[2] / W[0]) - (W[6] * energy_item[1]);
+    flux[5] = ((W[2] / W[0]) * W[5]) - ((W[1] / W[0]) * W[6]);
     flux[6] = 0.0;
-    flux[7] = W[2] / W[0] * W[6] - W[3] / W[0] * W[5];
+    flux[7] = ((W[2] / W[0]) * W[7]) - ((W[3] / W[0]) * W[6]);
     break;
   case 2:
     flux[0] = W[3];
-    flux[1] = W[3] * W[1] / W[0] - W[6] * W[4];
-    flux[2] = W[3] * W[2] / W[0] - W[6] * W[5];
-    flux[3] = W[3] * W[3] / W[0] - W[6] * W[6] + total_pressure;
-    flux[4] = (W[7] + total_pressure) * W[3] / W[0] - W[6] * energy_item[2];
-    flux[5] = W[3] / W[0] * W[4] - W[1] / W[0] * W[6];
-    flux[6] = W[3] / W[0] * W[5] - W[2] / W[0] * W[6];
+    flux[1] = (W[3] * W[1] / W[0]) - W[7] * W[5];
+    flux[2] = (W[3] * W[2] / W[0]) - W[7] * W[6];
+    flux[3] = (W[3] * W[3] / W[0]) - W[7] * W[7] + total_pressure;
+    flux[4] = (W[4] + total_pressure) * (W[3] / W[0]) - (W[7] * energy_item[2]);
+    flux[5] = ((W[3] / W[0]) * W[5]) - ((W[1] / W[0]) * W[7]);
+    flux[6] = ((W[3] / W[0]) * W[6]) - ((W[2] / W[0]) * W[7]);
     flux[7] = 0.0;
   }
 }
@@ -122,33 +122,33 @@ template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W, std_cxx11::array <std_cxx11::array <typename InputVector::value_type, dim>, n_components > &flux) const
 {
   const typename InputVector::value_type total_pressure = compute_total_pressure(W);
-  typename InputVector::value_type energy_item[dim] = { W[1] * W[4], W[2] * W[5], W[3] * W[6] };
+  typename InputVector::value_type energy_item[dim] = { W[1] * W[5], W[2] * W[6], W[3] * W[7] };
 
   flux[0][0] = W[1];
-  flux[1][0] = (W[1] * W[1] / W[0]) - W[4] * W[4] + total_pressure;
-  flux[2][0] = W[1] * W[2] / W[0] - W[4] * W[5];
-  flux[3][0] = W[1] * W[3] / W[0] - W[4] * W[6];
-  flux[4][0] = (W[7] + total_pressure) * W[1] / W[0] - W[4] * energy_item[0];
+  flux[1][0] = (W[1] * W[1] / W[0]) - W[5] * W[5] + total_pressure;
+  flux[2][0] = (W[1] * W[2] / W[0]) - W[5] * W[6];
+  flux[3][0] = (W[1] * W[3] / W[0]) - W[5] * W[7];
+  flux[4][0] = (W[4] + total_pressure) * (W[1] / W[0]) - W[5] * energy_item[0];
   flux[5][0] = 0.0;
-  flux[6][0] = W[1] / W[0] * W[5] - W[2] / W[0] * W[4];
-  flux[7][0] = W[1] / W[0] * W[6] - W[3] / W[0] * W[4];
+  flux[6][0] = ((W[1] / W[0]) * W[6]) - ((W[2] / W[0]) * W[5]);
+  flux[7][0] = ((W[1] / W[0]) * W[7]) - ((W[3] / W[0]) * W[5]);
 
   flux[0][1] = W[2];
-  flux[1][1] = W[2] * W[1] / W[0] - W[5] * W[4];
-  flux[2][1] = W[2] * W[2] / W[0] - W[5] * W[5] + total_pressure;
-  flux[3][1] = W[2] * W[3] / W[0] - W[5] * W[6];
-  flux[4][1] = (W[7] + total_pressure) * W[2] / W[0] - W[5] * energy_item[1];
-  flux[5][1] = W[2] / W[0] * W[4] - W[1] / W[0] * W[5];
+  flux[1][1] = (W[2] * W[1] / W[0]) - W[6] * W[5];
+  flux[2][1] = (W[2] * W[2] / W[0]) - W[6] * W[6] + total_pressure;
+  flux[3][1] = (W[2] * W[3] / W[0]) - W[6] * W[7];
+  flux[4][1] = (W[4] + total_pressure) * (W[2] / W[0]) - (W[6] * energy_item[1]);
+  flux[5][1] = ((W[2] / W[0]) * W[5]) - ((W[1] / W[0]) * W[6]);
   flux[6][1] = 0.0;
-  flux[7][1] = W[2] / W[0] * W[6] - W[3] / W[0] * W[5];
+  flux[7][1] = ((W[2] / W[0]) * W[7]) - ((W[3] / W[0]) * W[6]);
 
   flux[0][2] = W[3];
-  flux[1][2] = W[3] * W[1] / W[0] - W[6] * W[4];
-  flux[2][2] = W[3] * W[2] / W[0] - W[6] * W[5];
-  flux[3][2] = W[3] * W[3] / W[0] - W[6] * W[6] + total_pressure;
-  flux[4][2] = (W[7] + total_pressure) * W[3] / W[0] - W[6] * energy_item[2];
-  flux[5][2] = W[3] / W[0] * W[4] - W[1] / W[0] * W[6];
-  flux[6][2] = W[3] / W[0] * W[5] - W[2] / W[0] * W[6];
+  flux[1][2] = (W[3] * W[1] / W[0]) - W[7] * W[5];
+  flux[2][2] = (W[3] * W[2] / W[0]) - W[7] * W[6];
+  flux[3][2] = (W[3] * W[3] / W[0]) - W[7] * W[7] + total_pressure;
+  flux[4][2] = (W[4] + total_pressure) * (W[3] / W[0]) - (W[7] * energy_item[2]);
+  flux[5][2] = ((W[3] / W[0]) * W[5]) - ((W[1] / W[0]) * W[7]);
+  flux[6][2] = ((W[3] / W[0]) * W[6]) - ((W[2] / W[0]) * W[7]);
   flux[7][2] = 0.0;
 }
 
@@ -179,7 +179,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux)
 {
   // If we use Lax Friedrich's flux.
-  //if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
   std_cxx11::array<typename InputVector::value_type, n_components> normal_flux_lf;
   {
     std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
@@ -197,7 +196,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       normal_flux_lf[di] = normal_flux[di];
     }
 
-    //return;
+    if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+      return;
   }
 
   // If we use HLLD
@@ -208,7 +208,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     int dir_sign = normal[dir_abs] > 0. ? 1. : -1.;
     rho_L = Wplus[0], rho_R = Wminus[0];
     VelN_L = Wplus[1 + dir_abs] / rho_L, VelN_R = Wminus[1 + dir_abs] / rho_R;
-    MagN_L = Wplus[4 + dir_abs], MagN_R = Wminus[4 + dir_abs];
+    MagN_L = Wplus[5 + dir_abs], MagN_R = Wminus[5 + dir_abs];
 
     typename InputVector::value_type p_L, p_R, p_T_R, p_T_L, S_M, B_x, psT, B2L, B2R, S_L, S_R;
     typename InputVector::value_type aL2, aR2, cfL, cfR;
@@ -238,37 +238,21 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     if (S_L > 0.)
     {
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
+      normal_flux[5 + dir_abs] = 0.;
+
       for (unsigned int di = 0; di < n_components; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
-      for (unsigned int di = 0; di < n_components; ++di)
-      {
-        if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
-        {
-          if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
-          {
-            int a = 1;
-          }
-        }
-      }
+
       return;
     }
 
     if (S_R < 0.)
     {
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
+      normal_flux[5 + dir_abs] = 0.;
       for (unsigned int di = 0; di < n_components; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
 
-      for (unsigned int di = 0; di < n_components; ++di)
-      {
-        if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
-        {
-          if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
-          {
-            int a = 1;
-          }
-        }
-      }
       return;
     }
 
@@ -297,26 +281,26 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       case 0:
         magxStarL = B_x;
         velxStarL = S_M;
-        magyStarL = Wplus[5] * scrch5L;
-        magzStarL = Wplus[6] * scrch5L;
-        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[4] * Wplus[5] * scrch4L;
-        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[4] * Wplus[6] * scrch4L;
+        magyStarL = Wplus[6] * scrch5L;
+        magzStarL = Wplus[7] * scrch5L;
+        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[5] * Wplus[6] * scrch4L;
+        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[5] * Wplus[7] * scrch4L;
         break;
       case 1:
         magyStarL = B_x;
         velyStarL = S_M;
-        magxStarL = Wplus[4] * scrch5L;
-        magzStarL = Wplus[6] * scrch5L;
-        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[5] * Wplus[4] * scrch4L;
-        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[5] * Wplus[6] * scrch4L;
+        magxStarL = Wplus[5] * scrch5L;
+        magzStarL = Wplus[7] * scrch5L;
+        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[6] * Wplus[5] * scrch4L;
+        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[6] * Wplus[7] * scrch4L;
         break;
       case 2:
         magzStarL = B_x;
         velzStarL = S_M;
-        magxStarL = Wplus[4] * scrch5L;
-        magyStarL = Wplus[5] * scrch5L;
-        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[6] * Wplus[4] * scrch4L;
-        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[6] * Wplus[5] * scrch4L;
+        magxStarL = Wplus[5] * scrch5L;
+        magyStarL = Wplus[6] * scrch5L;
+        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[7] * Wplus[5] * scrch4L;
+        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[7] * Wplus[6] * scrch4L;
         break;
       }
 
@@ -324,11 +308,12 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       Us_L[2] = Us_L[0] * velyStarL;
       Us_L[3] = Us_L[0] * velzStarL;
 
-      Us_L[4] = magxStarL;
-      Us_L[5] = magyStarL;
-      Us_L[6] = magzStarL;
-      Us_L[7] = scrch1L * Wplus[7] - p_T_L * VelN_L + psT * S_M + B_x * (((Wplus[1] * Wplus[4] + Wplus[2] * Wplus[5] + Wplus[3] * Wplus[6]) / Wplus[0]) - velxStarL * Us_L[4] - velyStarL * Us_L[5] - velzStarL * Us_L[6]);
-      Us_L[7] = Us_L[7] / scrch2L;
+      Us_L[5] = magxStarL;
+      Us_L[6] = magyStarL;
+      Us_L[7] = magzStarL;
+      
+      // This has to be here as it uses the previous values in the same array.
+      Us_L[4] = (scrch1L * Wplus[4] - p_T_L * VelN_L + psT * S_M + B_x * (((Wplus[1] * Wplus[5] + Wplus[2] * Wplus[6] + Wplus[3] * Wplus[7]) / Wplus[0]) - velxStarL * Us_L[5] - velyStarL * Us_L[6] - velzStarL * Us_L[7])) / scrch2L;
     }
 
     std_cxx11::array<typename InputVector::value_type, n_components> Us_R;
@@ -339,37 +324,38 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       case 0:
         magxStarR = B_x;
         velxStarR = S_M;
-        magyStarR = Wminus[5] * scrch5R;
-        magzStarR = Wminus[6] * scrch5R;
-        velyStarR = (Wminus[1] / Wminus[0]) - Wminus[4] * Wminus[5] * scrch4R;
-        velzStarR = (Wminus[2] / Wminus[0]) - Wminus[4] * Wminus[6] * scrch4R;
+        magyStarR = Wminus[6] * scrch5R;
+        magzStarR = Wminus[7] * scrch5R;
+        velyStarR = (Wminus[1] / Wminus[0]) - Wminus[5] * Wminus[6] * scrch4R;
+        velzStarR = (Wminus[2] / Wminus[0]) - Wminus[5] * Wminus[7] * scrch4R;
         break;
       case 1:
         magyStarR = B_x;
         velyStarR = S_M;
-        magxStarR = Wminus[4] * scrch5R;
-        magzStarR = Wminus[6] * scrch5R;
-        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[5] * Wminus[4] * scrch4R;
-        velzStarR = (Wminus[2] / Wminus[0]) - Wminus[5] * Wminus[6] * scrch4R;
+        magxStarR = Wminus[5] * scrch5R;
+        magzStarR = Wminus[7] * scrch5R;
+        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[6] * Wminus[5] * scrch4R;
+        velzStarR = (Wminus[2] / Wminus[0]) - Wminus[6] * Wminus[7] * scrch4R;
         break;
       case 2:
         magzStarR = B_x;
         velzStarR = S_M;
-        magxStarR = Wminus[4] * scrch5R;
-        magyStarR = Wminus[5] * scrch5R;
-        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[6] * Wminus[4] * scrch4R;
-        velyStarR = (Wminus[1] / Wminus[0]) - Wminus[6] * Wminus[5] * scrch4R;
+        magxStarR = Wminus[5] * scrch5R;
+        magyStarR = Wminus[6] * scrch5R;
+        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[7] * Wminus[5] * scrch4R;
+        velyStarR = (Wminus[1] / Wminus[0]) - Wminus[7] * Wminus[6] * scrch4R;
       }
 
       Us_R[1] = Us_R[0] * velxStarR;
       Us_R[2] = Us_R[0] * velyStarR;
       Us_R[3] = Us_R[0] * velzStarR;
 
-      Us_R[4] = magxStarR;
-      Us_R[5] = magyStarR;
-      Us_R[6] = magzStarR;
-      Us_R[7] = scrch1R * Wminus[7] - p_T_R * VelN_R + psT * S_M + B_x * (((Wminus[1] * Wminus[4] + Wminus[2] * Wminus[5] + Wminus[3] * Wminus[6]) / Wminus[0]) - velxStarR * Us_R[4] - velyStarR * Us_R[5] - velzStarR * Us_R[6]);
-      Us_R[7] = Us_R[7] / scrch2R;
+      Us_R[5] = magxStarR;
+      Us_R[6] = magyStarR;
+      Us_R[7] = magzStarR;
+
+      // This has to be here as it uses the previous values in the same array.
+      Us_R[4] = (scrch1R * Wminus[4] - p_T_R * VelN_R + psT * S_M + B_x * (((Wminus[1] * Wminus[5] + Wminus[2] * Wminus[6] + Wminus[3] * Wminus[7]) / Wminus[0]) - velxStarR * Us_R[5] - velyStarR * Us_R[6] - velzStarR * Us_R[7])) / scrch2R;
     }
 
     typename InputVector::value_type Ss_L = S_M - (std::abs(B_x) / std::sqrt(Us_L[0]));
@@ -385,19 +371,10 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         this->compute_flux_vector(dir_abs, Wplus, F_L);
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
+        normal_flux[5 + dir_abs] = 0.;
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
 
-        for (unsigned int di = 0; di < n_components; ++di)
-        {
-          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
-          {
-            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
-            {
-              int a = 1;
-            }
-          }
-        }
         return;
       }
     }
@@ -411,19 +388,10 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         this->compute_flux_vector(dir_abs, Wminus, F_R);
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
+        normal_flux[5 + dir_abs] = 0.;
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
 
-        for (unsigned int di = 0; di < n_components; ++di)
-        {
-          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
-          {
-            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
-            {
-              int a = 1;
-            }
-          }
-        }
         return;
       }
     }
@@ -439,23 +407,23 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
     case 0:
       velxStar2 = S_M;
-      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
-      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
+      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
+      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[7] - Us_L[7]) * signumBn) * scrch2L;
       magxStar2 = B_x;
       magyStar2 = (scrch1L * magyStarR + scrch1R * magyStarL + scrch1L * scrch1R * (velyStarR - velyStarL) * signumBn) * scrch2L;
       magzStar2 = (scrch1L * magzStarR + scrch1R * magzStarL + scrch1L * scrch1R * (velzStarR - velzStarL) * signumBn) * scrch2L;
       break;
     case 1:
-      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[4] - Us_L[4]) * signumBn) * scrch2L;
+      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
       velyStar2 = S_M;
-      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
+      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[7] - Us_L[7]) * signumBn) * scrch2L;
       magxStar2 = (scrch1L * magxStarR + scrch1R * magxStarL + scrch1L * scrch1R * (velxStarR - velxStarL) * signumBn) * scrch2L;
       magyStar2 = B_x;
       magzStar2 = (scrch1L * magzStarR + scrch1R * magzStarL + scrch1L * scrch1R * (velzStarR - velzStarL) * signumBn) * scrch2L;
       break;
     case 2:
-      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[4] - Us_L[4]) * signumBn) * scrch2L;
-      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
+      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
+      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
       velzStar2 = S_M;
       magxStar2 = (scrch1L * magxStarR + scrch1R * magxStarL + scrch1L * scrch1R * (velxStarR - velxStarL) * signumBn) * scrch2L;
       magyStar2 = (scrch1L * magyStarR + scrch1R * magyStarL + scrch1L * scrch1R * (velyStarR - velyStarL) * signumBn) * scrch2L;
@@ -477,26 +445,19 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         Uss_L[2] = Uss_L[0] * velyStar2;
         Uss_L[3] = Uss_L[0] * velzStar2;
 
-        Uss_L[4] = magxStar2;
-        Uss_L[5] = magyStar2;
-        Uss_L[6] = magzStar2;
-        Uss_L[7] = Us_L[7] - sqrt(Us_L[0]) * signumBn * (velxStarL * Us_L[4] + velyStarL * Us_L[5] + velzStarL * Us_L[6] - velxStar2 * Uss_L[4] - velyStar2 * Uss_L[5] - velzStar2 * Uss_L[6]);
+        Uss_L[5] = magxStar2;
+        Uss_L[6] = magyStar2;
+        Uss_L[7] = magzStar2;
+
+        // This has to be here as it uses the previous values in the same array.
+        Uss_L[4] = Us_L[4] - sqrt(Us_L[0]) * signumBn * (velxStarL * Us_L[5] + velyStarL * Us_L[6] + velzStarL * Us_L[7] - velxStar2 * Uss_L[5] - velyStar2 * Uss_L[6] - velzStar2 * Uss_L[7]);
 
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
+        normal_flux[5 + dir_abs] = 0.;
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
 
-        for (unsigned int di = 0; di < n_components; ++di)
-        {
-          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
-          {
-            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
-            {
-              int a = 1;
-            }
-          }
-        }
         return;
       }
     }
@@ -515,27 +476,21 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         Uss_R[1] = Uss_R[0] * velxStar2;
         Uss_R[2] = Uss_R[0] * velyStar2;
         Uss_R[3] = Uss_R[0] * velzStar2;
+        
+        Uss_R[5] = magxStar2;
+        Uss_R[6] = magyStar2;
+        Uss_R[7] = magzStar2;
 
-        Uss_R[4] = magxStar2;
-        Uss_R[5] = magyStar2;
-        Uss_R[6] = magzStar2;
-        Uss_R[7] = Us_R[7] + sqrt(Us_R[0]) * signumBn * (velxStarR * Us_R[4] + velyStarR * Us_R[5] + velzStarR * Us_R[6] - velxStar2 * Uss_R[4] - velyStar2 * Uss_R[5] - velzStar2 * Uss_R[6]);
+        // This has to be here as it uses the previous values in the same array.
+        Uss_R[4] = Us_R[4] + sqrt(Us_R[0]) * signumBn * (velxStarR * Us_R[5] + velyStarR * Us_R[6] + velzStarR * Us_R[7] - velxStar2 * Uss_R[5] - velyStar2 * Uss_R[6] - velzStar2 * Uss_R[7]);
 
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
-        for (unsigned int di = 0; di < n_components; ++di)
-          normal_flux[di] = dir_sign * normal_flux[di];
+        normal_flux[5 + dir_abs] = 0.;
 
         for (unsigned int di = 0; di < n_components; ++di)
-        {
-          if (std::abs(normal_flux_lf[di]) > 1e-8 || std::abs(normal_flux[di]) > 1e-8)
-          {
-            if (std::abs(normal_flux_lf[di] - normal_flux[di]) > 1e-5)
-            {
-              int a = 1;
-            }
-          }
-        }
+          normal_flux[di] = dir_sign * normal_flux[di];
+        
         return;
       }
     }

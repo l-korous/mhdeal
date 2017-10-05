@@ -16,9 +16,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   boundary_conditions(boundary_conditions),
   mapping(),
   // Creating the FE system - first spaces for density & momentum, then for the mag field, and lastly for the energy.
-  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 4,
-    FE_RaviartThomas<dim>(1), 1,
-    FE_DGT<dim>(parameters.polynomial_order_dg), 1),
+  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
+    FE_RaviartThomas<dim>(1), 1),
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
@@ -93,9 +92,9 @@ void Problem<equationsType, dim>::postprocess()
     {
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
       if (component_i != 1)
-      {
+      { 
         unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-        component_ii = (component_ii == 7 ? 4 : component_ii);
+        
         if (!u_c_set[component_ii])
         {
           u_c[component_ii] = current_solution(dof_indices[i]);
@@ -143,14 +142,8 @@ void Problem<equationsType, dim>::postprocess()
       std::set<unsigned int> visited_faces;
 
       // (!!!) Find out u_i
-      double u_i[5];
-      Vector<double> vec_to_retrieve_value(8);
-      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), vec_to_retrieve_value);
-      u_i[0] = vec_to_retrieve_value[0];
-      u_i[1] = vec_to_retrieve_value[1];
-      u_i[2] = vec_to_retrieve_value[2];
-      u_i[3] = vec_to_retrieve_value[3];
-      u_i[4] = vec_to_retrieve_value[7];
+      Vector<double> u_i(8);
+      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), u_i);
 
       if (this->parameters.debug_limiter)
         std::cout << "\tv_i: " << cell->vertex(i) << ", values: " << u_i[0] << ", " << u_i[1] << ", " << u_i[2] << ", " << u_i[3] << ", " << u_i[4] << std::endl;
@@ -196,7 +189,7 @@ void Problem<equationsType, dim>::postprocess()
             if (component_i != 1)
             {
               unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-              component_ii = (component_ii == 7 ? 4 : component_ii);
+              
               if (!u_i_extrema_set[component_ii])
               {
                 double val = current_solution(dof_indices_neighbor[dof]);
@@ -248,7 +241,7 @@ void Problem<equationsType, dim>::postprocess()
                 if (component_i != 1)
                 {
                   unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-                  component_ii = (component_ii == 7 ? 4 : component_ii);
+                  
                   if (!u_i_extrema_set[component_ii])
                   {
                     u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
@@ -464,7 +457,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       }
     }
 
-    const FEValuesExtractors::Vector mag(dim + 1);
+    const FEValuesExtractors::Vector mag(dim + 2);
 
     if (initial_step)
     {
@@ -484,9 +477,9 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
-            W_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-            W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-            W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+            W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+            W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+            W_old[q][7] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
           }
           // For the other components (spaces), we go by each component.
           else
@@ -524,17 +517,17 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             std::cout << W_old[q][i] << (i < 7 ? ", " : "");
           std::cout << std::endl;
 
-          std::cout << "F[x]: ";
+          std::cout << "F[X]: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
           std::cout << std::endl;
 
-          std::cout << "F[y]: ";
+          std::cout << "F[Y]: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
           std::cout << std::endl;
 
-          std::cout << "F[z]: ";
+          std::cout << "F[Z]: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
           std::cout << std::endl;
@@ -558,7 +551,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         {
           if (parameters.is_stationary == false)
             val -= (1.0 / parameters.time_step)
-            * (W_old[q][4] * fe_v[mag].value(i, q)[0] + W_old[q][5] * fe_v[mag].value(i, q)[1] + W_old[q][6] * fe_v[mag].value(i, q)[2])
+            * (W_old[q][5] * fe_v[mag].value(i, q)[0] + W_old[q][6] * fe_v[mag].value(i, q)[1] + W_old[q][7] * fe_v[mag].value(i, q)[2])
             * fe_v.JxW(q);
 
           if (parameters.debug && q == 0)
@@ -569,14 +562,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           if (!initial_step)
           {
             for (unsigned int d = 0; d < dim; d++)
-              val -= (1.0 - parameters.theta) * (flux_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+              val -= (1.0 - parameters.theta) * (flux_old[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
             if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
-                val += (1.0 - parameters.theta) * (jacobian_addition_old[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+                val += (1.0 - parameters.theta) * (jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
             if (parameters.needs_forcing)
-              val -= (1.0 - parameters.theta) * (forcing_old[q][4] * fe_v[mag].value(i, q)[0] + forcing_old[q][5] * fe_v[mag].value(i, q)[1] + forcing_old[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
+              val -= (1.0 - parameters.theta) * (forcing_old[q][5] * fe_v[mag].value(i, q)[0] + forcing_old[q][6] * fe_v[mag].value(i, q)[1] + forcing_old[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
         }
         // For the other components (spaces), we go by each component.
@@ -646,7 +639,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       }
     }
 
-    const FEValuesExtractors::Vector mag(dim + 1);
+    const FEValuesExtractors::Vector mag(dim + 2);
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
@@ -657,9 +650,9 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
         {
-          W[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
-          W[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
-          W[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
+          W[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
+          W[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
+          W[q][7] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
         }
         // For the other components (spaces), we go by each component.
         else
@@ -704,7 +697,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         {
           if (parameters.is_stationary == false)
             R_i += (1.0 / parameters.time_step)
-            * (W[q][4] * fe_v[mag].value(i, q)[0] + W[q][5] * fe_v[mag].value(i, q)[1] + W[q][6] * fe_v[mag].value(i, q)[2])
+            * (W[q][5] * fe_v[mag].value(i, q)[0] + W[q][6] * fe_v[mag].value(i, q)[1] + W[q][7] * fe_v[mag].value(i, q)[2])
             * fe_v.JxW(q);
         }
         else
@@ -719,14 +712,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           if (component_i == 1)
           {
             for (unsigned int d = 0; d < dim; d++)
-              R_i -= parameters.theta * (flux[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + flux[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + flux[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+              R_i -= parameters.theta * (flux[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + flux[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + flux[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
             if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
-                R_i += parameters.theta * (jacobian_addition[q][4][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition[q][5][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition[q][6][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+                R_i += parameters.theta * (jacobian_addition[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
 
             if (parameters.needs_forcing)
-              R_i -= parameters.theta * (forcing[q][4] * fe_v[mag].value(i, q)[0] + forcing[q][5] * fe_v[mag].value(i, q)[1] + forcing[q][6] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
+              R_i -= parameters.theta * (forcing[q][5] * fe_v[mag].value(i, q)[0] + forcing[q][6] * fe_v[mag].value(i, q)[1] + forcing[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
           }
           // For the other components (spaces), we go by each component.
           else
@@ -784,7 +777,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
 
-    const FEValuesExtractors::Vector mag(dim + 1);
+    const FEValuesExtractors::Vector mag(dim + 2);
 
     if (parameters.debug)
       std::cout << "edqe: " << face_no << std::endl;
@@ -801,9 +794,9 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
-            Wplus_old[q][4] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
+            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
+            Wplus_old[q][7] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
           }
           // For the other components (spaces), we go by each component.
           else
@@ -819,9 +812,9 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
             if (component_i_neighbor == 1)
             {
-              Wminus_old[q][4] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
-              Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
-              Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+              Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+              Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+              Wminus_old[q][7] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
             }
             // For the other components (spaces), we go by each component.
             else
@@ -882,7 +875,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           if (component_i == 1)
           {
             val += (1.0 - parameters.theta)
-              * (normal_fluxes_old[q][4] * fe_v[mag].value(i, q)[0] + normal_fluxes_old[q][5] * fe_v[mag].value(i, q)[1] + normal_fluxes_old[q][6] * fe_v[mag].value(i, q)[2])
+              * (normal_fluxes_old[q][5] * fe_v[mag].value(i, q)[0] + normal_fluxes_old[q][6] * fe_v[mag].value(i, q)[1] + normal_fluxes_old[q][7] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
           }
           // For the other components (spaces), we go by each component.
@@ -936,7 +929,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       }
     }
 
-    const FEValuesExtractors::Vector mag(dim + 1);
+    const FEValuesExtractors::Vector mag(dim + 2);
 
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
@@ -949,9 +942,9 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
-            Wplus[q][4] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
-            Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
-            Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
+            Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
+            Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
+            Wplus[q][7] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
           }
           // For the other components (spaces), we go by each component.
           else
@@ -967,9 +960,9 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
             if (component_i_neighbor == 1)
             {
-              Wminus[q][4] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
-              Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
-              Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
+              Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
+              Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
+              Wminus[q][7] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
             }
             // For the other components (spaces), we go by each component.
             else
@@ -1008,7 +1001,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           if (component_i == 1)
           {
             R_i += (1.0 - parameters.theta)
-              * (normal_fluxes[q][4] * fe_v[mag].value(i, q)[0] + normal_fluxes[q][5] * fe_v[mag].value(i, q)[1] + normal_fluxes[q][6] * fe_v[mag].value(i, q)[2])
+              * (normal_fluxes[q][5] * fe_v[mag].value(i, q)[0] + normal_fluxes[q][6] * fe_v[mag].value(i, q)[1] + normal_fluxes[q][7] * fe_v[mag].value(i, q)[2])
               * fe_v.JxW(q);
           }
           // For the other components (spaces), we go by each component.
