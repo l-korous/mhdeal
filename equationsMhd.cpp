@@ -114,6 +114,7 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_vector(const int derivative,
     flux[5] = ((W[3] / W[0]) * W[5]) - ((W[1] / W[0]) * W[7]);
     flux[6] = ((W[3] / W[0]) * W[6]) - ((W[2] / W[0]) * W[7]);
     flux[7] = 0.0;
+    break;
   }
 }
 
@@ -240,6 +241,9 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
       normal_flux[5 + dir_abs] = 0.;
 
+      for (unsigned int di = 0; di < n_components; ++di)
+        if(di != 0) normal_flux[di] = dir_sign * normal_flux[di];
+
       return;
     }
 
@@ -247,12 +251,14 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
       normal_flux[5 + dir_abs] = 0.;
+      for (unsigned int di = 0; di < n_components; ++di)
+        if(di != 0) normal_flux[di] = dir_sign * normal_flux[di];
 
       return;
     }
 
     // Now we need to calculate S_M & all other stuff.
-    S_M = (((S_R - VelN_R) * (rho_R * VelN_R)) - ((S_L - VelN_L) * (rho_L * VelN_L)) - (p_T_R)+(p_T_L)) / (((S_R - VelN_R) * rho_R) - ((S_L - VelN_L) * rho_L));
+    S_M = (((S_R - VelN_R) * (rho_R * VelN_R)) - ((S_L - VelN_L) * (rho_L * VelN_L)) - p_T_R + p_T_L - (MagN_L * MagN_L) + (MagN_R * MagN_R)) / (((S_R - VelN_R) * rho_R) - ((S_L - VelN_L) * rho_L));
     B_x = (S_R * MagN_R - S_L * MagN_L) / (S_R - S_L);
 
     typename InputVector::value_type scrch1L = S_L - VelN_L, scrch2L = S_L - S_M, scrch3L = S_M - VelN_L;
@@ -359,7 +365,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     // Fs_L, Fss_L
     if (S_M >= 0.)
     {
-      // THIS is different to RIGHT state.
       if (Ss_L >= 0.)
       {
         std_cxx11::array<typename InputVector::value_type, n_components> F_L;
@@ -367,6 +372,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
         normal_flux[5 + dir_abs] = 0.;
+        for (unsigned int di = 0; di < n_components; ++di)
+          if(di != 0) normal_flux[di] = dir_sign * normal_flux[di];
 
         return;
       }
@@ -374,7 +381,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     // Fs_R, Fss_R
     else
     {
-      // THIS is different to LEFT state.
       if (Ss_R <= 0.)
       {
         std_cxx11::array<typename InputVector::value_type, n_components> F_R;
@@ -382,6 +388,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
         normal_flux[5 + dir_abs] = 0.;
+        for (unsigned int di = 0; di < n_components; ++di)
+          if(di != 0) normal_flux[di] = dir_sign * normal_flux[di];
 
         return;
       }
@@ -424,7 +432,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     // Fs_L, Fss_L
     if (S_M >= 0.)
     {
-      // THIS is different to RIGHT state.
       if (Ss_L < 0.)
       {
         std_cxx11::array<typename InputVector::value_type, n_components> F_L;
@@ -446,6 +453,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
         normal_flux[5 + dir_abs] = 0.;
+        for (unsigned int di = 0; di < n_components; ++di)
+          if(di != 0) normal_flux[di] = dir_sign * normal_flux[di];
 
         return;
       }
@@ -453,7 +462,6 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     // Fs_R, Fss_R
     else
     {
-      // THIS is different to LEFT state.
       if (Ss_R > 0.)
       {
         std_cxx11::array<typename InputVector::value_type, n_components> F_R;
@@ -477,6 +485,9 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
           normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
         normal_flux[5 + dir_abs] = 0.;
 
+        for (unsigned int di = 0; di < n_components; ++di)
+          if(di != 0) normal_flux[di] = dir_sign * normal_flux[di];
+        
         return;
       }
     }
