@@ -477,9 +477,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
-            W_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-            W_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-            W_old[q][7] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+            W_old[q][5] += old_solution(dof_indices[i]) * fe_v_value[0];
+            W_old[q][6] += old_solution(dof_indices[i]) * fe_v_value[1];
+            W_old[q][7] += old_solution(dof_indices[i]) * fe_v_value[2];
           }
           // For the other components (spaces), we go by each component.
           else
@@ -550,10 +551,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         if (component_i == 1)
         {
           if (parameters.is_stationary == false)
-            val -= (1.0 / parameters.time_step)
-            * (W_old[q][5] * fe_v[mag].value(i, q)[0] + W_old[q][6] * fe_v[mag].value(i, q)[1] + W_old[q][7] * fe_v[mag].value(i, q)[2])
-            * fe_v.JxW(q);
+          {
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
 
+            val -= (1.0 / parameters.time_step)
+              * (W_old[q][5] * fe_v_value[0] + W_old[q][6] * fe_v_value[1] + W_old[q][7] * fe_v_value[2])
+              * fe_v.JxW(q);
+          }
           if (parameters.debug && q == 0)
           {
             std::cout << "DOF: " << i << " - COMP: " << component_i << std::endl;
@@ -561,8 +565,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
           if (!initial_step)
           {
+            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
             for (unsigned int d = 0; d < dim; d++)
-              val -= (1.0 - parameters.theta) * (flux_old[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + flux_old[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + flux_old[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+              for (unsigned int e = 0; e < dim; e++)
+                val -= (1.0 - parameters.theta) * (flux_old[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
 
             if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
@@ -650,9 +656,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
         {
-          W[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
-          W[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
-          W[q][7] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
+          dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+          W[q][5] += independent_local_dof_values[i] * fe_v_value[0];
+          W[q][6] += independent_local_dof_values[i] * fe_v_value[1];
+          W[q][7] += independent_local_dof_values[i] * fe_v_value[2];
         }
         // For the other components (spaces), we go by each component.
         else
@@ -696,9 +703,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         if (component_i == 1)
         {
           if (parameters.is_stationary == false)
+          {
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+
             R_i += (1.0 / parameters.time_step)
-            * (W[q][5] * fe_v[mag].value(i, q)[0] + W[q][6] * fe_v[mag].value(i, q)[1] + W[q][7] * fe_v[mag].value(i, q)[2])
-            * fe_v.JxW(q);
+              * (W[q][5] * fe_v_value[0] + W[q][6] * fe_v_value[1] + W[q][7] * fe_v_value[2])
+              * fe_v.JxW(q);
+          }
         }
         else
         {
@@ -711,8 +722,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
+            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
             for (unsigned int d = 0; d < dim; d++)
-              R_i -= parameters.theta * (flux[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + flux[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + flux[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+              for (unsigned int e = 0; e < dim; e++)
+              R_i -= parameters.theta * (flux[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
 
             if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
@@ -794,9 +807,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
-            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[0];
-            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[1];
-            Wplus_old[q][7] += old_solution(dof_indices[i]) * fe_v[mag].value(i, q)[2];
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v_value[0];
+            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v_value[1];
+            Wplus_old[q][7] += old_solution(dof_indices[i]) * fe_v_value[2];
           }
           // For the other components (spaces), we go by each component.
           else
@@ -874,8 +888,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+
             val += (1.0 - parameters.theta)
-              * (normal_fluxes_old[q][5] * fe_v[mag].value(i, q)[0] + normal_fluxes_old[q][6] * fe_v[mag].value(i, q)[1] + normal_fluxes_old[q][7] * fe_v[mag].value(i, q)[2])
+              * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
           }
           // For the other components (spaces), we go by each component.
@@ -942,9 +958,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
-            Wplus[q][5] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[0];
-            Wplus[q][6] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[1];
-            Wplus[q][7] += independent_local_dof_values[i] * fe_v[mag].value(i, q)[2];
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+            Wplus[q][5] += independent_local_dof_values[i] * fe_v_value[0];
+            Wplus[q][6] += independent_local_dof_values[i] * fe_v_value[1];
+            Wplus[q][7] += independent_local_dof_values[i] * fe_v_value[2];
           }
           // For the other components (spaces), we go by each component.
           else
@@ -1000,8 +1017,9 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
+            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
             R_i += (1.0 - parameters.theta)
-              * (normal_fluxes[q][5] * fe_v[mag].value(i, q)[0] + normal_fluxes[q][6] * fe_v[mag].value(i, q)[1] + normal_fluxes[q][7] * fe_v[mag].value(i, q)[2])
+              * (normal_fluxes[q][5] * fe_v_value[0] + normal_fluxes[q][6] * fe_v_value[1] + normal_fluxes[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
           }
           // For the other components (spaces), we go by each component.
