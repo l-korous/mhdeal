@@ -14,17 +14,17 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   // Two corners of the hyper-rectangle
   // - corner A
-  this->corner_a = Point<dim>(-0.4, -.4, 0.);
+  this->corner_a = Point<dim>(-0.0, -.2, 0.);
   // - and corner B which should be the farthest one from corner A
-  this->corner_b = Point<dim>(.4 , .4, .01);
+  this->corner_b = Point<dim>(.2 , .2, .01);
   // Refinements in x-, y-, and z- coordinates.
-  this->refinements = { 100, 100, 1 };
+  this->refinements = { 10, 20, 1 };
   // deal.II function that takes the above attributes and returns the triangulation (the first parameter, passed by reference).
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b, true);
 
   this->time_step = 1.e-5;
   this->final_time = 10.;
-  this->cfl_constant = .05;
+  this->cfl_constant = .01;
 
   this->theta = 0.0;
   this->postprocess_in_newton_loop = true;
@@ -57,7 +57,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->newton_max_iterations = 30;
   this->newton_residual_norm_threshold = 1e-8;
 
-  this->num_flux_type = hlld;
+  this->num_flux_type = lax_friedrich;
   this->lax_friedrich_stabilization_value = 0.;
 
   this->is_stationary = false;
