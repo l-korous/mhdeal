@@ -14,11 +14,11 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   // Two corners of the hyper-rectangle
   // - corner A
-  this->corner_a = Point<dim>(-0.0, -.2, 0.);
+  this->corner_a = Point<dim>(-0.2, -.2, 0.);
   // - and corner B which should be the farthest one from corner A
   this->corner_b = Point<dim>(.2 , .2, .01);
   // Refinements in x-, y-, and z- coordinates.
-  this->refinements = { 10, 20, 1 };
+  this->refinements = { 13, 13, 1 };
   // deal.II function that takes the above attributes and returns the triangulation (the first parameter, passed by reference).
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b, true);
 
@@ -31,7 +31,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->polynomial_order_dg = 0;
   this->polynomial_order_hdiv = 0;
 
-  this->quadrature_order = 6;
+  this->quadrature_order = 5;
 
   this->patches = 2;
 

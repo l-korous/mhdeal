@@ -58,7 +58,7 @@ template <int dim>
 template <typename InputVector>
 typename InputVector::value_type Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
 {
-  return (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W));
+  return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
@@ -246,7 +246,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     if (S_L > 0.)
     {
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
-      //normal_flux[5 + dir_abs] = 0.;
+      normal_flux[5 + dir_abs] = 0.;
 
       for (unsigned int di = 0; di < n_components; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
@@ -257,7 +257,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     if (S_R < 0.)
     {
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
-      //normal_flux[5 + dir_abs] = 0.;
+      normal_flux[5 + dir_abs] = 0.;
       for (unsigned int di = 0; di < n_components; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
 
@@ -378,7 +378,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         this->compute_flux_vector(dir_abs, Wplus, F_L);
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
-        //normal_flux[5 + dir_abs] = 0.;
+        normal_flux[5 + dir_abs] = 0.;
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
 
@@ -394,7 +394,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         this->compute_flux_vector(dir_abs, Wminus, F_R);
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
-        //normal_flux[5 + dir_abs] = 0.;
+        normal_flux[5 + dir_abs] = 0.;
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
 
@@ -407,7 +407,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     scrch2L = 1. / (scrch1L + scrch1R);
     scrch2R = scrch2L;
 
-    signumBn = (B_x > 0. ? 1. : -1.);
+    signumBn = std::abs(B_x) > NEGLIGIBLE ? (B_x > 0. ? 1. : -1.) : 0.;
 
     switch (dir_abs)
     {
@@ -459,7 +459,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
-        //normal_flux[5 + dir_abs] = 0.;
+        normal_flux[5 + dir_abs] = 0.;
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
 
@@ -490,7 +490,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
         for (int k = 0; k < n_components; k++)
           normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
-        //normal_flux[5 + dir_abs] = 0.;
+        normal_flux[5 + dir_abs] = 0.;
 
         for (unsigned int di = 0; di < n_components; ++di)
           normal_flux[di] = dir_sign * normal_flux[di];
