@@ -88,8 +88,8 @@ void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> >
       result[i][4] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5;
     else
       result[i][4] = .1 / (this->getParams().gas_gamma - 1.0) + 0.5;
-    result[i][5] = 1.0 / std::sqrt(2.);
-    result[i][6] = 1.0 / std::sqrt(2.);
+    result[i][5] = 0.;// 1.0 / std::sqrt(2.);
+    result[i][6] = 0.;//1.0 / std::sqrt(2.);
     result[i][7] = 0.;
   }
 }
