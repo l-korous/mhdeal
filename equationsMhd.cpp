@@ -247,7 +247,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
 
-      for (unsigned int di = 0; di < 8; ++di)
+      for (unsigned int di = 0; di < 8; ++di) if (di != 0 && di != 4)
         normal_flux[di] = dir_sign * normal_flux[di];
 
       if (parameters.debug)
@@ -260,7 +260,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
 
-      for (unsigned int di = 0; di < 8; ++di)
+      for (unsigned int di = 0; di < 8; ++di) if (di != 0 && di != 4)
         normal_flux[di] = dir_sign * normal_flux[di];
 
       if (parameters.debug)
@@ -380,7 +380,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       this->compute_flux_vector(dir_abs, Wplus, F_L);
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
-      for (unsigned int di = 0; di < 8; ++di)
+      for (unsigned int di = 0; di < 8; ++di) if (di != 0 && di != 4)
         normal_flux[di] = dir_sign * normal_flux[di]; 
 
       if (parameters.debug)
@@ -393,7 +393,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       this->compute_flux_vector(dir_abs, Wminus, F_R);
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
-      for (unsigned int di = 0; di < 8; ++di)
+      for (unsigned int di = 0; di < 8; ++di) if (di != 0 && di != 4)
         normal_flux[di] = dir_sign * normal_flux[di];
 
       if (parameters.debug)
@@ -456,7 +456,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
-      for (unsigned int di = 0; di < 8; ++di)
+      for (unsigned int di = 0; di < 8; ++di) if (di != 0 && di != 4)
         normal_flux[di] = dir_sign * normal_flux[di];
 
       if (parameters.debug)
@@ -486,7 +486,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
 
-      for (unsigned int di = 0; di < 8; ++di)
+      for (unsigned int di = 0; di < 8; ++di) if (di != 0 && di != 4)
         normal_flux[di] = dir_sign * normal_flux[di];
 
       if (parameters.debug)

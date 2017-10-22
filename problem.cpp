@@ -1371,7 +1371,6 @@ void Problem<equationsType, dim>::run()
   }
 }
 
-
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
@@ -1400,7 +1399,6 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
   ++time_step;
   time += parameters.time_step;
   initial_step = false;
-  parameters.debug = true;
 }
 
 template class Problem<EquationsTypeMhd, 3>;

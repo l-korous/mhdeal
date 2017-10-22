@@ -9,16 +9,16 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 #endif
 {
   this->num_flux_type = hlld;
-  this->cfl_constant = .01;
-  this->corner_a = Point<dim>(-0.0, -.0, 0.);
-  this->corner_b = Point<dim>(.2 , .1, .01);
-  this->refinements = { 2, 1, 1 };
+  this->cfl_constant = .1;
+  this->corner_a = Point<dim>(-0.3, -.3, 0.);
+  this->corner_b = Point<dim>(.3 , .3, .01);
+  this->refinements = { 100, 100, 1 };
+  this->quadrature_order = 5;
+  this->polynomial_order_dg = 0;
+  this->polynomial_order_hdiv = 0;
 
   this->theta = 0.0;
   this->postprocess_in_newton_loop = true;
-  this->polynomial_order_dg = 0;
-  this->polynomial_order_hdiv = 0;
-  this->quadrature_order = 1;
   this->patches = 2;
   this->output_step = -1.e-3;
 
