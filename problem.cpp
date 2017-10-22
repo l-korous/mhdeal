@@ -312,6 +312,7 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
   Vector<double> cell_rhs_neighbor(dofs_per_cell);
 
   // Loop through all cells.
+  int ith_cell = 0;
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
   {
     // Only assemble what belongs to this process.
@@ -326,7 +327,7 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
     cell->get_dof_indices(dof_indices);
 
     if (parameters.debug)
-      std::cout << cell << std::endl;
+      std::cout << "NEW CELL: " << ith_cell++ << std::endl;
 
     // Assemble the volumetric integrals.
     assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
@@ -511,24 +512,24 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
         if (parameters.debug)
         {
-          std::cout << "point_i: " << q << std::endl;
-          std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
-          std::cout << "W: ";
+          std::cout << "\tpoint_i: " << q << std::endl;
+          std::cout << "\tq: " << fe_v.quadrature_point(q) << std::endl;
+          std::cout << "\tW: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << W_old[q][i] << (i < 7 ? ", " : "");
           std::cout << std::endl;
 
-          std::cout << "F[X]: ";
+          std::cout << "\tF[X]: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
           std::cout << std::endl;
 
-          std::cout << "F[Y]: ";
+          std::cout << "\tF[Y]: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
           std::cout << std::endl;
 
-          std::cout << "F[Z]: ";
+          std::cout << "\tF[Z]: ";
           for (unsigned int i = 0; i < 8; i++)
             std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
           std::cout << std::endl;
@@ -558,9 +559,9 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
               * (W_old[q][5] * fe_v_value[0] + W_old[q][6] * fe_v_value[1] + W_old[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
           }
-          if (parameters.debug && q == 0)
+          if (parameters.debug_dofs && q == 0)
           {
-            std::cout << "DOF: " << i << " - COMP: " << component_i << std::endl;
+            std::cout << "\tDOF: " << i << " - COMP: " << component_i << std::endl;
           }
 
           if (!initial_step)
@@ -585,10 +586,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           if (parameters.is_stationary == false)
             val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
 
-          if (parameters.debug && q == 0)
+          if (parameters.debug_dofs && q == 0)
           {
-            std::cout << "DOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
-          }
+            std::cout << "\tDOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
+          } 
 
           if (!initial_step)
           {
@@ -793,7 +794,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     const FEValuesExtractors::Vector mag(dim + 2);
 
     if (parameters.debug)
-      std::cout << "edqe: " << face_no << std::endl;
+      std::cout << "\tEdqe: " << face_no << std::endl;
 
     // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
     for (unsigned int q = 0; q < n_q_points; ++q)
@@ -856,19 +857,19 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       // Some debugging outputs.
       if (parameters.debug)
       {
-        std::cout << "point_i: " << q << std::endl;
-        std::cout << "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
-        std::cout << "Wplus: ";
+        std::cout << "\t\tpoint_i: " << q << std::endl;
+        std::cout << "\t\tq: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
+        std::cout << "\t\tWplus: ";
         for (unsigned int i = 0; i < 8; i++)
           std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
 
-        std::cout << "Wminus: ";
+        std::cout << "\t\tWminus: ";
         for (unsigned int i = 0; i < 8; i++)
           std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
 
-        std::cout << "Num F: ";
+        std::cout << "\t\tNum F: ";
         for (unsigned int i = 0; i < 8; i++)
           std::cout << normal_fluxes_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
@@ -1399,6 +1400,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
   ++time_step;
   time += parameters.time_step;
   initial_step = false;
+  parameters.debug = true;
 }
 
 template class Problem<EquationsTypeMhd, 3>;

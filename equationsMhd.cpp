@@ -247,8 +247,11 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
 
-      for (unsigned int di = 0; di < n_components; ++di)
+      for (unsigned int di = 0; di < 8; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
+
+      if (parameters.debug)
+        std::cout << "\t\t\tFlux regime: " << "S_L > 0." << std::endl;
 
       return;
     }
@@ -257,8 +260,11 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     {
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
 
-      for (unsigned int di = 0; di < n_components; ++di)
+      for (unsigned int di = 0; di < 8; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
+
+      if (parameters.debug)
+        std::cout << "\t\t\tFlux regime: " << "S_R < 0." << std::endl;
 
       return;
     }
@@ -368,14 +374,17 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     typename InputVector::value_type Ss_L = S_M - (std::abs(B_x) / std::sqrt(Us_L[0]));
     typename InputVector::value_type Ss_R = S_M + (std::abs(B_x) / std::sqrt(Us_R[0]));
 
-    if (Ss_L >= 0.)
+    if (S_M >= 0. && Ss_L >= 0.)
     {
       std_cxx11::array<typename InputVector::value_type, n_components> F_L;
       this->compute_flux_vector(dir_abs, Wplus, F_L);
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
-      for (unsigned int di = 0; di < n_components; ++di)
-        normal_flux[di] = dir_sign * normal_flux[di];
+      for (unsigned int di = 0; di < 8; ++di)
+        normal_flux[di] = dir_sign * normal_flux[di]; 
+
+      if (parameters.debug)
+        std::cout << "\t\t\tFlux regime: " << "S_M >= 0. && Ss_L >= 0." << std::endl;
       return;
     }
     else if(S_M < 0. && Ss_R < 0.)
@@ -384,8 +393,11 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       this->compute_flux_vector(dir_abs, Wminus, F_R);
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
-      for (unsigned int di = 0; di < n_components; ++di)
+      for (unsigned int di = 0; di < 8; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
+
+      if (parameters.debug)
+        std::cout << "\t\t\tFlux regime: " << "S_M < 0. && Ss_R < 0." << std::endl;
       return;
     }
 
@@ -444,12 +456,15 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
-      for (unsigned int di = 0; di < n_components; ++di)
+      for (unsigned int di = 0; di < 8; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
+
+      if (parameters.debug)
+        std::cout << "\t\t\tFlux regime: " << "S_M >= 0. && Ss_L < 0." << std::endl;
 
       return;
     }
-    else if(Ss_R >= 0.)
+    else if(S_M < 0. && Ss_R >= 0.)
     {
       std_cxx11::array<typename InputVector::value_type, n_components> F_R;
       this->compute_flux_vector(dir_abs, Wminus, F_R);
@@ -471,8 +486,11 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
 
-      for (unsigned int di = 0; di < n_components; ++di)
+      for (unsigned int di = 0; di < 8; ++di)
         normal_flux[di] = dir_sign * normal_flux[di];
+
+      if (parameters.debug)
+        std::cout << "\t\t\tFlux regime: " << "S_M < 0. && Ss_R >= 0." << std::endl;
 
       return;
     }
@@ -524,12 +542,6 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
 {
   const unsigned int n_quadrature_points = uh.size();
 
-  Assert(computed_quantities.size() == n_quadrature_points,
-    ExcInternalError());
-
-  Assert(uh[0].size() == n_components,
-    ExcInternalError());
-
   for (unsigned int q = 0; q < n_quadrature_points; ++q)
   {
     const double density = uh[q](0);
@@ -553,7 +565,6 @@ template <int dim>
 std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<EquationsTypeMhd, dim>::Postprocessor::get_data_component_interpretation() const
 {
   std::vector<DataComponentInterpretation::DataComponentInterpretation> interpretation(dim, DataComponentInterpretation::component_is_part_of_vector);
-
   interpretation.push_back(DataComponentInterpretation::component_is_scalar);
   interpretation.push_back(DataComponentInterpretation::component_is_scalar);
 

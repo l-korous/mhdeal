@@ -93,8 +93,7 @@ public:
   std::vector<unsigned int> refinements;
 
   // Debugging purposes
-  bool debug;
-  bool debug_limiter;
+  bool debug, debug_limiter, debug_dofs;
 };
 
 #endif
