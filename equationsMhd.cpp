@@ -182,13 +182,25 @@ void Equations<EquationsTypeMhd, dim>::store_max_signal_speed(double val)
 
 template <int dim>
 template <typename InputVector>
-void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
+void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus_, const InputVector &Wminus_,
   std_cxx11::array<typename InputVector::value_type, n_components> &normal_flux)
 {
-  // First, calculation of speeds for CFL.
   typename InputVector::value_type rho_L, rho_R, VelN_L, VelN_R, MagN_L, MagN_R;
   int dir_abs = (std::abs(std::abs(normal[0]) - 1.) < NEGLIGIBLE ? 0 : (std::abs(std::abs(normal[1]) - 1.) < NEGLIGIBLE ? 1 : 2));
   double dir_sign = normal[dir_abs] > 0. ? 1. : -1.;
+
+  std_cxx11::array <typename InputVector::value_type, n_components> Wplus, Wminus;
+  for (unsigned int di = 0; di < 8; ++di)
+  {
+    Wplus[di] = Wplus_[di];
+    Wminus[di] = Wminus_[di];
+  }
+  Wplus[1 + dir_abs] *= dir_sign;
+  Wplus[5 + dir_abs] *= dir_sign;
+  Wminus[1 + dir_abs] *= dir_sign;
+  Wminus[5 + dir_abs] *= dir_sign;
+
+  // First, calculation of speeds for CFL.
   rho_L = Wplus[0], rho_R = Wminus[0];
   VelN_L = Wplus[1 + dir_abs] / rho_L, VelN_R = Wminus[1 + dir_abs] / rho_R;
   MagN_L = Wplus[5 + dir_abs], MagN_R = Wminus[5 + dir_abs];
@@ -223,8 +235,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   {
     std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
 
-    compute_flux_matrix(Wplus, iflux);
-    compute_flux_matrix(Wminus, oflux);
+    compute_flux_matrix(Wplus_, iflux);
+    compute_flux_matrix(Wminus_, oflux);
 
     for (unsigned int di = 0; di < n_components; ++di)
     {
@@ -232,7 +244,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       for (unsigned int d = 0; d < dim; ++d)
         normal_flux[di] += 0.5 * (iflux[di][d] + oflux[di][d]) * normal[d];
 
-      normal_flux[di] += 0.5 * this->parameters.lax_friedrich_stabilization_value * (Wplus[di] - Wminus[di]);
+      normal_flux[di] += 0.5 * this->parameters.lax_friedrich_stabilization_value * (Wplus_[di] - Wminus_[di]);
       normal_flux_lf[di] = normal_flux[di];
     }
 

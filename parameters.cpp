@@ -9,7 +9,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 #endif
 {
   this->num_flux_type = hlld;
-  this->cfl_constant = .1;
+  this->cfl_constant = .2;
   this->corner_a = Point<dim>(-0.3, -.3, 0.);
   this->corner_b = Point<dim>(.3 , .3, .01);
   this->refinements = { 100, 100, 1 };
