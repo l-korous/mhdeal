@@ -1,8 +1,6 @@
 #include "util.h"
 #include "equationsMhd.h"
 
-#define NEGLIGIBLE 1e-12
-
 template <int dim>
 Equations<EquationsTypeMhd, dim>::Equations(Parameters<dim>& parameters) : parameters(parameters)
 {
@@ -260,7 +258,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       this->compute_flux_vector(dir_abs, Wplus, normal_flux);
 
       normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] *= dir_sign;
+      normal_flux[5 + dir_abs] = 0.;
 
       if (parameters.debug)
         std::cout << "\t\t\tFlux regime: " << "S_L > 0." << std::endl;
@@ -273,7 +271,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       this->compute_flux_vector(dir_abs, Wminus, normal_flux);
       
       normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] *= dir_sign;
+      normal_flux[5 + dir_abs] = 0.;
 
       if (parameters.debug)
         std::cout << "\t\t\tFlux regime: " << "S_R < 0." << std::endl;
@@ -393,7 +391,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
       normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] *= dir_sign;
+      normal_flux[5 + dir_abs] = 0.;
 
       if (parameters.debug)
         std::cout << "\t\t\tFlux regime: " << "S_M >= 0. && Ss_L >= 0." << std::endl;
@@ -406,7 +404,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
       for (int k = 0; k < n_components; k++)
         normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
       normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] *= dir_sign;
+      normal_flux[5 + dir_abs] = 0.;
 
       if (parameters.debug)
         std::cout << "\t\t\tFlux regime: " << "S_M < 0. && Ss_R < 0." << std::endl;
@@ -470,7 +468,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
      
       normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] *= dir_sign;
+      normal_flux[5 + dir_abs] = 0.;
 
       if (parameters.debug)
         std::cout << "\t\t\tFlux regime: " << "S_M >= 0. && Ss_L < 0." << std::endl;
@@ -500,7 +498,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
         normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
       
       normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] *= dir_sign;
+      normal_flux[5 + dir_abs] = 0.;
 
       if (parameters.debug)
         std::cout << "\t\t\tFlux regime: " << "S_M < 0. && Ss_R >= 0." << std::endl;

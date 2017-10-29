@@ -57,5 +57,10 @@
 #include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/distributed/solution_transfer.h>
 
+
+#ifndef NEGLIGIBLE
+#define NEGLIGIBLE 1e-12
+#endif
+
 using namespace dealii;
 #endif

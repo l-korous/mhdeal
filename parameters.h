@@ -76,7 +76,7 @@ public:
   // Polynomial order for the mag field part.
   int polynomial_order_hdiv;
   // Quadrature order.
-  int quadrature_order;
+  int quadrature_order, initial_quadrature_order;
   // Do we need calculated gradients? E.g. for resistivity.
   bool needs_gradients;
   // Do we have forcing (source) terms in the equations?

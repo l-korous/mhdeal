@@ -21,7 +21,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
-  initial_quadrature(parameters.quadrature_order),
+  initial_quadrature(parameters.initial_quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
   assemble_only_rhs(false),
@@ -143,7 +143,7 @@ void Problem<equationsType, dim>::postprocess()
 
       // (!!!) Find out u_i
       Vector<double> u_i(8);
-      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - 1.e-12) * (cell->vertex(i) - cell->center()), u_i);
+      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
 
       if (this->parameters.debug_limiter)
         std::cout << "\tv_i: " << cell->vertex(i) << ", values: " << u_i[0] << ", " << u_i[1] << ", " << u_i[2] << ", " << u_i[3] << ", " << u_i[4] << std::endl;
@@ -259,7 +259,7 @@ void Problem<equationsType, dim>::postprocess()
       {
         // Based on u_i_min, u_i_max, u_i, get alpha_e
         for (int k = 0; k < 5; k++)
-          if ((std::abs(u_c[k]) > 1e-12) && (std::abs((u_c[k] - u_i[k]) / u_c[k]) > 1e-8))
+          if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
           {
             alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
             if (this->parameters.debug_limiter)
