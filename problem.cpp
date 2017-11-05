@@ -512,13 +512,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].grad(i, q);
+            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
 
             for (unsigned int d = 0; d < dim; d++)
             {
               W_old[q][5 + d] += old_solution(dof_indices[i]) * fe_v_value[d];
               if (parameters.theta > 0. && parameters.needs_gradients)
-                grad_W_old[q][5 + d] += old_solution(dof_indices[i]) * fe_v_grad[d];
+                for (unsigned int d1 = 0; d1 < dim; d1++)
+                  grad_W_old[q][5 + d][d1] += old_solution(dof_indices[i]) * fe_v_grad[d][d1];
     }
   }
           // For the other components (spaces), we go by each component.
@@ -699,12 +700,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         if (component_i == 1)
         {
           dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-          dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].grad(i, q);
+          dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
           for (unsigned int d = 0; d < dim; d++)
           {
             W[q][5 + d] += independent_local_dof_values[i] * fe_v_value[d];
             if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
-              grad_W[q][5 + d] += independent_local_dof_values[i] * fe_v_grad[d];
+              for (unsigned int d1 = 0; d1 < dim; d1++)
+                grad_W[q][5 + d][d1] += independent_local_dof_values[i] * fe_v_grad[d][d1];
   }
         }
         else

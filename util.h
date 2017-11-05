@@ -62,7 +62,7 @@
 #endif
 
 #ifndef USE_HDIV_FOR_B
-//#define USE_HDIV_FOR_B
+#define USE_HDIV_FOR_B
 #endif
 
 using namespace dealii;
