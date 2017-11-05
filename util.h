@@ -57,9 +57,12 @@
 #include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/distributed/solution_transfer.h>
 
-
 #ifndef NEGLIGIBLE
 #define NEGLIGIBLE 1e-12
+#endif
+
+#ifndef USE_HDIV_FOR_B
+//#define USE_HDIV_FOR_B
 #endif
 
 using namespace dealii;

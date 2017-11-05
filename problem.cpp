@@ -15,9 +15,12 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
   mapping(),
-  // Creating the FE system - first spaces for density & momentum, then for the mag field, and lastly for the energy.
+#ifdef USE_HDIV_FOR_B
   fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
     FE_RaviartThomas<dim>(1), 1),
+#else
+  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 8),
+#endif
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
@@ -56,6 +59,12 @@ void Problem<equationsType, dim>::setup_system()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::postprocess()
 {
+#ifdef USE_HDIV_FOR_B
+#define COMPONENTS_TO_LIMIT 5
+#else
+#define COMPONENTS_TO_LIMIT 8
+#endif
+
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
@@ -81,20 +90,25 @@ void Problem<equationsType, dim>::postprocess()
     if (!cell->is_locally_owned())
       continue;
 
-    bool u_c_set[5] = { false, false, false, false, false };
-    double u_c[5];
-    std::vector<unsigned int> lambda_indices_to_multiply[5];
+    bool u_c_set[COMPONENTS_TO_LIMIT];
+    for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+      u_c_set[i] = false;
+
+    double u_c[COMPONENTS_TO_LIMIT];
+    std::vector<unsigned int> lambda_indices_to_multiply[COMPONENTS_TO_LIMIT];
 
     fe_v.reinit(cell);
     cell->get_dof_indices(dof_indices);
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
+#ifdef USE_HDIV_FOR_B
       const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
       if (component_i != 1)
-      { 
+#endif
+      {
         unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-        
+
         if (!u_c_set[component_ii])
         {
           u_c[component_ii] = current_solution(dof_indices[i]);
@@ -105,12 +119,14 @@ void Problem<equationsType, dim>::postprocess()
           lambda_indices_to_multiply[component_ii].push_back(dof_indices[i]);
         }
       }
-    }
+  }
 
     if (parameters.debug_limiter)
       std::cout << "cell: " << ++cell_count << " - center: " << cell->center() << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
 
-    double alpha_e[5] = { 1., 1., 1., 1., 1. };
+    double alpha_e[COMPONENTS_TO_LIMIT];
+    for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+      alpha_e[i] = 1.;
 
     // For all vertices -> v_i
     for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
@@ -146,11 +162,17 @@ void Problem<equationsType, dim>::postprocess()
       VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
 
       if (this->parameters.debug_limiter)
-        std::cout << "\tv_i: " << cell->vertex(i) << ", values: " << u_i[0] << ", " << u_i[1] << ", " << u_i[2] << ", " << u_i[3] << ", " << u_i[4] << std::endl;
+      {
+        std::cout << "\tv_i: " << cell->vertex(i) << ", values: ";
+        for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+          std::cout << u_i[i] << (i == COMPONENTS_TO_LIMIT - 1 ? "" : ", ");
+        std::cout << std::endl;
+      }
+
       // Init u_i_min, u_i_max
-      double u_i_min[5];
-      double u_i_max[5];
-      for (int k = 0; k < 5; k++)
+      double u_i_min[COMPONENTS_TO_LIMIT];
+      double u_i_max[COMPONENTS_TO_LIMIT];
+      for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
       {
         u_i_min[k] = u_c[k];
         u_i_max[k] = u_c[k];
@@ -182,14 +204,19 @@ void Problem<equationsType, dim>::postprocess()
           fe_v_neighbor.reinit(neighbor);
           neighbor->get_dof_indices(dof_indices_neighbor);
 
-          bool u_i_extrema_set[5] = { false, false, false, false, false };
+          bool u_i_extrema_set[COMPONENTS_TO_LIMIT];
+          for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+            u_i_extrema_set[i] = false;
+
           for (unsigned int dof = 0; dof < dofs_per_cell; ++dof)
           {
+#ifdef USE_HDIV_FOR_B
             const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
             if (component_i != 1)
+#endif
             {
               unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-              
+
               if (!u_i_extrema_set[component_ii])
               {
                 double val = current_solution(dof_indices_neighbor[dof]);
@@ -204,7 +231,7 @@ void Problem<equationsType, dim>::postprocess()
                 u_i_max[component_ii] = std::max(u_i_max[component_ii], val);
                 u_i_extrema_set[component_ii] = true;
               }
-            } 
+            }
           }
 
           // From the right neighbor, look at all faces, such that the face contains the vertex
@@ -234,19 +261,23 @@ void Problem<equationsType, dim>::postprocess()
               fe_v_neighbor.reinit(neighbor_neighbor);
               neighbor_neighbor->get_dof_indices(dof_indices_neighbor);
 
-              bool u_i_extrema_set[5] = { false, false, false, false, false };
+              bool u_i_extrema_set_neighbor[COMPONENTS_TO_LIMIT];
+              for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+                u_i_extrema_set_neighbor[i] = false;
               for (unsigned int dof = 0; dof < dofs_per_cell; ++dof)
               {
+#ifdef USE_HDIV_FOR_B
                 const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
                 if (component_i != 1)
+#endif
                 {
                   unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-                  
-                  if (!u_i_extrema_set[component_ii])
+
+                  if (!u_i_extrema_set_neighbor[component_ii])
                   {
                     u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
                     u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                    u_i_extrema_set[component_ii] = true;
+                    u_i_extrema_set_neighbor[component_ii] = true;
                   }
                 }
               }
@@ -258,7 +289,7 @@ void Problem<equationsType, dim>::postprocess()
       if (!is_boundary_vertex)
       {
         // Based on u_i_min, u_i_max, u_i, get alpha_e
-        for (int k = 0; k < 5; k++)
+        for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
           if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
           {
             alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
@@ -268,10 +299,10 @@ void Problem<equationsType, dim>::postprocess()
       }
     }
 
-    for (int k = 0; k < 5; k++)
+    for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
       for (int i = 0; i < lambda_indices_to_multiply[k].size(); i++)
         current_limited_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
-  }
+}
 }
 
 template <EquationsType equationsType, int dim>
@@ -455,10 +486,12 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           for (unsigned int d = 0; d < dim; ++d)
             grad_W_old[q][c][d] = 0;
         }
+        }
       }
-    }
 
+#ifdef USE_HDIV_FOR_B
     const FEValuesExtractors::Vector mag(dim + 2);
+#endif
 
     if (initial_step)
     {
@@ -474,28 +507,32 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       {
         for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
+#ifdef USE_HDIV_FOR_B
           const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            W_old[q][5] += old_solution(dof_indices[i]) * fe_v_value[0];
-            W_old[q][6] += old_solution(dof_indices[i]) * fe_v_value[1];
-            W_old[q][7] += old_solution(dof_indices[i]) * fe_v_value[2];
-          }
+            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].grad(i, q);
+
+            for (unsigned int d = 0; d < dim; d++)
+            {
+              W_old[q][5 + d] += old_solution(dof_indices[i]) * fe_v_value[d];
+              if (parameters.theta > 0. && parameters.needs_gradients)
+                grad_W_old[q][5 + d] += old_solution(dof_indices[i]) * fe_v_grad[d];
+    }
+  }
           // For the other components (spaces), we go by each component.
           else
+#endif
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-          }
 
-          if (parameters.theta > 0. && parameters.needs_gradients)
-          {
-            for (unsigned int d = 0; d < dim; d++)
-              grad_W_old[q][component_i][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_i)[d];
+            if (parameters.theta > 0. && parameters.needs_gradients)
+              for (unsigned int d = 0; d < dim; d++)
+                grad_W_old[q][component_ii][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_ii)[d];
           }
-        }
+}
       }
     }
 
@@ -548,7 +585,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
-        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+#ifdef USE_HDIV_FOR_B
         if (component_i == 1)
         {
           if (parameters.is_stationary == false)
@@ -577,10 +614,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
             if (parameters.needs_forcing)
               val -= (1.0 - parameters.theta) * (forcing_old[q][5] * fe_v[mag].value(i, q)[0] + forcing_old[q][6] * fe_v[mag].value(i, q)[1] + forcing_old[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
-          }
+    }
         }
         // For the other components (spaces), we go by each component.
         else
+#endif
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
           if (parameters.is_stationary == false)
@@ -589,7 +627,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           if (parameters.debug_dofs && q == 0)
           {
             std::cout << "\tDOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
-          } 
+          }
 
           if (!initial_step)
           {
@@ -609,7 +647,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       if (std::isnan(val))
       {
         std::cout << "isnan: " << val << std::endl;
+#ifdef USE_HDIV_FOR_B
         std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+#else
+        std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+#endif
         std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
         for (int j = 0; j < 8; j++)
           std::cout << "W [" << j << "]: " << (double)W_old[0][j] << ", F [" << j << "]: " << (double)flux_old[0][j][0] << ", " << (double)flux_old[0][j][1] << ", " << (double)flux_old[0][j][2] << std::endl;
@@ -652,27 +694,28 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
+#ifdef USE_HDIV_FOR_B
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
         if (component_i == 1)
         {
           dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-          W[q][5] += independent_local_dof_values[i] * fe_v_value[0];
-          W[q][6] += independent_local_dof_values[i] * fe_v_value[1];
-          W[q][7] += independent_local_dof_values[i] * fe_v_value[2];
+          dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].grad(i, q);
+          for (unsigned int d = 0; d < dim; d++)
+          {
+            W[q][5 + d] += independent_local_dof_values[i] * fe_v_value[d];
+            if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
+              grad_W[q][5 + d] += independent_local_dof_values[i] * fe_v_grad[d];
+  }
         }
-        // For the other components (spaces), we go by each component.
         else
+#endif
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
           W[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
-        }
 
-        if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
-        {
-          for (unsigned int d = 0; d < dim; d++)
-            grad_W[q][component_i][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, component_i)[d];
+          if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
+            for (unsigned int d = 0; d < dim; d++)
+              grad_W[q][component_ii][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, component_ii)[d];
         }
       }
     }
@@ -700,7 +743,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
       for (unsigned int q = 0; q < n_q_points; ++q)
       {
-        // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+#ifdef USE_HDIV_FOR_B
         if (component_i == 1)
         {
           if (parameters.is_stationary == false)
@@ -710,9 +753,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
             R_i += (1.0 / parameters.time_step)
               * (W[q][5] * fe_v_value[0] + W[q][6] * fe_v_value[1] + W[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
-          }
+    }
         }
         else
+#endif
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
           if (parameters.is_stationary == false)
@@ -720,13 +764,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         }
 
         if (parameters.theta > 0. && !initial_step) {
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+#ifdef USE_HDIV_FOR_B
           if (component_i == 1)
           {
             dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
             for (unsigned int d = 0; d < dim; d++)
               for (unsigned int e = 0; e < dim; e++)
-              R_i -= parameters.theta * (flux[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
+                R_i -= parameters.theta * (flux[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
 
             if (parameters.needs_gradients)
               for (unsigned int d = 0; d < dim; d++)
@@ -734,9 +778,10 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
             if (parameters.needs_forcing)
               R_i -= parameters.theta * (forcing[q][5] * fe_v[mag].value(i, q)[0] + forcing[q][6] * fe_v[mag].value(i, q)[1] + forcing[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
-          }
+        }
           // For the other components (spaces), we go by each component.
           else
+#endif
           {
             for (unsigned int d = 0; d < dim; d++)
               R_i -= parameters.theta * flux[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
@@ -758,7 +803,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       if (std::isnan(R_i.val()))
       {
         std::cout << "isnan: " << R_i.val() << std::endl;
+#ifdef USE_HDIV_FOR_B
         std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+#else
+        std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+#endif
         std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
         for (int j = 0; j < 8; j++)
           std::cout << "W [" << j << "]: " << (double)W[0][j].val() << ", F [" << j << "]: " << (double)flux[0][j][0].val() << ", " << (double)flux[0][j][1].val() << ", " << (double)flux[0][j][2].val() << std::endl;
@@ -803,18 +852,17 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       {
         if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
         {
+#ifdef USE_HDIV_FOR_B
           const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
             Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v_value[0];
             Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v_value[1];
             Wplus_old[q][7] += old_solution(dof_indices[i]) * fe_v_value[2];
-          }
-          // For the other components (spaces), we go by each component.
+  }
           else
+#endif
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
@@ -822,22 +870,21 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
           if (!external_face)
           {
+#ifdef USE_HDIV_FOR_B
             const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-
-            // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
             if (component_i_neighbor == 1)
             {
               Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
               Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
               Wminus_old[q][7] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
-            }
-            // For the other components (spaces), we go by each component.
+          }
             else
+#endif
             {
               const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
               Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
             }
-          }
+}
         }
       }
 
@@ -886,7 +933,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
         for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+#ifdef USE_HDIV_FOR_B
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
@@ -894,26 +941,29 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             val += (1.0 - parameters.theta)
               * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
-          }
-          // For the other components (spaces), we go by each component.
+      }
           else
+#endif
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             val += (1.0 - parameters.theta) * normal_fluxes_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
           }
 
-          // Some debugging outputs.
           if (std::isnan(val))
           {
             equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
             std::cout << "isnan: " << val << std::endl;
+#ifdef USE_HDIV_FOR_B
             std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+#else
+            std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+#endif
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
             std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
             for (int j = 0; j < 8; j++)
               std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
           }
-        }
+    }
 
         cell_rhs(i) -= val;
       }
@@ -954,18 +1004,17 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
       {
         if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
         {
+#ifdef USE_HDIV_FOR_B
           const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
             Wplus[q][5] += independent_local_dof_values[i] * fe_v_value[0];
             Wplus[q][6] += independent_local_dof_values[i] * fe_v_value[1];
             Wplus[q][7] += independent_local_dof_values[i] * fe_v_value[2];
-          }
-          // For the other components (spaces), we go by each component.
+  }
           else
+#endif
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             Wplus[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
@@ -973,17 +1022,16 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
           if (!external_face)
           {
+#ifdef USE_HDIV_FOR_B
             const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-
-            // component_i_neighbor == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
             if (component_i_neighbor == 1)
             {
               Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
               Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
               Wminus[q][7] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
-            }
-            // For the other components (spaces), we go by each component.
+          }
             else
+#endif
             {
               const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
               Wminus[q][component_ii_neighbor] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
@@ -1015,16 +1063,16 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
         for (unsigned int q = 0; q < n_q_points; ++q)
         {
-          // component_i == 1 means that this is in fact the vector-valued FE space for the magnetic field and we need to calculate the value for all three components of this vector field together.
+#ifdef USE_HDIV_FOR_B
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
             R_i += (1.0 - parameters.theta)
               * (normal_fluxes[q][5] * fe_v_value[0] + normal_fluxes[q][6] * fe_v_value[1] + normal_fluxes[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
-          }
-          // For the other components (spaces), we go by each component.
+      }
           else
+#endif
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
             R_i += (1.0 - parameters.theta) * normal_fluxes[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
@@ -1033,13 +1081,17 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           if (std::isnan(R_i.val()))
           {
             std::cout << "isnan: " << R_i.val() << std::endl;
+#ifdef USE_HDIV_FOR_B
             std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+#else
+            std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+#endif
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
             std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
             for (int j = 0; j < 8; j++)
               std::cout << "W+ [" << j << "]: " << (double)Wplus[q][j].val() << ", W- [" << j << "]: " << (double)Wminus[q][j].val() << ", F [" << j << "]: " << (double)normal_fluxes[q][j].val() << std::endl;
           }
-        }
+          }
 
         if (!assemble_only_rhs)
           for (unsigned int k = 0; k < dofs_per_cell; ++k)
@@ -1055,7 +1107,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
         cell_rhs(i) -= R_i.val();
-      }
+    }
     }
   }
 }
@@ -1151,7 +1203,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-  }
+}
 #else
   std::string filename = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -1204,7 +1256,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
     }
     history.close();
   }
-  
+
   if (should_load_from_file)
   {
     this->time = _time;
@@ -1218,7 +1270,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
     remove("triangulation");
     remove("triangulation.info");
     remove("history");
-  }
+}
 #else
   old_solution = 0;
 #endif

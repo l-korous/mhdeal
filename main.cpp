@@ -65,6 +65,9 @@ int main(int argc, char *argv[])
     case 3:
       initial_condition = new SimpleICMHD<EQUATIONS, DIMENSION>(parameters);
       break;
+    case 4:
+      initial_condition = new EulerBlastIC<EQUATIONS, DIMENSION>(parameters);
+      break;
     }
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);

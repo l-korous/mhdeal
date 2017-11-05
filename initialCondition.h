@@ -38,6 +38,14 @@ public:
 };
 
 template <EquationsType equationsType, int dim>
+class EulerBlastIC : public InitialCondition<equationsType, dim>
+{
+public:
+  EulerBlastIC(Parameters<dim>&);
+  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+};
+
+template <EquationsType equationsType, int dim>
 class MHDBlastIC : public InitialCondition<equationsType, dim>
 {
 public:
