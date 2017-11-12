@@ -20,6 +20,10 @@ template void Equations<EquationsTypeMhd, 3>::numerical_normal_flux(const Tensor
 
 template void Equations<EquationsTypeMhd, 3>::compute_forcing_vector(const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W, std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type, n_components> &forcing) const;
 
+template void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type, n_components> &result, const dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> &W, const Tensor<1, 3> &normal) const;
+
+template void Equations<EquationsTypeMhd, 3>::Q_inv<dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> >(std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type, n_components> &result, std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1>::value_type, n_components> &W, const Tensor<1, 3> &normal) const;
+
 // 3D & Sacado::Fad::DFad<double>
 template typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type Equations<EquationsTypeMhd, 3>::compute_kinetic_energy(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W);
 
@@ -41,3 +45,7 @@ template void Equations<EquationsTypeMhd, 3>::numerical_normal_flux(const Tensor
   std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type, n_components> &normal_flux);
 
 template void Equations<EquationsTypeMhd, 3>::compute_forcing_vector(const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W, std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type, n_components> &forcing) const;
+
+template void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type, n_components> &result, const dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> &W, const Tensor<1, 3> &normal) const;
+
+template void Equations<EquationsTypeMhd, 3>::Q_inv<dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> >(std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type, n_components> &result, std_cxx11::array<typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type, n_components> &W, const Tensor<1, 3> &normal) const;

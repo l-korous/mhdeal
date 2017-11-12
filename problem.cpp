@@ -19,7 +19,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
     FE_RaviartThomas<dim>(1), 1),
 #else
-  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 8),
+  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
+    FE_DivFree<dim>(parameters.polynomial_order_dg), 3),
 #endif
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),

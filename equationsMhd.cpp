@@ -178,6 +178,76 @@ void Equations<EquationsTypeMhd, dim>::store_max_signal_speed(double val)
   this->max_signal_speed = val;
 }
 
+template <>
+template <typename InputVector>
+void Equations<EquationsTypeMhd, 3>::Q(std_cxx11::array<typename InputVector::value_type, n_components> &result, const InputVector &W, const Tensor<1, 3> &normal) const
+{
+  int dir_abs = (std::abs(std::abs(normal[0]) - 1.) < NEGLIGIBLE ? 0 : (std::abs(std::abs(normal[1]) - 1.) < NEGLIGIBLE ? 1 : 2));
+  double dir_sign = normal[dir_abs] > 0. ? 1. : -1.;
+  result[0] = W[0];
+  result[4] = W[4];
+  result[1] = W[1 + dir_abs];
+  result[5] = W[5 + dir_abs];
+  switch (dir_abs) {
+  case 0:
+    result[2] = W[2];
+    result[3] = W[3];
+    result[6] = W[6];
+    result[7] = W[7];
+    break;
+  case 1:
+    result[2] = W[1];
+    result[3] = W[3];
+    result[6] = W[5];
+    result[7] = W[7];
+    break;
+  case 2:
+    result[2] = W[1];
+    result[3] = W[2];
+    result[6] = W[5];
+    result[7] = W[6];
+    break;
+  }
+
+  result[1 + dir_abs] *= dir_sign;
+  result[5 + dir_abs] *= dir_sign;
+}
+
+template <int dim>
+template <typename InputVector>
+void Equations<EquationsTypeMhd, dim>::Q_inv(std_cxx11::array<typename InputVector::value_type, n_components> &result, std_cxx11::array<typename InputVector::value_type, n_components> &W, const Tensor<1, dim> &normal) const
+{
+  int dir_abs = (std::abs(std::abs(normal[0]) - 1.) < NEGLIGIBLE ? 0 : (std::abs(std::abs(normal[1]) - 1.) < NEGLIGIBLE ? 1 : 2));
+  double dir_sign = normal[dir_abs] > 0. ? 1. : -1.;
+  result[0] = W[0];
+  result[4] = W[4];
+  result[1] = W[1 + dir_abs];
+  result[5] = W[5 + dir_abs];
+  switch (dir_abs) {
+  case 0:
+    result[2] = W[2];
+    result[3] = W[3];
+    result[6] = W[6];
+    result[7] = W[7];
+    break;
+  case 1:
+    result[1] = W[2];
+    result[3] = W[3];
+    result[5] = W[6];
+    result[7] = W[7];
+    break;
+  case 2:
+    result[1] = W[2];
+    result[2] = W[3];
+    result[5] = W[6];
+    result[6] = W[7];
+    break;
+  }
+
+  result[1 + dir_abs] *= dir_sign;
+  result[5 + dir_abs] *= dir_sign;
+}
+
 template <int dim>
 template <typename InputVector>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus_, const InputVector &Wminus_,
@@ -253,258 +323,237 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // If we use HLLD
   if (this->parameters.num_flux_type == Parameters<dim>::hlld)
   {
-    if (S_L > 0.)
+    typename InputVector::value_type srdl, srdr, hl[2], hr[2], Uk, Um, E2, E3, Sl, Sr, B, B2, cm;
+    typename InputVector::value_type sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
+
+    std_cxx11::array<typename InputVector::value_type, n_components> Fl;
+    std_cxx11::array<typename InputVector::value_type, n_components> Fr;
+    std_cxx11::array<typename InputVector::value_type, n_components> Udl;
+    std_cxx11::array<typename InputVector::value_type, n_components> Udr;
+    std_cxx11::array<typename InputVector::value_type, n_components> Ul;
+    std_cxx11::array<typename InputVector::value_type, n_components> Ur;
+
+    std_cxx11::array<typename InputVector::value_type, n_components> QedWminus;
+    std_cxx11::array<typename InputVector::value_type, n_components> QedWplus;
+
+    Q(QedWplus, Wplus, normal);
+    Q(QedWminus, Wminus, normal);
+
+    // Simple average of mag. field in direction of normal vector
+    B = 0.5*(QedWminus[5] + QedWplus[5]);
+    B2 = B*B;
+
+    // Calculate left flux
+    hl[0] = 1.0 / QedWplus[0];
+    Uk = compute_kinetic_energy(QedWplus);
+    Um = compute_magnetic_energy(QedWplus);
+    hl[1] = compute_pressure(QedWplus, Uk, Um);
+    E2 = hl[0] * (QedWplus[1] * QedWplus[7] - QedWplus[3] * QedWplus[5]);
+    E3 = hl[0] * (QedWplus[2] * QedWplus[5] - QedWplus[1] * QedWplus[6]);
+
+    Fl[0] = QedWplus[1];
+    Fl[1] = hl[0] * QedWplus[1] * QedWplus[1] - QedWplus[5] * QedWplus[5] + Um + hl[1];
+    Fl[2] = hl[0] * QedWplus[1] * QedWplus[2] - QedWplus[5] * QedWplus[6];
+    Fl[3] = hl[0] * QedWplus[1] * QedWplus[3] - QedWplus[5] * QedWplus[7];
+    Fl[5] = 0.0;
+    Fl[6] = -E3;
+    Fl[7] = E2;
+    Fl[4] = hl[0] * QedWplus[1] * (hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedWplus[7] - E3*QedWplus[6]);
+
+    // Calculate right flux
+    hr[0] = 1.0 / QedWminus[0];
+    Uk = compute_kinetic_energy(QedWminus);
+    Um = compute_magnetic_energy(QedWminus);
+    hr[1] = compute_pressure(QedWminus, Uk, Um);
+    E2 = hr[0] * (QedWminus[1] * QedWminus[7] - QedWminus[3] * QedWminus[5]);
+    E3 = hr[0] * (QedWminus[2] * QedWminus[5] - QedWminus[1] * QedWminus[6]);
+
+    Fr[0] = QedWminus[1];
+    Fr[1] = hr[0] * QedWminus[1] * QedWminus[1] - QedWminus[5] * QedWminus[5] + Um + hr[1];
+    Fr[2] = hr[0] * QedWminus[1] * QedWminus[2] - QedWminus[5] * QedWminus[6];
+    Fr[3] = hr[0] * QedWminus[1] * QedWminus[3] - QedWminus[5] * QedWminus[7];
+    Fr[5] = 0.0;
+    Fr[6] = -E3;
+    Fr[7] = E2;
+    Fr[4] = hr[0] * QedWminus[1] * (hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*QedWminus[7] - E3*QedWminus[6]);
+
+    // maximum of fast magnetoacoustic speeds L/R
+    sp[0] = std::min(QedWplus[1] * hl[0] - cfL, QedWminus[1] * hr[0] - cfR);
+    sp[4] = std::max(QedWplus[1] * hl[0] + cfL, QedWminus[1] * hr[0] + cfR);
+
+    // Upwind flux in the case of supersonic flow
+    if (sp[0] >= 0.0)
     {
-      this->compute_flux_vector(dir_abs, Wplus, normal_flux);
-
-      normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] = 0.;
-
-      if (parameters.debug)
-        std::cout << "\t\t\tFlux regime: " << "S_L > 0." << std::endl;
-
+      // use F_L
+      for (int k = 0; k < n_components; k++)
+        normal_flux[k] = Fl[k];
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
+      return;
+    }
+    if (sp[4] <= 0.0)
+    {
+      for (int k = 0; k < n_components; k++)
+        normal_flux[k] = Fr[k];
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
       return;
     }
 
-    if (S_R < 0.)
+    // Determine Alfven and middle speeds
+    Sl = sp[0] - QedWplus[1] * hl[0];
+    Sr = sp[4] - QedWminus[1] * hr[0];
+    sp[2] = (QedWminus[1] * Sr - QedWplus[1] * Sl - p_T_R + p_T_L) / (QedWminus[0] * Sr - QedWplus[0] * Sl);
+    sml = sp[0] - sp[2];
+    smr = sp[4] - sp[2];
+
+    // Density
+    Ul[0] = QedWplus[0] * Sl / sml;
+    Ur[0] = QedWminus[0] * Sr / smr;
+
+    Ul[5] = Udl[5] = QedWplus[5];
+    Ur[5] = Udr[5] = QedWminus[5];
+
+    srdl = sqrt(Ul[0]);
+    srdr = sqrt(Ur[0]);
+
+    // Sl*
+    sp[1] = sp[2] - fabs(Ul[5]) / srdl;
+    // Sr*
+    sp[3] = sp[2] + fabs(Ur[5]) / srdr;
+
+    ptst = p_T_L + QedWplus[0] * Sl*(Sl - sml);
+    ptstr = p_T_R + QedWminus[0] * Sr*(Sr - smr);
+
+    // F*_L
+    Ul[1] = Ul[0] * sp[2];
+
+    cfL = QedWplus[0] * Sl*sml - Ul[5] * Ul[5];
+    if (fabs(cfL) < 1e-8 * ptst)
     {
-      this->compute_flux_vector(dir_abs, Wminus, normal_flux);
+      Ul[2] = Ul[0] * QedWplus[2] * hl[0];
+      Ul[3] = Ul[0] * QedWplus[3] * hl[0];
+      Ul[6] = QedWplus[6];
+      Ul[7] = QedWplus[7];
+    }
+    else
+    {
+      cfL = 1.0 / cfL;
+      cm = Ul[5] * (Sl - sml)*cfL;
+      Ul[2] = Ul[0] * (QedWplus[2] * hl[0] - QedWplus[6] * cm);
+      Ul[3] = Ul[0] * (QedWplus[3] * hl[0] - QedWplus[7] * cm);
+      cm = (QedWplus[0] * Sl*Sl - Ul[5] * Ul[5])*cfL;
+      Ul[6] = QedWplus[6] * cm;
+      Ul[7] = QedWplus[7] * cm;
+    }
+
+    vbstl = (Ul[1] * Ul[5] + Ul[2] * Ul[6] + Ul[3] * Ul[7]) / Ul[0];
+
+    Ul[4] = (Sl*QedWplus[4] - p_T_L * QedWplus[1] * hl[0] + ptst * sp[2] + Ul[5] * ((QedWplus[1] * QedWplus[5] + QedWplus[2] * QedWplus[6] + QedWplus[3] * QedWplus[7])*hl[0] - vbstl)) / sml;
+
+    // F*_R
+    Ur[1] = Ur[0] * sp[2];
+    cfL = QedWminus[0] * Sr*smr - Ur[5] * Ur[5];
+    if (fabs(cfL) < 1e-8*ptstr)
+    {
+      Ur[2] = Ur[0] * QedWminus[2] * hr[0];
+      Ur[3] = Ur[0] * QedWminus[3] * hr[0];
+      Ur[6] = QedWminus[6];
+      Ur[7] = QedWminus[7];
+    }
+    else
+    {
+      cfL = 1.0 / cfL;
+      cm = Ur[5] * (Sr - smr)*cfL;
+      Ur[2] = Ur[0] * (QedWminus[2] * hr[0] - QedWminus[6] * cm);
+      Ur[3] = Ur[0] * (QedWminus[3] * hr[0] - QedWminus[7] * cm);
+      cm = (QedWminus[0] * Sr*Sr - Ur[5] * Ur[5])*cfL;
+      Ur[6] = QedWminus[6] * cm;
+      Ur[7] = QedWminus[7] * cm;
+    }
+
+    vbstr = (Ur[1] * Ur[5] + Ur[2] * Ur[6] + Ur[3] * Ur[7]) / Ur[0];
+
+    Ur[4] = (Sr*QedWminus[4] - p_T_R * QedWminus[1] * hr[0] + ptstr * sp[2] + Ur[5] * ((QedWminus[1] * QedWminus[5] + QedWminus[2] * QedWminus[6] + QedWminus[3] * QedWminus[7])*hr[0] - vbstr)) / smr;
+
+    if (sp[1] >= 0.0)
+    {
+      for (register int j = 0; j < n_components; j++)
+        normal_flux[j] = Fl[j] + sp[0] * (Ul[j] - QedWplus[j]);
+
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
+      return;
+    }
+    if (sp[3] <= 0.0 && sp[2] < 0.0)
+    {
+      for (register int j = 0; j < n_components; j++)
+        normal_flux[j] = Fr[j] + sp[4] * (Ur[j] - QedWminus[j]);
       
-      normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] = 0.;
-
-      if (parameters.debug)
-        std::cout << "\t\t\tFlux regime: " << "S_R < 0." << std::endl;
-
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
       return;
     }
 
-    // Now we need to calculate S_M & all other stuff.
-    S_M = (((S_R - VelN_R) * (rho_R * VelN_R)) - ((S_L - VelN_L) * (rho_L * VelN_L)) - p_T_R + p_T_L - (MagN_L * MagN_L) + (MagN_R * MagN_R)) / (((S_R - VelN_R) * rho_R) - ((S_L - VelN_L) * rho_L));
-    B_x = (S_R * MagN_R - S_L * MagN_L) / (S_R - S_L);
-
-    typename InputVector::value_type scrch1L = S_L - VelN_L, scrch2L = S_L - S_M, scrch3L = S_M - VelN_L;
-    typename InputVector::value_type scrch1R = S_R - VelN_R, scrch2R = S_R - S_M, scrch3R = S_M - VelN_R;
-
-    typename InputVector::value_type denom = rho_L * scrch1L * scrch2L - MagN_L * MagN_L;
-    typename InputVector::value_type scrch4L = scrch3L / denom, scrch5L = (rho_L * scrch1L * scrch1L - MagN_L * MagN_L) / denom;
-
-    denom = rho_R * scrch1R * scrch2R - MagN_R * MagN_R;
-    typename InputVector::value_type scrch4R = scrch3R / denom, scrch5R = (rho_R * scrch1R * scrch1R - MagN_R * MagN_R) / denom;
-
-    psT = (((S_R - VelN_R) * (rho_R * p_T_L)) - ((S_L - VelN_L) * (rho_L * p_T_R)) + ((rho_L * rho_R) * (S_R - VelN_R) * (S_L - VelN_L) * (VelN_R - VelN_L))) / (((S_R - VelN_R) * rho_R) - ((S_L - VelN_L) * rho_L));
-
-    typename InputVector::value_type velxStarL, velyStarL, velzStarL, velxStarR, velyStarR, velzStarR, magxStarL, magyStarL, magzStarL, magxStarR, magyStarR, magzStarR, velxStar2, velyStar2, velzStar2, magxStar2, magyStar2, magzStar2, signumBn;
-
-    std_cxx11::array<typename InputVector::value_type, n_components> Us_L;
+    // F**_L and F**_R
+    if (B2 < 1e-8*(ptst + ptstr))
     {
-      Us_L[0] = rho_L * (S_L - VelN_L) / (S_L - S_M);
-      switch (dir_abs)
+      for (register int j = 0; j < n_components; j++)
       {
-      case 0:
-        magxStarL = B_x;
-        velxStarL = S_M;
-        magyStarL = Wplus[6] * scrch5L;
-        magzStarL = Wplus[7] * scrch5L;
-        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[5] * Wplus[6] * scrch4L;
-        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[5] * Wplus[7] * scrch4L;
-        break;
-      case 1:
-        magyStarL = B_x;
-        velyStarL = S_M;
-        magxStarL = Wplus[5] * scrch5L;
-        magzStarL = Wplus[7] * scrch5L;
-        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[6] * Wplus[5] * scrch4L;
-        velzStarL = (Wplus[3] / Wplus[0]) - Wplus[6] * Wplus[7] * scrch4L;
-        break;
-      case 2:
-        magzStarL = B_x;
-        velzStarL = S_M;
-        magxStarL = Wplus[5] * scrch5L;
-        magyStarL = Wplus[6] * scrch5L;
-        velxStarL = (Wplus[1] / Wplus[0]) - Wplus[7] * Wplus[5] * scrch4L;
-        velyStarL = (Wplus[2] / Wplus[0]) - Wplus[7] * Wplus[6] * scrch4L;
-        break;
+        Udl[j] = Ul[j];
+        Udr[j] = Ur[j];
       }
+    }
+    else
+    {
+      invsumd = 1.0 / (srdl + srdr);
+      Bsgnl = (Ul[5] > 0.0) ? 1.0 : -1.0;
+      Bsgnr = (Ur[5] > 0.0) ? 1.0 : -1.0;
 
-      Us_L[1] = Us_L[0] * velxStarL;
-      Us_L[2] = Us_L[0] * velyStarL;
-      Us_L[3] = Us_L[0] * velzStarL;
+      Udl[0] = Ul[0];
+      Udr[0] = Ur[0];
 
-      Us_L[5] = magxStarL;
-      Us_L[6] = magyStarL;
-      Us_L[7] = magzStarL;
+      Udl[1] = Ul[1];
+      Udr[1] = Ur[1];
 
-      // This has to be here as it uses the previous values in the same array.
-      Us_L[4] = ((scrch1L * Wplus[4]) - (p_T_L * VelN_L) + (psT * S_M) + (B_x * (((Wplus[1] * Wplus[5] + Wplus[2] * Wplus[6] + Wplus[3] * Wplus[7]) / Wplus[0]) - (velxStarL * Us_L[5]) - (velyStarL * Us_L[6]) - (velzStarL * Us_L[7])))) / scrch2L;
+      cm = invsumd*(srdl*Ul[2] / Ul[0] + srdr*Ur[2] / Ur[0]);
+      cfL = invsumd*(Ur[6] - Ul[6]);
+      Udl[2] = Ul[0] * (cm + Bsgnl*cfL);
+      Udr[2] = Ur[0] * (cm + Bsgnr*cfL);
+
+      cm = invsumd*(srdl*Ul[3] / Ul[0] + srdr*Ur[3] / Ur[0]);
+      cfL = invsumd*(Ur[7] - Ul[7]);
+      Udl[3] = Ul[0] * (cm + Bsgnl*cfL);
+      Udr[3] = Ur[0] * (cm + Bsgnr*cfL);
+
+      cm = invsumd*(srdl*Ur[6] + srdr*Ul[6]);
+      cfL = invsumd*srdl*srdr*(Ur[2] / Ur[0] - Ul[2] / Ul[0]);
+      Udl[6] = cm + Bsgnl*cfL;
+      Udr[6] = cm + Bsgnr*cfL;
+
+      cm = invsumd*(srdl*Ur[7] + srdr*Ul[7]);
+      cfL = invsumd*srdl*srdr*(Ur[3] / Ur[0] - Ul[3] / Ul[0]);
+      Udl[7] = cm + Bsgnl*cfL;
+      Udr[7] = cm + Bsgnr*cfL;
+
+      Udl[4] = Ul[4] - srdl*Bsgnl*(vbstl - sp[2] * Ul[5] - (Udl[2] * Udl[6] + Udl[3] * Udl[7]) / Udl[0]);
+      Udr[4] = Ur[4] + srdr*Bsgnr*(vbstr - sp[2] * Ur[5] - (Udr[2] * Udr[6] + Udr[3] * Udr[7]) / Udr[0]);
     }
 
-    std_cxx11::array<typename InputVector::value_type, n_components> Us_R;
+    if (sp[2] >= 0.0)
     {
-      Us_R[0] = rho_R * (S_R - VelN_R) / (S_R - S_M);
-      switch (dir_abs)
-      {
-      case 0:
-        magxStarR = B_x;
-        velxStarR = S_M;
-        magyStarR = Wminus[6] * scrch5R;
-        magzStarR = Wminus[7] * scrch5R;
-        velyStarR = (Wminus[2] / Wminus[0]) - Wminus[5] * Wminus[6] * scrch4R;
-        velzStarR = (Wminus[3] / Wminus[0]) - Wminus[5] * Wminus[7] * scrch4R;
-        break;
-      case 1:
-        magyStarR = B_x;
-        velyStarR = S_M;
-        magxStarR = Wminus[5] * scrch5R;
-        magzStarR = Wminus[7] * scrch5R;
-        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[6] * Wminus[5] * scrch4R;
-        velzStarR = (Wminus[3] / Wminus[0]) - Wminus[6] * Wminus[7] * scrch4R;
-        break;
-      case 2:
-        magzStarR = B_x;
-        velzStarR = S_M;
-        magxStarR = Wminus[5] * scrch5R;
-        magyStarR = Wminus[6] * scrch5R;
-        velxStarR = (Wminus[1] / Wminus[0]) - Wminus[7] * Wminus[5] * scrch4R;
-        velyStarR = (Wminus[2] / Wminus[0]) - Wminus[7] * Wminus[6] * scrch4R;
-      }
-
-      Us_R[1] = Us_R[0] * velxStarR;
-      Us_R[2] = Us_R[0] * velyStarR;
-      Us_R[3] = Us_R[0] * velzStarR;
-
-      Us_R[5] = magxStarR;
-      Us_R[6] = magyStarR;
-      Us_R[7] = magzStarR;
-
-      // This has to be here as it uses the previous values in the same array.
-      Us_R[4] = ((scrch1R * Wminus[4]) - (p_T_R * VelN_R) + (psT * S_M) + (B_x * (((Wminus[1] * Wminus[5] + Wminus[2] * Wminus[6] + Wminus[3] * Wminus[7]) / Wminus[0]) - (velxStarR * Us_R[5]) - (velyStarR * Us_R[6]) - (velzStarR * Us_R[7])))) / scrch2R;
-    }
-
-    typename InputVector::value_type Ss_L = S_M - (std::abs(B_x) / std::sqrt(Us_L[0]));
-    typename InputVector::value_type Ss_R = S_M + (std::abs(B_x) / std::sqrt(Us_R[0]));
-
-    if (S_M >= 0. && Ss_L >= 0.)
-    {
-      std_cxx11::array<typename InputVector::value_type, n_components> F_L;
-      this->compute_flux_vector(dir_abs, Wplus, F_L);
-      for (int k = 0; k < n_components; k++)
-        normal_flux[k] = F_L[k] + S_L * (Us_L[k] - Wplus[k]);
-      normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] = 0.;
-
-      if (parameters.debug)
-        std::cout << "\t\t\tFlux regime: " << "S_M >= 0. && Ss_L >= 0." << std::endl;
-      return;
-    }
-    else if(S_M < 0. && Ss_R < 0.)
-    {
-      std_cxx11::array<typename InputVector::value_type, n_components> F_R;
-      this->compute_flux_vector(dir_abs, Wminus, F_R);
-      for (int k = 0; k < n_components; k++)
-        normal_flux[k] = F_R[k] + S_R * (Us_R[k] - Wminus[k]);
-      normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] = 0.;
-
-      if (parameters.debug)
-        std::cout << "\t\t\tFlux regime: " << "S_M < 0. && Ss_R < 0." << std::endl;
-      return;
-    }
-
-    scrch1L = sqrt(Us_L[0]);
-    scrch1R = sqrt(Us_R[0]);
-    scrch2L = 1. / (scrch1L + scrch1R);
-    scrch2R = scrch2L;
-
-    signumBn = std::abs(B_x) > NEGLIGIBLE ? (B_x > 0. ? 1. : -1.) : 0.;
-
-    switch (dir_abs)
-    {
-    case 0:
-      velxStar2 = S_M;
-      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
-      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[7] - Us_L[7]) * signumBn) * scrch2L;
-      magxStar2 = B_x;
-      magyStar2 = (scrch1L * magyStarR + scrch1R * magyStarL + scrch1L * scrch1R * (velyStarR - velyStarL) * signumBn) * scrch2L;
-      magzStar2 = (scrch1L * magzStarR + scrch1R * magzStarL + scrch1L * scrch1R * (velzStarR - velzStarL) * signumBn) * scrch2L;
-      break;
-    case 1:
-      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
-      velyStar2 = S_M;
-      velzStar2 = (scrch1L * velzStarL + scrch1R * velzStarR + (Us_R[7] - Us_L[7]) * signumBn) * scrch2L;
-      magxStar2 = (scrch1L * magxStarR + scrch1R * magxStarL + scrch1L * scrch1R * (velxStarR - velxStarL) * signumBn) * scrch2L;
-      magyStar2 = B_x;
-      magzStar2 = (scrch1L * magzStarR + scrch1R * magzStarL + scrch1L * scrch1R * (velzStarR - velzStarL) * signumBn) * scrch2L;
-      break;
-    case 2:
-      velxStar2 = (scrch1L * velxStarL + scrch1R * velxStarR + (Us_R[5] - Us_L[5]) * signumBn) * scrch2L;
-      velyStar2 = (scrch1L * velyStarL + scrch1R * velyStarR + (Us_R[6] - Us_L[6]) * signumBn) * scrch2L;
-      velzStar2 = S_M;
-      magxStar2 = (scrch1L * magxStarR + scrch1R * magxStarL + scrch1L * scrch1R * (velxStarR - velxStarL) * signumBn) * scrch2L;
-      magyStar2 = (scrch1L * magyStarR + scrch1R * magyStarL + scrch1L * scrch1R * (velyStarR - velyStarL) * signumBn) * scrch2L;
-      magzStar2 = B_x;
-    } 
-
-    // Fs_L, Fss_L
-    if (S_M >= 0. && Ss_L < 0.)
-    {
-      std_cxx11::array<typename InputVector::value_type, n_components> F_L;
-      this->compute_flux_vector(dir_abs, Wplus, F_L);
-      std_cxx11::array<typename InputVector::value_type, n_components> Uss_L;
-      Uss_L[0] = Us_L[0];
-
-      Uss_L[1] = Uss_L[0] * velxStar2;
-      Uss_L[2] = Uss_L[0] * velyStar2;
-      Uss_L[3] = Uss_L[0] * velzStar2;
-
-      Uss_L[5] = magxStar2;
-      Uss_L[6] = magyStar2;
-      Uss_L[7] = magzStar2;
-
-      // This has to be here as it uses the previous values in the same array.
-      Uss_L[4] = Us_L[4] - sqrt(Us_L[0]) * signumBn * (velxStarL * Us_L[5] + velyStarL * Us_L[6] + velzStarL * Us_L[7] - velxStar2 * Uss_L[5] - velyStar2 * Uss_L[6] - velzStar2 * Uss_L[7]);
-
-      for (int k = 0; k < n_components; k++)
-        normal_flux[k] = F_L[k] + Ss_L * Uss_L[k] - ((Ss_L - S_L) * Us_L[k]) - (S_L * Wplus[k]);
-     
-      normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] = 0.;
-
-      if (parameters.debug)
-        std::cout << "\t\t\tFlux regime: " << "S_M >= 0. && Ss_L < 0." << std::endl;
-
-      return;
-    }
-    else if(S_M < 0. && Ss_R >= 0.)
-    {
-      std_cxx11::array<typename InputVector::value_type, n_components> F_R;
-      this->compute_flux_vector(dir_abs, Wminus, F_R);
-
-      std_cxx11::array<typename InputVector::value_type, n_components> Uss_R;
-      Uss_R[0] = Us_R[0];
-
-      Uss_R[1] = Uss_R[0] * velxStar2;
-      Uss_R[2] = Uss_R[0] * velyStar2;
-      Uss_R[3] = Uss_R[0] * velzStar2;
-
-      Uss_R[5] = magxStar2;
-      Uss_R[6] = magyStar2;
-      Uss_R[7] = magzStar2;
-
-      // This has to be here as it uses the previous values in the same array.
-      Uss_R[4] = Us_R[4] + sqrt(Us_R[0]) * signumBn * (velxStarR * Us_R[5] + velyStarR * Us_R[6] + velzStarR * Us_R[7] - velxStar2 * Uss_R[5] - velyStar2 * Uss_R[6] - velzStar2 * Uss_R[7]);
-
-      for (int k = 0; k < n_components; k++)
-        normal_flux[k] = F_R[k] + Ss_R * Uss_R[k] - ((Ss_R - S_R) * Us_R[k]) - (S_R * Wminus[k]);
+      cm = sp[1] - sp[0];
+      for (register int j = 0; j < n_components; j++)
+        normal_flux[j] = Fl[j] + sp[1] * Udl[j] - sp[0] * QedWplus[j] - cm*Ul[j];
       
-      normal_flux[1 + dir_abs] *= dir_sign;
-      normal_flux[5 + dir_abs] = 0.;
-
-      if (parameters.debug)
-        std::cout << "\t\t\tFlux regime: " << "S_M < 0. && Ss_R >= 0." << std::endl;
-
-      return;
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
     }
+    else
+    {
+      cm = sp[3] - sp[4];
+      for (register int j = 0; j < n_components; j++)
+        normal_flux[j] = Fr[j] + sp[3] * Udr[j] - sp[4] * QedWminus[j] - cm*Ur[j];
+      
+      Q_inv<InputVector>(normal_flux, normal_flux, normal);
+    }
+
+    return;
   }
 }
 
@@ -585,7 +634,7 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
 template <int dim>
 UpdateFlags Equations<EquationsTypeMhd, dim>::Postprocessor::get_needed_update_flags() const
 {
-  return update_values;
+  return update_values | update_gradients;
 }
 
 template class Equations<EquationsTypeMhd, 3>;

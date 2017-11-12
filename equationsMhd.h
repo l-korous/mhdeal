@@ -46,6 +46,12 @@ public:
   template <typename InputVector, typename ValueType>
   void compute_jacobian_addition(double cell_diameter, const InputVector& grad_W, std_cxx11::array <std_cxx11::array <ValueType, dim>, n_components > &jacobian_addition) const;
 
+  template <typename InputVector>
+  void Q(std_cxx11::array<typename InputVector::value_type, n_components> &result, const InputVector &W, const Tensor<1, 3> &normal) const;
+
+  template <typename InputVector>
+  void Q_inv(std_cxx11::array<typename InputVector::value_type, n_components> &result, std_cxx11::array<typename InputVector::value_type, n_components> &F, const Tensor<1, dim> &normal) const;
+
   // Compute the values for the numerical flux
   template <typename InputVector>
   void numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus,
