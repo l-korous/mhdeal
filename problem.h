@@ -88,10 +88,10 @@ private:
   const QGauss<dim - 1> face_quadrature;
 
   // Currently sought solution, the previous one, and the initial solution for newton's loop on the current time level.
-  TrilinosWrappers::MPI::Vector     current_solution;
+  TrilinosWrappers::MPI::Vector     limited_solution;
   TrilinosWrappers::MPI::Vector     current_limited_solution;
   TrilinosWrappers::MPI::Vector     current_unlimited_solution;
-  TrilinosWrappers::MPI::Vector     old_solution;
+  TrilinosWrappers::MPI::Vector     prev_solution;
   
   // The system being assembled.
   TrilinosWrappers::MPI::Vector system_rhs;

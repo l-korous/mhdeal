@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
       system("del *.vtu");
       system("del *.pvtu");
       system("del *.newton_update");
-      system("del *.current_solution");
+      system("del *.limited_solution");
       system("del *.matrix");
       system("del *.rhs");
 #else
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
       system("rm *.vtu");
       system("rm *.pvtu");
       system("rm *.newton_update");
-      system("rm *.current_solution");
+      system("rm *.limited_solution");
       system("rm *.matrix");
       system("rm *.rhs");
 #endif

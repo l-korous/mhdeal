@@ -30,7 +30,7 @@ public:
   bool output_matrix;
   // Output rhs after assemble_system() in Problem::run().
   bool output_rhs;
-  // Output current_solution after solve() in Problem::run().
+  // Output limited_solution after solve() in Problem::run().
   bool output_solution;
 
   // initial conditions: 0 - MHD Blast, 1 - Titov&Demoulin flux rope

@@ -19,8 +19,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
     FE_RaviartThomas<dim>(1), 1),
 #else
-  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
-    FE_DivFree<dim>(parameters.polynomial_order_dg), 3),
+  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 8),
 #endif
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
@@ -81,7 +80,7 @@ void Problem<equationsType, dim>::postprocess()
   FEValues<dim> fe_v_neighbor(mapping, fe, quadrature, update_flags);
 
   // This is what we return.
-  current_limited_solution = current_solution;
+  current_limited_solution = limited_solution;
   constraints.distribute(current_limited_solution);
 
   int cell_count = 0;
@@ -112,7 +111,7 @@ void Problem<equationsType, dim>::postprocess()
 
         if (!u_c_set[component_ii])
         {
-          u_c[component_ii] = current_solution(dof_indices[i]);
+          u_c[component_ii] = limited_solution(dof_indices[i]);
           u_c_set[component_ii] = true;
         }
         else
@@ -120,7 +119,7 @@ void Problem<equationsType, dim>::postprocess()
           lambda_indices_to_multiply[component_ii].push_back(dof_indices[i]);
         }
       }
-  }
+    }
 
     if (parameters.debug_limiter)
       std::cout << "cell: " << ++cell_count << " - center: " << cell->center() << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
@@ -160,7 +159,7 @@ void Problem<equationsType, dim>::postprocess()
 
       // (!!!) Find out u_i
       Vector<double> u_i(8);
-      VectorTools::point_value(dof_handler, current_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
+      VectorTools::point_value(dof_handler, limited_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
 
       if (this->parameters.debug_limiter)
       {
@@ -220,7 +219,7 @@ void Problem<equationsType, dim>::postprocess()
 
               if (!u_i_extrema_set[component_ii])
               {
-                double val = current_solution(dof_indices_neighbor[dof]);
+                double val = limited_solution(dof_indices_neighbor[dof]);
                 if (this->parameters.debug_limiter)
                 {
                   if (val < u_i_min[component_ii])
@@ -276,8 +275,8 @@ void Problem<equationsType, dim>::postprocess()
 
                   if (!u_i_extrema_set_neighbor[component_ii])
                   {
-                    u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
-                    u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)current_solution(dof_indices_neighbor[dof]));
+                    u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)limited_solution(dof_indices_neighbor[dof]));
+                    u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)limited_solution(dof_indices_neighbor[dof]));
                     u_i_extrema_set_neighbor[component_ii] = true;
                   }
                 }
@@ -303,7 +302,7 @@ void Problem<equationsType, dim>::postprocess()
     for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
       for (int i = 0; i < lambda_indices_to_multiply[k].size(); i++)
         current_limited_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
-}
+  }
 }
 
 template <EquationsType equationsType, int dim>
@@ -471,229 +470,40 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
 
-  // This is for the explicit case.
-  if (parameters.theta < 1.)
-  {
-    Table<2, double> W_old(n_q_points, Equations<equationsType, dim>::n_components);
-    Table<3, double> grad_W_old(n_q_points, Equations<equationsType, dim>::n_components, dim);
+  Table<2, double> W_prev(n_q_points, Equations<equationsType, dim>::n_components);
+  Table<3, double> grad_W_prev(n_q_points, Equations<equationsType, dim>::n_components, dim);
+  Table<2, double> W_lin(n_q_points, Equations<equationsType, dim>::n_components);
+  Table<3, double> grad_W_lin(n_q_points, Equations<equationsType, dim>::n_components, dim);
 
+  if (initial_step)
+  {
+    std::vector<Vector<double> > initial_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
+    initial_condition.vector_value(fe_v.get_quadrature_points(), initial_values);
+    for (unsigned int q = 0; q < n_q_points; ++q)
+      for (unsigned int i = 0; i < equations.n_components; ++i)
+        W_prev[q][i] = initial_values[q][i];
+  }
+  else
+  {
+#ifdef USE_HDIV_FOR_B
+    const FEValuesExtractors::Vector mag(dim + 2);
+#endif
     for (unsigned int q = 0; q < n_q_points; ++q)
     {
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
-        W_old[q][c] = 0;
-        if (parameters.needs_gradients && !initial_step)
+        W_prev[q][c] = 0.;
+        W_lin[q][c] = 0.;
+        if (!initial_step)
         {
           for (unsigned int d = 0; d < dim; ++d)
-            grad_W_old[q][c][d] = 0;
-        }
-        }
-      }
-
-#ifdef USE_HDIV_FOR_B
-    const FEValuesExtractors::Vector mag(dim + 2);
-#endif
-
-    if (initial_step)
-    {
-      std::vector<Vector<double> > initial_values(n_q_points, Vector<double>(Equations<equationsType, dim>::n_components));
-      initial_condition.vector_value(fe_v.get_quadrature_points(), initial_values);
-      for (unsigned int q = 0; q < n_q_points; ++q)
-        for (unsigned int i = 0; i < equations.n_components; ++i)
-          W_old[q][i] = initial_values[q][i];
-    }
-    else
-    {
-      for (unsigned int q = 0; q < n_q_points; ++q)
-      {
-        for (unsigned int i = 0; i < dofs_per_cell; ++i)
-        {
-#ifdef USE_HDIV_FOR_B
-          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-          if (component_i == 1)
           {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
-
-            for (unsigned int d = 0; d < dim; d++)
-            {
-              W_old[q][5 + d] += old_solution(dof_indices[i]) * fe_v_value[d];
-              if (parameters.theta > 0. && parameters.needs_gradients)
-                for (unsigned int d1 = 0; d1 < dim; d1++)
-                  grad_W_old[q][5 + d][d1] += old_solution(dof_indices[i]) * fe_v_grad[d][d1];
-    }
-  }
-          // For the other components (spaces), we go by each component.
-          else
-#endif
-          {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            W_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-
-            if (parameters.theta > 0. && parameters.needs_gradients)
-              for (unsigned int d = 0; d < dim; d++)
-                grad_W_old[q][component_ii][d] += old_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_ii)[d];
-          }
-}
-      }
-    }
-
-    std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > flux_old(n_q_points);
-    std::vector < std_cxx11::array< double, Equations<equationsType, dim>::n_components> > forcing_old(n_q_points);
-    // LK: This is for e.g. stabilization for Euler
-    std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition_old(n_q_points);
-
-    if (!initial_step)
-    {
-      for (unsigned int q = 0; q < n_q_points; ++q)
-      {
-        equations.compute_flux_matrix(W_old[q], flux_old[q]);
-
-        if (parameters.debug)
-        {
-          std::cout << "\tpoint_i: " << q << std::endl;
-          std::cout << "\tq: " << fe_v.quadrature_point(q) << std::endl;
-          std::cout << "\tW: ";
-          for (unsigned int i = 0; i < 8; i++)
-            std::cout << W_old[q][i] << (i < 7 ? ", " : "");
-          std::cout << std::endl;
-
-          std::cout << "\tF[X]: ";
-          for (unsigned int i = 0; i < 8; i++)
-            std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
-          std::cout << std::endl;
-
-          std::cout << "\tF[Y]: ";
-          for (unsigned int i = 0; i < 8; i++)
-            std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
-          std::cout << std::endl;
-
-          std::cout << "\tF[Z]: ";
-          for (unsigned int i = 0; i < 8; i++)
-            std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
-          std::cout << std::endl;
-        }
-        equations.compute_forcing_vector(W_old[q], forcing_old[q]);
-        if (parameters.needs_gradients)
-          equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W_old[q], jacobian_addition_old[q]);
-      }
-    }
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    {
-      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-      double val = 0;
-
-      for (unsigned int q = 0; q < n_q_points; ++q)
-      {
-#ifdef USE_HDIV_FOR_B
-        if (component_i == 1)
-        {
-          if (parameters.is_stationary == false)
-          {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-
-            val -= (1.0 / parameters.time_step)
-              * (W_old[q][5] * fe_v_value[0] + W_old[q][6] * fe_v_value[1] + W_old[q][7] * fe_v_value[2])
-              * fe_v.JxW(q);
-          }
-          if (parameters.debug_dofs && q == 0)
-          {
-            std::cout << "\tDOF: " << i << " - COMP: " << component_i << std::endl;
-          }
-
-          if (!initial_step)
-          {
-            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
-            for (unsigned int d = 0; d < dim; d++)
-              for (unsigned int e = 0; e < dim; e++)
-                val -= (1.0 - parameters.theta) * (flux_old[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
-
-            if (parameters.needs_gradients)
-              for (unsigned int d = 0; d < dim; d++)
-                val += (1.0 - parameters.theta) * (jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
-
-            if (parameters.needs_forcing)
-              val -= (1.0 - parameters.theta) * (forcing_old[q][5] * fe_v[mag].value(i, q)[0] + forcing_old[q][6] * fe_v[mag].value(i, q)[1] + forcing_old[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
-    }
-        }
-        // For the other components (spaces), we go by each component.
-        else
-#endif
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          if (parameters.is_stationary == false)
-            val -= (1.0 / parameters.time_step) * W_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
-
-          if (parameters.debug_dofs && q == 0)
-          {
-            std::cout << "\tDOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
-          }
-
-          if (!initial_step)
-          {
-            for (unsigned int d = 0; d < dim; d++)
-              val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
-
-            if (parameters.needs_gradients)
-              for (unsigned int d = 0; d < dim; d++)
-                val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-
-            if (parameters.needs_forcing)
-              val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+            grad_W_prev[q][c][d] = 0.;
+            grad_W_lin[q][c][d] = 0.;
           }
         }
       }
 
-      if (std::isnan(val))
-      {
-        std::cout << "isnan: " << val << std::endl;
-#ifdef USE_HDIV_FOR_B
-        std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-#else
-        std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
-#endif
-        std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
-        for (int j = 0; j < 8; j++)
-          std::cout << "W [" << j << "]: " << (double)W_old[0][j] << ", F [" << j << "]: " << (double)flux_old[0][j][0] << ", " << (double)flux_old[0][j][1] << ", " << (double)flux_old[0][j][2] << std::endl;
-      }
-
-      cell_rhs(i) -= val;
-    }
-  }
-
-  // Now this is for the implicit case. This is different from the face term, as the time derivative needs to be there in both explicit and implicit cases.
-  // So we do all the preparations, but only add the time-derivative contribution to the assembly if we in fact have the explicit case.
-  {
-    Table<2, Sacado::Fad::DFad<double> > W(n_q_points, Equations<equationsType, dim>::n_components);
-    Table<3, Sacado::Fad::DFad<double> > grad_W(n_q_points, Equations<equationsType, dim>::n_components, dim);
-    std::vector<double> residual_derivatives(dofs_per_cell);
-
-    std::vector<Sacado::Fad::DFad<double> > independent_local_dof_values(dofs_per_cell);
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-      independent_local_dof_values[i] = current_solution(dof_indices[i]);
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-      independent_local_dof_values[i].diff(i, dofs_per_cell);
-
-    for (unsigned int q = 0; q < n_q_points; ++q)
-    {
-      for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
-      {
-        W[q][c] = 0;
-        if (parameters.needs_gradients && !initial_step)
-        {
-          for (unsigned int d = 0; d < dim; ++d)
-            grad_W[q][c][d] = 0;
-        }
-      }
-    }
-
-    const FEValuesExtractors::Vector mag(dim + 2);
-
-    for (unsigned int q = 0; q < n_q_points; ++q)
-    {
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
 #ifdef USE_HDIV_FOR_B
@@ -702,122 +512,185 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         {
           dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
           dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
+
           for (unsigned int d = 0; d < dim; d++)
           {
-            W[q][5 + d] += independent_local_dof_values[i] * fe_v_value[d];
-            if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
-              for (unsigned int d1 = 0; d1 < dim; d1++)
-                grad_W[q][5 + d][d1] += independent_local_dof_values[i] * fe_v_grad[d][d1];
-  }
+            W_prev[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
+            W_lin[q][5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
+            for (unsigned int d1 = 0; d1 < dim; d1++)
+            {
+              grad_W_prev[q][5 + d][d1] += prev_solution(dof_indices[i]) * fe_v_grad[d][d1];
+              grad_W_lin[q][5 + d][d1] += lin_solution(dof_indices[i]) * fe_v_grad[d][d1];
+            }
+          }
         }
         else
 #endif
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          W[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
+          W_prev[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+          W_lin[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
 
-          if (parameters.theta > 0. && parameters.needs_gradients && !initial_step)
-            for (unsigned int d = 0; d < dim; d++)
-              grad_W[q][component_ii][d] += independent_local_dof_values[i] * fe_v.shape_grad_component(i, q, component_ii)[d];
-        }
-      }
-    }
-
-    std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > flux(n_q_points);
-    std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > forcing(n_q_points);
-    // This is for e.g. stabilization for Euler, it is any addition to the jacobian that is not a part of the flux.
-    std::vector < std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, Equations<equationsType, dim>::n_components > > jacobian_addition(n_q_points);
-
-    if (parameters.theta > 0. && !initial_step)
-    {
-      for (unsigned int q = 0; q < n_q_points; ++q)
-      {
-        equations.compute_flux_matrix(W[q], flux[q]);
-        equations.compute_forcing_vector(W[q], forcing[q]);
-        if (parameters.needs_gradients)
-          equations.compute_jacobian_addition(fe_v.get_cell()->diameter(), grad_W[q], jacobian_addition[q]);
-      }
-    }
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    {
-      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-      Sacado::Fad::DFad<double> R_i = 0;
-
-      for (unsigned int q = 0; q < n_q_points; ++q)
-      {
-#ifdef USE_HDIV_FOR_B
-        if (component_i == 1)
-        {
-          if (parameters.is_stationary == false)
+          for (unsigned int d = 0; d < dim; d++)
           {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-
-            R_i += (1.0 / parameters.time_step)
-              * (W[q][5] * fe_v_value[0] + W[q][6] * fe_v_value[1] + W[q][7] * fe_v_value[2])
-              * fe_v.JxW(q);
-    }
-        }
-        else
-#endif
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          if (parameters.is_stationary == false)
-            R_i += (1.0 / parameters.time_step) * W[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
-        }
-
-        if (parameters.theta > 0. && !initial_step) {
-#ifdef USE_HDIV_FOR_B
-          if (component_i == 1)
-          {
-            dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
-            for (unsigned int d = 0; d < dim; d++)
-              for (unsigned int e = 0; e < dim; e++)
-                R_i -= parameters.theta * (flux[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
-
-            if (parameters.needs_gradients)
-              for (unsigned int d = 0; d < dim; d++)
-                R_i += parameters.theta * (jacobian_addition[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
-
-            if (parameters.needs_forcing)
-              R_i -= parameters.theta * (forcing[q][5] * fe_v[mag].value(i, q)[0] + forcing[q][6] * fe_v[mag].value(i, q)[1] + forcing[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
-        }
-          // For the other components (spaces), we go by each component.
-          else
-#endif
-          {
-            for (unsigned int d = 0; d < dim; d++)
-              R_i -= parameters.theta * flux[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-
-            if (parameters.needs_gradients)
-              for (unsigned int d = 0; d < dim; d++)
-                R_i += parameters.theta * jacobian_addition[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-
-            if (parameters.needs_forcing)
-              R_i -= parameters.theta * forcing[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+            grad_W_prev[q][component_ii][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_ii)[d];
+            grad_W_lin[q][component_ii][d] += lin_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_ii)[d];
           }
         }
       }
-
-      if (!assemble_only_rhs)
-        for (unsigned int k = 0; k < dofs_per_cell; ++k)
-          cell_matrix(i, k) += R_i.fastAccessDx(k);
-
-      if (std::isnan(R_i.val()))
-      {
-        std::cout << "isnan: " << R_i.val() << std::endl;
-#ifdef USE_HDIV_FOR_B
-        std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-#else
-        std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
-#endif
-        std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
-        for (int j = 0; j < 8; j++)
-          std::cout << "W [" << j << "]: " << (double)W[0][j].val() << ", F [" << j << "]: " << (double)flux[0][j][0].val() << ", " << (double)flux[0][j][1].val() << ", " << (double)flux[0][j][2].val() << std::endl;
-      }
-
-      cell_rhs(i) -= R_i.val();
     }
+  }
+
+  for (unsigned int q = 0; q < n_q_points; ++q)
+  {
+    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    {
+      const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+
+      // RHS
+      JacobiM(A, W_prev[q]);
+
+      cell_rhs(i) += JxW[point] * W_prev[q][component_ii];
+
+      if (!initial_step)
+      {
+        double val = A[0][component_ii][0] * grad_W_prev[q][0][0];
+        for (int d = 1; d < dim; d++)
+          val += A[d][component_ii][0] * prev_grads[q][0][d];
+        for (ui d = 0; d<DIM; d++)
+          for (ui j = 1; j<COMPONENT_COUNT; j++)
+            rhs[i] += A[d][i][j] * prev_grads[q][j][d];
+
+        cell_rhs(i) -= JxW[point] * 0.5 * parameters.time_step * val;
+      }
+      // MATRIX
+      JacobiM(A, W_lin[q]);
+      for (unsigned int j = 0; j < dofs_per_cell; ++j)
+      {
+        cell_matrix(i, k) += R_i.fastAccessDx(k);
+
+        if (!initial_step)
+        {
+          cell_matrix(i, k) += R_i.fastAccessDx(k);
+        }
+      }
+    }
+  }
+    equations.compute_flux_matrix(W_prev[q], flux_old[q]);
+
+    if (parameters.debug)
+    {
+      std::cout << "\tpoint_i: " << q << std::endl;
+      std::cout << "\tq: " << fe_v.quadrature_point(q) << std::endl;
+      std::cout << "\tW: ";
+      for (unsigned int i = 0; i < 8; i++)
+        std::cout << W_prev[q][i] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+
+      std::cout << "\tF[X]: ";
+      for (unsigned int i = 0; i < 8; i++)
+        std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+
+      std::cout << "\tF[Y]: ";
+      for (unsigned int i = 0; i < 8; i++)
+        std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+
+      std::cout << "\tF[Z]: ";
+      for (unsigned int i = 0; i < 8; i++)
+        std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+    }
+
+    equations.compute_forcing_vector(W_prev[q], forcing_old[q]);
+  }
+
+  for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  {
+    const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+
+    double val = 0;
+
+    for (unsigned int q = 0; q < n_q_points; ++q)
+    {
+#ifdef USE_HDIV_FOR_B
+      if (component_i == 1)
+      {
+        if (parameters.is_stationary == false)
+        {
+          dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+
+          val -= (1.0 / parameters.time_step)
+            * (W_prev[q][5] * fe_v_value[0] + W_prev[q][6] * fe_v_value[1] + W_prev[q][7] * fe_v_value[2])
+            * fe_v.JxW(q);
+        }
+        if (parameters.debug_dofs && q == 0)
+        {
+          std::cout << "\tDOF: " << i << " - COMP: " << component_i << std::endl;
+        }
+
+        if (!initial_step)
+        {
+          dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
+          for (unsigned int d = 0; d < dim; d++)
+            for (unsigned int e = 0; e < dim; e++)
+              val -= (1.0 - parameters.theta) * (flux_old[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
+
+          if (parameters.needs_gradients)
+            for (unsigned int d = 0; d < dim; d++)
+              val += (1.0 - parameters.theta) * (jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
+
+          if (parameters.needs_forcing)
+            val -= (1.0 - parameters.theta) * (forcing_old[q][5] * fe_v[mag].value(i, q)[0] + forcing_old[q][6] * fe_v[mag].value(i, q)[1] + forcing_old[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
+        }
+      }
+      // For the other components (spaces), we go by each component.
+      else
+#endif
+      {
+        const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+        if (parameters.is_stationary == false)
+          val -= (1.0 / parameters.time_step) * W_prev[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
+
+        if (parameters.debug_dofs && q == 0)
+        {
+          std::cout << "\tDOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
+        }
+
+        if (!initial_step)
+        {
+          for (unsigned int d = 0; d < dim; d++)
+            val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
+
+          if (parameters.needs_gradients)
+            for (unsigned int d = 0; d < dim; d++)
+              val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
+
+          if (parameters.needs_forcing)
+            val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
+        }
+      }
+    }
+
+    if (std::isnan(val))
+    {
+      std::cout << "isnan: " << val << std::endl;
+#ifdef USE_HDIV_FOR_B
+      std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+#else
+      std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+#endif
+      std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
+      for (int j = 0; j < 8; j++)
+        std::cout << "W [" << j << "]: " << (double)W_prev[0][j] << ", F [" << j << "]: " << (double)flux_old[0][j][0] << ", " << (double)flux_old[0][j][1] << ", " << (double)flux_old[0][j][2] << std::endl;
+    }
+
+    cell_rhs(i) -= val;
+
+    if (!assemble_only_rhs)
+      for (unsigned int k = 0; k < dofs_per_cell; ++k)
+        cell_matrix(i, k) += R_i.fastAccessDx(k);
   }
 }
 
@@ -860,15 +733,15 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           if (component_i == 1)
           {
             dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            Wplus_old[q][5] += old_solution(dof_indices[i]) * fe_v_value[0];
-            Wplus_old[q][6] += old_solution(dof_indices[i]) * fe_v_value[1];
-            Wplus_old[q][7] += old_solution(dof_indices[i]) * fe_v_value[2];
-  }
+            Wplus_old[q][5] += prev_solution(dof_indices[i]) * fe_v_value[0];
+            Wplus_old[q][6] += prev_solution(dof_indices[i]) * fe_v_value[1];
+            Wplus_old[q][7] += prev_solution(dof_indices[i]) * fe_v_value[2];
+          }
           else
 #endif
           {
             const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            Wplus_old[q][component_ii] += old_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+            Wplus_old[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
           }
 
           if (!external_face)
@@ -877,17 +750,17 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
             if (component_i_neighbor == 1)
             {
-              Wminus_old[q][5] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
-              Wminus_old[q][6] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
-              Wminus_old[q][7] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
-          }
+              Wminus_old[q][5] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+              Wminus_old[q][6] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+              Wminus_old[q][7] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
+            }
             else
 #endif
             {
               const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-              Wminus_old[q][component_ii_neighbor] += old_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
+              Wminus_old[q][component_ii_neighbor] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
             }
-}
+          }
         }
       }
 
@@ -944,7 +817,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             val += (1.0 - parameters.theta)
               * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
-      }
+          }
           else
 #endif
           {
@@ -966,7 +839,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             for (int j = 0; j < 8; j++)
               std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
           }
-    }
+        }
 
         cell_rhs(i) -= val;
       }
@@ -985,7 +858,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 
     for (unsigned int i = 0; i < dofs_per_cell; i++)
     {
-      independent_local_dof_values[i] = current_solution(dof_indices[i]);
+      independent_local_dof_values[i] = limited_solution(dof_indices[i]);
       independent_local_dof_values[i].diff(i, n_independent_variables);
     }
 
@@ -994,7 +867,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
     {
       for (unsigned int i = 0; i < dofs_per_cell; i++)
       {
-        independent_neighbor_dof_values[i] = current_solution(dof_indices_neighbor[i]);
+        independent_neighbor_dof_values[i] = limited_solution(dof_indices_neighbor[i]);
         independent_neighbor_dof_values[i].diff(i + dofs_per_cell, n_independent_variables);
       }
     }
@@ -1015,7 +888,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             Wplus[q][5] += independent_local_dof_values[i] * fe_v_value[0];
             Wplus[q][6] += independent_local_dof_values[i] * fe_v_value[1];
             Wplus[q][7] += independent_local_dof_values[i] * fe_v_value[2];
-  }
+          }
           else
 #endif
           {
@@ -1032,7 +905,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
               Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
               Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
               Wminus[q][7] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
-          }
+            }
             else
 #endif
             {
@@ -1073,7 +946,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             R_i += (1.0 - parameters.theta)
               * (normal_fluxes[q][5] * fe_v_value[0] + normal_fluxes[q][6] * fe_v_value[1] + normal_fluxes[q][7] * fe_v_value[2])
               * fe_v.JxW(q);
-      }
+          }
           else
 #endif
           {
@@ -1094,7 +967,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
             for (int j = 0; j < 8; j++)
               std::cout << "W+ [" << j << "]: " << (double)Wplus[q][j].val() << ", W- [" << j << "]: " << (double)Wminus[q][j].val() << ", F [" << j << "]: " << (double)normal_fluxes[q][j].val() << std::endl;
           }
-          }
+        }
 
         if (!assemble_only_rhs)
           for (unsigned int k = 0; k < dofs_per_cell; ++k)
@@ -1110,7 +983,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
           }
         }
         cell_rhs(i) -= R_i.val();
-    }
+      }
     }
   }
 }
@@ -1170,10 +1043,10 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
   data_out.attach_dof_handler(dof_handler);
 
   // Solution components.
-  data_out.add_data_vector(current_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
+  data_out.add_data_vector(limited_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
 
   // Derived quantities.
-  data_out.add_data_vector(current_solution, postprocessor);
+  data_out.add_data_vector(limited_solution, postprocessor);
 
 #ifdef HAVE_MPI
   // Subdomains.
@@ -1206,7 +1079,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -1220,8 +1093,8 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::setup_initial_solution()
 {
-  old_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  current_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
@@ -1269,18 +1142,18 @@ void Problem<equationsType, dim>::setup_initial_solution()
     load();
   }
   else {
-    old_solution = 0;
+    prev_solution = 0;
     remove("triangulation");
     remove("triangulation.info");
     remove("history");
-}
+  }
 #else
-  old_solution = 0;
+  prev_solution = 0;
 #endif
 
-  current_solution = old_solution;
-  current_unlimited_solution = old_solution;
-  current_limited_solution = old_solution;
+  limited_solution = prev_solution;
+  current_unlimited_solution = prev_solution;
+  current_limited_solution = prev_solution;
 }
 
 template <EquationsType equationsType, int dim>
@@ -1323,7 +1196,7 @@ void Problem<equationsType, dim>::save()
   history.close();
 
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
-  sol_trans.prepare_serialization(this->current_solution);
+  sol_trans.prepare_serialization(this->limited_solution);
   this->triangulation.save("triangulation");
 #endif
 }
@@ -1334,7 +1207,7 @@ void Problem<equationsType, dim>::load()
 #ifdef HAVE_MPI
   this->triangulation.load("triangulation");
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
-  sol_trans.deserialize(this->old_solution);
+  sol_trans.deserialize(this->prev_solution);
 #endif
 }
 
@@ -1360,7 +1233,7 @@ void Problem<equationsType, dim>::run()
 
     // Preparation for the Newton loop.
     unsigned int newton_iter = 0;
-    current_solution = old_solution;
+    limited_solution = prev_solution;
     while (true)
     {
       if (!(initial_step && (newton_iter == 0)))
@@ -1383,7 +1256,7 @@ void Problem<equationsType, dim>::run()
       }
 
       // Assemble.
-      current_solution = current_limited_solution;
+      limited_solution = current_limited_solution;
       system_matrix = 0;
       system_rhs = 0;
       assemble_system(false);
@@ -1402,20 +1275,20 @@ void Problem<equationsType, dim>::run()
         newton_update *= parameters.newton_damping;
 
       // Update the unlimited solution, and make solution equal.
-      current_solution += newton_update;
-      current_unlimited_solution = current_solution;
+      limited_solution += newton_update;
+      current_unlimited_solution = limited_solution;
 
-      // Postprocess, and store into limited solution (keep current_solution intact)
+      // Postprocess, and store into limited solution (keep limited_solution intact)
       if (parameters.polynomial_order_dg > 0 && parameters.postprocess_in_newton_loop)
         postprocess();
       else
-        current_limited_solution = current_solution;
+        current_limited_solution = limited_solution;
 
       ++newton_iter;
       AssertThrow(newton_iter <= parameters.newton_max_iterations, ExcMessage("No convergence in nonlinear solver"));
     }
 
-    // Make current_solution point to the limited one.
+    // Make limited_solution point to the limited one.
     if (parameters.polynomial_order_dg > 0 && !parameters.postprocess_in_newton_loop)
       postprocess();
 
@@ -1429,11 +1302,11 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
-  current_solution = current_limited_solution;
-  old_solution = current_solution;
+  limited_solution = current_limited_solution;
+  prev_solution = limited_solution;
 
   if (parameters.output_solution)
-    output_vector(current_solution, "current_solution", time_step);
+    output_vector(limited_solution, "limited_solution", time_step);
 
   if ((parameters.output_step < 0) || (time - last_output_time >= parameters.output_step))
   {

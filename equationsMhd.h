@@ -65,6 +65,10 @@ public:
 
   void store_max_signal_speed(typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type val);
 
+  // Jacobi matrixes of the fluxes
+  void JacobiM(double A[3][8][8], dealii::Vector<double> lv);
+  static double A[dim][8][8];
+
   // Passed as a constructor parameter
   Parameters<dim>& parameters;
 
