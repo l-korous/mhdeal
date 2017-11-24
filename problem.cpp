@@ -19,7 +19,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
     FE_RaviartThomas<dim>(1), 1),
 #else
-  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 8),
+  fe(FE_DGT<dim>(parameters.polynomial_order_dg), Equations<equationsType, dim>::n_components),
 #endif
   dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
@@ -27,7 +27,6 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   initial_quadrature(parameters.initial_quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
-  assemble_only_rhs(false),
   last_output_time(0.), last_snapshot_time(0.), time(0.),
   time_step(0)
 {
@@ -62,7 +61,7 @@ void Problem<equationsType, dim>::postprocess()
 #ifdef USE_HDIV_FOR_B
 #define COMPONENTS_TO_LIMIT 5
 #else
-#define COMPONENTS_TO_LIMIT 8
+#define COMPONENTS_TO_LIMIT Equations<equationsType, dim>::n_components
 #endif
 
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
@@ -158,7 +157,7 @@ void Problem<equationsType, dim>::postprocess()
       std::set<unsigned int> visited_faces;
 
       // (!!!) Find out u_i
-      Vector<double> u_i(8);
+      Vector<double> u_i(Equations<equationsType, dim>::n_components);
       VectorTools::point_value(dof_handler, limited_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
 
       if (this->parameters.debug_limiter)
@@ -314,7 +313,6 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::assemble_system(bool only_rhs)
 {
-  this->assemble_only_rhs = only_rhs;
   this->cfl_time_step = 1.e6;
 
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
@@ -350,8 +348,7 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
     if (!cell->is_locally_owned())
       continue;
 
-    if (!assemble_only_rhs)
-      cell_matrix = 0;
+    cell_matrix = 0;
     cell_rhs = 0;
 
     fe_v.reinit(cell);
@@ -368,8 +365,7 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        if (!assemble_only_rhs)
-          cell_matrix_neighbor = 0;
+        cell_matrix_neighbor = 0;
         cell_rhs_neighbor = 0;
 
         // Boundary face - here we pass the boundary id
@@ -401,10 +397,6 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
               assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
               constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
-              if (assemble_only_rhs)
-                constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
-              else
-                constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
             }
           }
           // Here the neighbor face is less split than the current one, there is some transformation needed.
@@ -426,10 +418,7 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
 
             assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            if (assemble_only_rhs)
-              constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
-            else
-              constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
           // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
           // This is the only face assembly case performed without adaptivity.
@@ -443,23 +432,16 @@ void Problem<equationsType, dim>::assemble_system(bool only_rhs)
 
             assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
 
-            if (assemble_only_rhs)
-              constraints.distribute_local_to_global(cell_rhs_neighbor, dof_indices_neighbor, system_rhs);
-            else
-              constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
           }
         }
       }
     }
 
-    if (assemble_only_rhs)
-      constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
-    else
-      constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
+    constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
   }
 
-  if (!assemble_only_rhs)
-    system_matrix.compress(VectorOperation::add);
+  system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
 }
 
@@ -550,147 +532,35 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       // RHS
       JacobiM(A, W_prev[q]);
 
-      cell_rhs(i) += JxW[point] * W_prev[q][component_ii];
+      cell_rhs(i) += JxW[point] * W_prev[q][component_ii] * fe_v.shape_value(i, q);
 
       if (!initial_step)
       {
         double val = A[0][component_ii][0] * grad_W_prev[q][0][0];
         for (int d = 1; d < dim; d++)
-          val += A[d][component_ii][0] * prev_grads[q][0][d];
-        for (ui d = 0; d<DIM; d++)
-          for (ui j = 1; j<COMPONENT_COUNT; j++)
-            rhs[i] += A[d][i][j] * prev_grads[q][j][d];
+          val += A[d][component_ii][0] * grad_W_prev[q][0][d];
+        for (int d = 0; d < dim; d++)
+          for (int j = 1; j < Equations<equationsType, dim>::n_components; j++)
+            val += A[d][i][j] * grad_W_prev[q][j][d];
 
-        cell_rhs(i) -= JxW[point] * 0.5 * parameters.time_step * val;
+        cell_rhs(i) -= JxW[q] * 0.5 * parameters.time_step * val;
       }
       // MATRIX
       JacobiM(A, W_lin[q]);
       for (unsigned int j = 0; j < dofs_per_cell; ++j)
       {
-        cell_matrix(i, k) += R_i.fastAccessDx(k);
+        const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
+
+        if (component_ii == component_jj)
+          cell_matrix(i, j) = JxW[q] * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
 
         if (!initial_step)
         {
-          cell_matrix(i, k) += R_i.fastAccessDx(k);
+          for (int d = 0; d < dim; d++)
+            cell_matrix(i, j) += JxW[q] * 0.5 * parameters.time_step * A[d][component_ii][component_jj] * fe_v.shape_value(i, q) * fe_v.shape_grad(j, q)[d];
         }
       }
     }
-  }
-    equations.compute_flux_matrix(W_prev[q], flux_old[q]);
-
-    if (parameters.debug)
-    {
-      std::cout << "\tpoint_i: " << q << std::endl;
-      std::cout << "\tq: " << fe_v.quadrature_point(q) << std::endl;
-      std::cout << "\tW: ";
-      for (unsigned int i = 0; i < 8; i++)
-        std::cout << W_prev[q][i] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
-
-      std::cout << "\tF[X]: ";
-      for (unsigned int i = 0; i < 8; i++)
-        std::cout << flux_old[q][i][0] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
-
-      std::cout << "\tF[Y]: ";
-      for (unsigned int i = 0; i < 8; i++)
-        std::cout << flux_old[q][i][1] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
-
-      std::cout << "\tF[Z]: ";
-      for (unsigned int i = 0; i < 8; i++)
-        std::cout << flux_old[q][i][2] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
-    }
-
-    equations.compute_forcing_vector(W_prev[q], forcing_old[q]);
-  }
-
-  for (unsigned int i = 0; i < dofs_per_cell; ++i)
-  {
-    const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-
-    double val = 0;
-
-    for (unsigned int q = 0; q < n_q_points; ++q)
-    {
-#ifdef USE_HDIV_FOR_B
-      if (component_i == 1)
-      {
-        if (parameters.is_stationary == false)
-        {
-          dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-
-          val -= (1.0 / parameters.time_step)
-            * (W_prev[q][5] * fe_v_value[0] + W_prev[q][6] * fe_v_value[1] + W_prev[q][7] * fe_v_value[2])
-            * fe_v.JxW(q);
-        }
-        if (parameters.debug_dofs && q == 0)
-        {
-          std::cout << "\tDOF: " << i << " - COMP: " << component_i << std::endl;
-        }
-
-        if (!initial_step)
-        {
-          dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
-          for (unsigned int d = 0; d < dim; d++)
-            for (unsigned int e = 0; e < dim; e++)
-              val -= (1.0 - parameters.theta) * (flux_old[q][5 + e][d] * fe_v_grad[e][d]) * fe_v.JxW(q);
-
-          if (parameters.needs_gradients)
-            for (unsigned int d = 0; d < dim; d++)
-              val += (1.0 - parameters.theta) * (jacobian_addition_old[q][5][d] * fe_v[mag].gradient(i, q)[0][d] + jacobian_addition_old[q][6][d] * fe_v[mag].gradient(i, q)[1][d] + jacobian_addition_old[q][7][d] * fe_v[mag].gradient(i, q)[2][d]) * fe_v.JxW(q);
-
-          if (parameters.needs_forcing)
-            val -= (1.0 - parameters.theta) * (forcing_old[q][5] * fe_v[mag].value(i, q)[0] + forcing_old[q][6] * fe_v[mag].value(i, q)[1] + forcing_old[q][7] * fe_v[mag].value(i, q)[2]) * fe_v.JxW(q);
-        }
-      }
-      // For the other components (spaces), we go by each component.
-      else
-#endif
-      {
-        const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-        if (parameters.is_stationary == false)
-          val -= (1.0 / parameters.time_step) * W_prev[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
-
-        if (parameters.debug_dofs && q == 0)
-        {
-          std::cout << "\tDOF: " << i << " - COMP: " << component_i << " - SUB: " << component_ii << std::endl;
-        }
-
-        if (!initial_step)
-        {
-          for (unsigned int d = 0; d < dim; d++)
-            val -= (1.0 - parameters.theta) * flux_old[q][component_ii][d] * fe_v.shape_grad_component(i, q, component_ii)[d] * fe_v.JxW(q);
-
-          if (parameters.needs_gradients)
-            for (unsigned int d = 0; d < dim; d++)
-              val += (1.0 - parameters.theta) * jacobian_addition_old[q][component_i][d] * fe_v.shape_grad_component(i, q, component_i)[d] * fe_v.JxW(q);
-
-          if (parameters.needs_forcing)
-            val -= (1.0 - parameters.theta) * forcing_old[q][component_i] * fe_v.shape_value_component(i, q, component_i) * fe_v.JxW(q);
-        }
-      }
-    }
-
-    if (std::isnan(val))
-    {
-      std::cout << "isnan: " << val << std::endl;
-#ifdef USE_HDIV_FOR_B
-      std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-#else
-      std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
-#endif
-      std::cout << "point: " << fe_v.quadrature_point(0)[0] << ", " << fe_v.quadrature_point(0)[1] << ", " << fe_v.quadrature_point(0)[2] << std::endl;
-      for (int j = 0; j < 8; j++)
-        std::cout << "W [" << j << "]: " << (double)W_prev[0][j] << ", F [" << j << "]: " << (double)flux_old[0][j][0] << ", " << (double)flux_old[0][j][1] << ", " << (double)flux_old[0][j][2] << std::endl;
-    }
-
-    cell_rhs(i) -= val;
-
-    if (!assemble_only_rhs)
-      for (unsigned int k = 0; k < dofs_per_cell; ++k)
-        cell_matrix(i, k) += R_i.fastAccessDx(k);
   }
 }
 
@@ -783,17 +653,17 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
         std::cout << "\t\tpoint_i: " << q << std::endl;
         std::cout << "\t\tq: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
         std::cout << "\t\tWplus: ";
-        for (unsigned int i = 0; i < 8; i++)
+        for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
           std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
 
         std::cout << "\t\tWminus: ";
-        for (unsigned int i = 0; i < 8; i++)
+        for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
           std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
 
         std::cout << "\t\tNum F: ";
-        for (unsigned int i = 0; i < 8; i++)
+        for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
           std::cout << normal_fluxes_old[q][i] << (i < 7 ? ", " : "");
         std::cout << std::endl;
       }
@@ -836,153 +706,12 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
 #endif
             std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
             std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
-            for (int j = 0; j < 8; j++)
+            for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
               std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
           }
         }
 
         cell_rhs(i) -= val;
-      }
-    }
-  }
-
-  // Now this is for the implicit case.
-  if (parameters.theta > 0.)
-  {
-    std::vector<Sacado::Fad::DFad<double> > independent_local_dof_values(dofs_per_cell), independent_neighbor_dof_values(external_face == false ? dofs_per_cell : 0);
-    const unsigned int n_independent_variables = (external_face == false ? 2 * dofs_per_cell : dofs_per_cell);
-
-    Table<2, Sacado::Fad::DFad<double> > Wplus(n_q_points, Equations<equationsType, dim>::n_components), Wminus(n_q_points, Equations<equationsType, dim>::n_components);
-
-    std::vector< std_cxx11::array < Sacado::Fad::DFad<double>, Equations<equationsType, dim>::n_components> > normal_fluxes(n_q_points);
-
-    for (unsigned int i = 0; i < dofs_per_cell; i++)
-    {
-      independent_local_dof_values[i] = limited_solution(dof_indices[i]);
-      independent_local_dof_values[i].diff(i, n_independent_variables);
-    }
-
-    // We need the neighbor values if this is an internal face.
-    if (external_face == false)
-    {
-      for (unsigned int i = 0; i < dofs_per_cell; i++)
-      {
-        independent_neighbor_dof_values[i] = limited_solution(dof_indices_neighbor[i]);
-        independent_neighbor_dof_values[i].diff(i + dofs_per_cell, n_independent_variables);
-      }
-    }
-
-    const FEValuesExtractors::Vector mag(dim + 2);
-
-    for (unsigned int q = 0; q < n_q_points; ++q)
-    {
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-      {
-        if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
-        {
-#ifdef USE_HDIV_FOR_B
-          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-          if (component_i == 1)
-          {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            Wplus[q][5] += independent_local_dof_values[i] * fe_v_value[0];
-            Wplus[q][6] += independent_local_dof_values[i] * fe_v_value[1];
-            Wplus[q][7] += independent_local_dof_values[i] * fe_v_value[2];
-          }
-          else
-#endif
-          {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            Wplus[q][component_ii] += independent_local_dof_values[i] * fe_v.shape_value_component(i, q, component_ii);
-          }
-
-          if (!external_face)
-          {
-#ifdef USE_HDIV_FOR_B
-            const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-            if (component_i_neighbor == 1)
-            {
-              Wminus[q][5] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[0];
-              Wminus[q][6] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[1];
-              Wminus[q][7] += independent_neighbor_dof_values[i] * fe_v_neighbor[mag].value(i, q)[2];
-            }
-            else
-#endif
-            {
-              const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-              Wminus[q][component_ii_neighbor] += independent_neighbor_dof_values[i] * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
-            }
-          }
-        }
-      }
-      // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
-      // - it simply must fill the other (minus) state.
-      if (external_face)
-      {
-        dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1> Wminus_q = Wminus[q];
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_q, Wplus[q]);
-        for (unsigned int di = 0; di < this->equations.n_components; ++di)
-          Wminus[q][di] = Wminus_q[di];
-      }
-
-      equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus[q], Wminus[q], normal_fluxes[q]);
-    }
-
-    std::vector<double> residual_derivatives(dofs_per_cell);
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    {
-      if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
-      {
-        const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-        Sacado::Fad::DFad<double> R_i = 0;
-
-        for (unsigned int q = 0; q < n_q_points; ++q)
-        {
-#ifdef USE_HDIV_FOR_B
-          if (component_i == 1)
-          {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            R_i += (1.0 - parameters.theta)
-              * (normal_fluxes[q][5] * fe_v_value[0] + normal_fluxes[q][6] * fe_v_value[1] + normal_fluxes[q][7] * fe_v_value[2])
-              * fe_v.JxW(q);
-          }
-          else
-#endif
-          {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            R_i += (1.0 - parameters.theta) * normal_fluxes[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
-          }
-
-          if (std::isnan(R_i.val()))
-          {
-            std::cout << "isnan: " << R_i.val() << std::endl;
-#ifdef USE_HDIV_FOR_B
-            std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-#else
-            std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
-#endif
-            std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
-            std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
-            for (int j = 0; j < 8; j++)
-              std::cout << "W+ [" << j << "]: " << (double)Wplus[q][j].val() << ", W- [" << j << "]: " << (double)Wminus[q][j].val() << ", F [" << j << "]: " << (double)normal_fluxes[q][j].val() << std::endl;
-          }
-        }
-
-        if (!assemble_only_rhs)
-          for (unsigned int k = 0; k < dofs_per_cell; ++k)
-            cell_matrix(i, k) += R_i.fastAccessDx(k);
-
-        if (!assemble_only_rhs)
-        {
-          // We only add contribution to the matrix entries corresponding to a neighbor cell if there is any - and there is none there if we are dealing with an external face.
-          if (external_face == false)
-          {
-            for (unsigned int k = 0; k < dofs_per_cell; ++k)
-              cell_matrix_neighbor(i, k) += R_i.fastAccessDx(dofs_per_cell + k);
-          }
-        }
-        cell_rhs(i) -= R_i.val();
       }
     }
   }
