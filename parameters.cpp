@@ -8,12 +8,12 @@ Parameters<dim>::Parameters(parallel::distributed::Triangulation<dim> &triangula
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 #endif
 {
-  this->initCond = 4;
+  this->initCond = 0;
   this->num_flux_type = hlld;
   this->cfl_constant = .01;
-  this->corner_a = Point<dim>(-0.0, -0.0, 0.);
-  this->corner_b = Point<dim>(.3 , .3, .01);
-  this->refinements = { 5, 5, 1 };
+  this->corner_a = Point<dim>(-0.4, -0.4, 0.);
+  this->corner_b = Point<dim>(.4 , .4, .01);
+  this->refinements = { 50, 50, 1 };
   this->quadrature_order = 5;
   this->initial_quadrature_order = 10;
   this->polynomial_order_dg = 1;

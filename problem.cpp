@@ -242,7 +242,7 @@ void Problem<equationsType, dim>::postprocess()
             visited_faces.insert(neighbor->face_index(neighbor_face_no));
 
             if (neighbor->at_boundary(neighbor_face_no))
-              continue; 
+              continue;
 
             // Look at the right neighbor's neighbor (h-adaptivity)
             // (!!!) Assuming there is no division at this point (no adaptivity)
@@ -498,14 +498,14 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-      
+
       cell_rhs(i) += fe_v.JxW(q) * W_prev[q][component_ii] * fe_v.shape_value(i, q);
       if (!initial_step)
       {
         for (int d = 0; d < dim; d++)
           cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
       }
-      
+
       for (unsigned int j = 0; j < dofs_per_cell; ++j)
       {
         const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
@@ -927,11 +927,12 @@ void Problem<equationsType, dim>::run()
       newton_update -= lin_solution;
 
       lin_solution = current_limited_solution;
+      double res_norm = newton_update.linfty_norm();
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-        std::cout << "\tLin step #" << linStep << ", error: " << newton_update.linfty_norm() << std::endl;
-      if (newton_update.linfty_norm() < parameters.newton_residual_norm_threshold)
+        std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
+      if (res_norm < parameters.newton_residual_norm_threshold)
         break;
-  }
+    }
 
     move_time_step_handle_outputs();
   }
