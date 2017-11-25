@@ -1,6 +1,9 @@
 #include "problem.h"
 
 template <EquationsType equationsType, int dim>
+double Problem<equationsType, dim>::A[dim][8][8];
+
+template <EquationsType equationsType, int dim>
 Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation,
@@ -30,6 +33,13 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   last_output_time(0.), last_snapshot_time(0.), time(0.),
   time_step(0)
 {
+  for (unsigned int k = 0; k < dim; k++) {
+    for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++) {
+      for (unsigned int j = 0; j < Equations<equationsType, dim>::n_components; j++) {
+        A[k][i][j] = 0.0;
+      }
+    }
+  }
 }
 
 template <EquationsType equationsType, int dim>
@@ -79,7 +89,7 @@ void Problem<equationsType, dim>::postprocess()
   FEValues<dim> fe_v_neighbor(mapping, fe, quadrature, update_flags);
 
   // This is what we return.
-  current_limited_solution = limited_solution;
+  current_limited_solution = current_unlimited_solution;
   constraints.distribute(current_limited_solution);
 
   int cell_count = 0;
@@ -110,7 +120,7 @@ void Problem<equationsType, dim>::postprocess()
 
         if (!u_c_set[component_ii])
         {
-          u_c[component_ii] = limited_solution(dof_indices[i]);
+          u_c[component_ii] = current_unlimited_solution(dof_indices[i]);
           u_c_set[component_ii] = true;
         }
         else
@@ -158,7 +168,7 @@ void Problem<equationsType, dim>::postprocess()
 
       // (!!!) Find out u_i
       Vector<double> u_i(Equations<equationsType, dim>::n_components);
-      VectorTools::point_value(dof_handler, limited_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
+      VectorTools::point_value(dof_handler, current_unlimited_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
 
       if (this->parameters.debug_limiter)
       {
@@ -218,7 +228,7 @@ void Problem<equationsType, dim>::postprocess()
 
               if (!u_i_extrema_set[component_ii])
               {
-                double val = limited_solution(dof_indices_neighbor[dof]);
+                double val = current_unlimited_solution(dof_indices_neighbor[dof]);
                 if (this->parameters.debug_limiter)
                 {
                   if (val < u_i_min[component_ii])
@@ -274,8 +284,8 @@ void Problem<equationsType, dim>::postprocess()
 
                   if (!u_i_extrema_set_neighbor[component_ii])
                   {
-                    u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)limited_solution(dof_indices_neighbor[dof]));
-                    u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)limited_solution(dof_indices_neighbor[dof]));
+                    u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)current_unlimited_solution(dof_indices_neighbor[dof]));
+                    u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)current_unlimited_solution(dof_indices_neighbor[dof]));
                     u_i_extrema_set_neighbor[component_ii] = true;
                   }
                 }
@@ -311,7 +321,7 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::assemble_system(bool only_rhs)
+void Problem<equationsType, dim>::assemble_system()
 {
   this->cfl_time_step = 1.e6;
 
@@ -510,54 +520,58 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 #endif
         {
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          W_prev[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-          W_lin[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
+          W_prev[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          W_lin[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
 
           for (unsigned int d = 0; d < dim; d++)
           {
-            grad_W_prev[q][component_ii][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_ii)[d];
-            grad_W_lin[q][component_ii][d] += lin_solution(dof_indices[i]) * fe_v.shape_grad_component(i, q, component_ii)[d];
+            grad_W_prev[q][component_ii][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
+            grad_W_lin[q][component_ii][d] += lin_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
           }
         }
       }
     }
   }
 
+  std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > flux_old(n_q_points);
+
   for (unsigned int q = 0; q < n_q_points; ++q)
   {
+    if (!initial_step)
+      equations.compute_flux_matrix(W_lin[q], flux_old[q]);
+
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
 
       // RHS
-      JacobiM(A, W_prev[q]);
-
-      cell_rhs(i) += JxW[point] * W_prev[q][component_ii] * fe_v.shape_value(i, q);
+      cell_rhs(i) += fe_v.JxW(q) * W_prev[q][component_ii] * fe_v.shape_value(i, q);
 
       if (!initial_step)
       {
-        double val = A[0][component_ii][0] * grad_W_prev[q][0][0];
-        for (int d = 1; d < dim; d++)
-          val += A[d][component_ii][0] * grad_W_prev[q][0][d];
+        double val = 0.;
+        
         for (int d = 0; d < dim; d++)
-          for (int j = 1; j < Equations<equationsType, dim>::n_components; j++)
-            val += A[d][i][j] * grad_W_prev[q][j][d];
+          val += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
 
-        cell_rhs(i) -= JxW[q] * 0.5 * parameters.time_step * val;
+        cell_rhs(i) += val;
       }
       // MATRIX
-      JacobiM(A, W_lin[q]);
       for (unsigned int j = 0; j < dofs_per_cell; ++j)
       {
         const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
 
         if (component_ii == component_jj)
-          cell_matrix(i, j) = JxW[q] * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
+          cell_matrix(i, j) += fe_v.JxW(q) * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
 
         if (!initial_step)
         {
-          for (int d = 0; d < dim; d++)
-            cell_matrix(i, j) += JxW[q] * 0.5 * parameters.time_step * A[d][component_ii][component_jj] * fe_v.shape_value(i, q) * fe_v.shape_grad(j, q)[d];
+        //  for (int d = 0; d < dim; d++)
+          //  cell_matrix(i, j) += fe_v.JxW(q) * parameters.time_step * A[d][component_ii][component_jj] * fe_v.shape_value(i, q) * fe_v.shape_grad(j, q)[d];
+        }
+        if (std::isnan(cell_matrix(i, j)))
+        {
+          std::cout << "NaN: " << i << ", " << j << ": " << cell_matrix(i, j) << std::endl;
         }
       }
     }
@@ -566,7 +580,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::assemble_face_term(const unsigned int           face_no,
+Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
   const FEFaceValuesBase<dim> &fe_v,
   const FEFaceValuesBase<dim> &fe_v_neighbor,
   const std::vector<types::global_dof_index> &dof_indices,
@@ -579,140 +593,131 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int           fac
   const unsigned int n_q_points = fe_v.n_quadrature_points;
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
 
-  // This is for the explicit case.
-  if (parameters.theta < 1.)
+  Table<2, double> Wplus_old(n_q_points, Equations<equationsType, dim>::n_components), Wminus_old(n_q_points, Equations<equationsType, dim>::n_components);
+
+  std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
+
+  const FEValuesExtractors::Vector mag(dim + 2);
+
+  if (parameters.debug)
+    std::cout << "\tEdqe: " << face_no << std::endl;
+
+  // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
+  for (unsigned int q = 0; q < n_q_points; ++q)
   {
-    Table<2, double> Wplus_old(n_q_points, Equations<equationsType, dim>::n_components), Wminus_old(n_q_points, Equations<equationsType, dim>::n_components);
-
-    std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_q_points);
-
-    const FEValuesExtractors::Vector mag(dim + 2);
-
-    if (parameters.debug)
-      std::cout << "\tEdqe: " << face_no << std::endl;
-
-    // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
-    for (unsigned int q = 0; q < n_q_points; ++q)
-    {
-      for (unsigned int i = 0; i < dofs_per_cell; ++i)
-      {
-        if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
-        {
-#ifdef USE_HDIV_FOR_B
-          const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-          if (component_i == 1)
-          {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-            Wplus_old[q][5] += prev_solution(dof_indices[i]) * fe_v_value[0];
-            Wplus_old[q][6] += prev_solution(dof_indices[i]) * fe_v_value[1];
-            Wplus_old[q][7] += prev_solution(dof_indices[i]) * fe_v_value[2];
-          }
-          else
-#endif
-          {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            Wplus_old[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value_component(i, q, component_ii);
-          }
-
-          if (!external_face)
-          {
-#ifdef USE_HDIV_FOR_B
-            const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
-            if (component_i_neighbor == 1)
-            {
-              Wminus_old[q][5] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
-              Wminus_old[q][6] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
-              Wminus_old[q][7] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
-            }
-            else
-#endif
-            {
-              const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-              Wminus_old[q][component_ii_neighbor] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value_component(i, q, component_ii_neighbor);
-            }
-          }
-        }
-      }
-
-      // Wminus (state vector on the other side of the currently assembled face) on the boundary corresponds to the (Dirichlet) values, but we do not limit the condition on what it does.
-      // - it simply must fill the other (minus) state.
-      if (external_face)
-      {
-        dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> Wminus_old_q = Wminus_old[q];
-        boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old_q, Wplus_old[q]);
-        for (unsigned int di = 0; di < this->equations.n_components; ++di)
-          Wminus_old[q][di] = Wminus_old_q[di];
-      }
-
-      // Once we have the states on both sides of the face, we need to calculate the numerical flux.
-      equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
-
-      // Some debugging outputs.
-      if (parameters.debug)
-      {
-        std::cout << "\t\tpoint_i: " << q << std::endl;
-        std::cout << "\t\tq: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
-        std::cout << "\t\tWplus: ";
-        for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-          std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
-
-        std::cout << "\t\tWminus: ";
-        for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-          std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
-
-        std::cout << "\t\tNum F: ";
-        for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-          std::cout << normal_fluxes_old[q][i] << (i < 7 ? ", " : "");
-        std::cout << std::endl;
-      }
-    }
-
-    // The actual contributions to the right-hand-side (this is the explicit case, no contribution to the matrix here).
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
       {
+#ifdef USE_HDIV_FOR_B
         const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-        double val = 0.;
+        if (component_i == 1)
+        {
+          dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+          Wplus_old[q][5] += lin_solution(dof_indices[i]) * fe_v_value[0];
+          Wplus_old[q][6] += lin_solution(dof_indices[i]) * fe_v_value[1];
+          Wplus_old[q][7] += lin_solution(dof_indices[i]) * fe_v_value[2];
+        }
+        else
+#endif
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          Wplus_old[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+        }
 
-        for (unsigned int q = 0; q < n_q_points; ++q)
+        if (!external_face)
         {
 #ifdef USE_HDIV_FOR_B
-          if (component_i == 1)
+          const unsigned int component_i_neighbor = fe_v_neighbor.get_fe().system_to_base_index(i).first.first;
+          if (component_i_neighbor == 1)
           {
-            dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-
-            val += (1.0 - parameters.theta)
-              * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2])
-              * fe_v.JxW(q);
+            Wminus_old[q][5] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[0];
+            Wminus_old[q][6] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[1];
+            Wminus_old[q][7] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor[mag].value(i, q)[2];
           }
           else
 #endif
           {
-            const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-            val += (1.0 - parameters.theta) * normal_fluxes_old[q][component_ii] * fe_v.shape_value_component(i, q, component_ii) * fe_v.JxW(q);
-          }
-
-          if (std::isnan(val))
-          {
-            equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
-            std::cout << "isnan: " << val << std::endl;
-#ifdef USE_HDIV_FOR_B
-            std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-#else
-            std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
-#endif
-            std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
-            std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
-            for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
-              std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
+            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
+            Wminus_old[q][component_ii_neighbor] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
           }
         }
-
-        cell_rhs(i) -= val;
       }
+    }
+
+    if (external_face)
+    {
+      dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> Wminus_old_q = Wminus_old[q];
+      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old_q, Wplus_old[q]);
+      for (unsigned int di = 0; di < this->equations.n_components; ++di)
+        Wminus_old[q][di] = Wminus_old_q[di];
+    }
+
+    // Once we have the states on both sides of the face, we need to calculate the numerical flux.
+    equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
+
+    // Some debugging outputs.
+    if (parameters.debug)
+    {
+      std::cout << "\t\tpoint_i: " << q << std::endl;
+      std::cout << "\t\tq: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
+      std::cout << "\t\tWplus: ";
+      for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+        std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+
+      std::cout << "\t\tWminus: ";
+      for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+        std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+
+      std::cout << "\t\tNum F: ";
+      for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+        std::cout << normal_fluxes_old[q][i] << (i < 7 ? ", " : "");
+      std::cout << std::endl;
+    }
+  }
+
+  for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  {
+    if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
+    {
+      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
+      double val = 0.;
+
+      for (unsigned int q = 0; q < n_q_points; ++q)
+      {
+#ifdef USE_HDIV_FOR_B
+        if (component_i == 1)
+        {
+          dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+
+          val += this->parameters.time_step * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2]) * fe_v.JxW(q);
+        }
+        else
+#endif
+        {
+          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
+          val += this->parameters.time_step * normal_fluxes_old[q][component_ii] * fe_v.shape_value(i, q) * fe_v.JxW(q);
+        }
+
+        if (std::isnan(val))
+        {
+          equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
+          std::cout << "isnan: " << val << std::endl;
+#ifdef USE_HDIV_FOR_B
+          std::cout << "i: " << i << ", ci: " << (component_i == 1 ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
+#else
+          std::cout << "i: " << i << ", ci: " << fe_v.get_fe().system_to_component_index(i).first << std::endl;
+#endif
+          std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
+          std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
+          for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
+            std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
+        }
+      }
+
+      cell_rhs(i) -= val;
     }
   }
 }
@@ -772,10 +777,10 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
   data_out.attach_dof_handler(dof_handler);
 
   // Solution components.
-  data_out.add_data_vector(limited_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
+  data_out.add_data_vector(prev_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
 
   // Derived quantities.
-  data_out.add_data_vector(limited_solution, postprocessor);
+  data_out.add_data_vector(prev_solution, postprocessor);
 
 #ifdef HAVE_MPI
   // Subdomains.
@@ -818,12 +823,11 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
   ++output_file_number;
 }
 
-
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::setup_initial_solution()
 {
   prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  lin_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
@@ -880,7 +884,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
   prev_solution = 0;
 #endif
 
-  limited_solution = prev_solution;
+  lin_solution = prev_solution;
   current_unlimited_solution = prev_solution;
   current_limited_solution = prev_solution;
 }
@@ -925,7 +929,7 @@ void Problem<equationsType, dim>::save()
   history.close();
 
   parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> sol_trans(dof_handler);
-  sol_trans.prepare_serialization(this->limited_solution);
+  sol_trans.prepare_serialization(this->prev_solution);
   this->triangulation.save("triangulation");
 #endif
 }
@@ -960,69 +964,35 @@ void Problem<equationsType, dim>::run()
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
-    // Preparation for the Newton loop.
-    unsigned int newton_iter = 0;
-    limited_solution = prev_solution;
-    while (true)
+    for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
-      if (!(initial_step && (newton_iter == 0)))
-      {
-        system_rhs = 0;
-        assemble_system(true);
-        // L2 norm of the residual - to check Newton convergence
-        const double res_norm = system_rhs.l2_norm();
-        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-        {
-          if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
-            std::printf("   %-16.3e (converged)\n\n", res_norm);
-          else
-            std::printf("   %-16.3e\n", res_norm);
-        }
-
-        // If we are below threshold for the L2 residual norm, break the loop and go to next time step
-        if (std::fabs(res_norm) < parameters.newton_residual_norm_threshold)
-          break;
-      }
-
-      // Assemble.
-      limited_solution = current_limited_solution;
       system_matrix = 0;
       system_rhs = 0;
-      assemble_system(false);
+      assemble_system();
 
-      // Outputs of algebraic stuff (optional - possible to be set in the Parameters class).
       if (parameters.output_matrix)
-        output_matrix(system_matrix, "matrix", time_step, newton_iter);
+        output_matrix(system_matrix, "matrix", time_step, linStep);
       if (parameters.output_rhs)
-        output_vector(system_rhs, "rhs", time_step, newton_iter);
+        output_vector(system_rhs, "rhs", time_step, linStep);
+
+      solve(current_unlimited_solution);
+
       if (parameters.output_solution)
-        output_vector(newton_update, "newton_update", time_step, newton_iter);
+        output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
 
-      solve(newton_update);
-
-      if (parameters.theta > 0.)
-        newton_update *= parameters.newton_damping;
-
-      // Update the unlimited solution, and make solution equal.
-      limited_solution += newton_update;
-      current_unlimited_solution = limited_solution;
-
-      // Postprocess, and store into limited solution (keep limited_solution intact)
-      if (parameters.polynomial_order_dg > 0 && parameters.postprocess_in_newton_loop)
+      if (parameters.polynomial_order_dg > 0)
         postprocess();
       else
-        current_limited_solution = limited_solution;
+        current_limited_solution = current_unlimited_solution;
 
-      ++newton_iter;
-      AssertThrow(newton_iter <= parameters.newton_max_iterations, ExcMessage("No convergence in nonlinear solver"));
-    }
+      newton_update = current_limited_solution;
+      newton_update -= lin_solution;
 
-    // Make limited_solution point to the limited one.
-    if (parameters.polynomial_order_dg > 0 && !parameters.postprocess_in_newton_loop)
-      postprocess();
-
-    if (!initial_step)
-      calculate_cfl_condition();
+      lin_solution = current_limited_solution;
+      std::cout << "\tLin step #" << linStep << ", error: " << newton_update.linfty_norm() << std::endl;
+      if (newton_update.linfty_norm() < parameters.newton_residual_norm_threshold)
+        break;
+  }
 
     move_time_step_handle_outputs();
   }
@@ -1031,11 +1001,10 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
-  limited_solution = current_limited_solution;
-  prev_solution = limited_solution;
+  this->prev_solution = this->lin_solution;
 
   if (parameters.output_solution)
-    output_vector(limited_solution, "limited_solution", time_step);
+    output_vector(prev_solution, "prev_solution", time_step);
 
   if ((parameters.output_step < 0) || (time - last_output_time >= parameters.output_step))
   {
@@ -1049,13 +1018,439 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     last_snapshot_time = time;
   }
 
-  double global_cfl_time_step = dealii::Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
   if (!initial_step)
+  {
+    calculate_cfl_condition();
+    double global_cfl_time_step = dealii::Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
     parameters.time_step = global_cfl_time_step;
+  }
 
   ++time_step;
   time += parameters.time_step;
   initial_step = false;
+}
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::JacobiM(double A[3][8][8], dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> lv)
+{
+  double v[8], iRh, iRh2, Uk, p, gmmo, Ec1, Ec2, Ec3, E1, E2, E3;
+
+  // using shorter notation for old solution
+  // order of the variables is following: rho, v(3), B(3), U, J(3)
+  for (unsigned int i = 0; i < 8; i++)
+    v[i] = lv[i];
+
+  iRh = 1.0 / v[0];
+  iRh2 = iRh * iRh;
+  Uk = iRh * (v[1] * v[1] + v[2] * v[2] + v[3] * v[3]);
+  p = this->parameters.gas_gamma * (v[4] - (v[5] * v[5] + v[6] * v[6] + v[7] * v[7]) - Uk);
+  gmmo = this->parameters.gas_gamma - 1.0;
+  Ec1 = (v[3] * v[6] - v[2] * v[7]) * iRh;
+  Ec2 = (v[1] * v[7] - v[3] * v[5]) * iRh;
+  Ec3 = (v[2] * v[5] - v[1] * v[6]) * iRh;
+  E1 = Ec1; //   + ETA * v[8];
+  E2 = Ec2; //   + ETA * v[9];
+  E3 = Ec3; //   + ETA * v[10];
+
+            // A[0][0][0] = 0;
+  A[0][0][1] = 1;
+  // A[0][0][2] = 0;
+  // A[0][0][3] = 0;
+  // A[0][0][5] = 0;
+  // A[0][0][6] = 0;
+  // A[0][0][7] = 0;
+  // A[0][0][4] = 0;
+  // A[0][0][8] = 0;
+  // A[0][0][9] = 0;
+  // A[0][0][10] = 0;
+
+  A[0][1][0] = -(v[1] * v[1] * iRh2) + gmmo * Uk * .5 * iRh;
+  A[0][1][1] = (2 - gmmo) * v[1] * iRh;
+  A[0][1][2] = -gmmo * v[2] * iRh;
+  A[0][1][3] = -gmmo * v[3] * iRh;
+  A[0][1][5] = -this->parameters.gas_gamma * v[5];
+  A[0][1][6] = (1 - gmmo) * v[6];
+  A[0][1][7] = (1 - gmmo) * v[7];
+  A[0][1][4] = 0.5 * gmmo;
+  // A[0][1][8] = 0;
+  // A[0][1][9] = 0;
+  // A[0][1][10] = 0;
+
+  A[0][2][0] = -v[1] * v[2] * iRh2;
+  A[0][2][1] = v[2] * iRh;
+  A[0][2][2] = v[1] * iRh;
+  // A[0][2][3] = 0;
+  A[0][2][5] = -v[6];
+  A[0][2][6] = -v[5];
+  // A[0][2][7] = 0;
+  // A[0][2][4] = 0;
+  // A[0][2][8] = 0;
+  // A[0][2][9] = 0;
+  // A[0][2][10] = 0;
+
+  A[0][3][0] = -v[1] * v[3] * iRh2;
+  A[0][3][1] = v[3] * iRh;
+  // A[0][3][2] = 0;
+  A[0][3][3] = v[1] * iRh;
+  A[0][3][5] = -v[7];
+  // A[0][3][6] = 0;
+  A[0][3][7] = -v[5];
+  // A[0][3][4] = 0;
+  // A[0][3][8] = 0;
+  // A[0][3][9] = 0;
+  // A[0][3][10] = 0;
+
+  // A[0][5][0] = 0;
+  // A[0][5][1] = 0;
+  // A[0][5][2] = 0;
+  // A[0][5][3] = 0;
+  // A[0][5][5] = 0;
+  // A[0][5][6] = 0;
+  // A[0][5][7] = 0;
+  // A[0][5][4] = 0;
+  // A[0][5][8] = 0;
+  // A[0][5][9] = 0;
+  // A[0][5][10] = 0;
+
+  A[0][6][0] = Ec3 * iRh;
+  A[0][6][1] = v[6] * iRh;
+  A[0][6][2] = -v[5] * iRh;
+  // A[0][6][3] = 0;
+  A[0][6][5] = -v[2] * iRh;
+  A[0][6][6] = v[1] * iRh;
+  // A[0][6][7] = 0;
+  // A[0][6][4] = 0;
+  // A[0][6][8] = 0;
+  // A[0][6][9] = 0;
+  // A[0][6][10] =  - ETA;
+
+  A[0][7][0] = -Ec2 * iRh;
+  A[0][7][1] = v[7] * iRh;
+  // A[0][7][2] = 0;
+  A[0][7][3] = -v[5] * iRh;
+  A[0][7][5] = -v[3] * iRh;
+  // A[0][7][6] = 0;
+  A[0][7][7] = v[1] * iRh;
+  // A[0][7][4] = 0;
+  // A[0][7][8] = 0;
+  // A[0][7][9] = ETA;
+  // A[0][7][10] = 0;
+
+  A[0][4][0] = 2 * iRh * (v[6] * Ec3 - v[7] * Ec2) + v[1] * gmmo * Uk * iRh2 - v[1] * (Uk + p) * iRh2;
+  A[0][4][1] = 2 * (v[6] * v[6] + v[7] * v[7]) * iRh - 2 * v[1] * gmmo * v[1] * iRh2 + (Uk + p) * iRh;
+  A[0][4][2] = -2 * v[5] * v[6] * iRh - v[1] * 2 * gmmo * v[2] * iRh2;
+  A[0][4][3] = -2 * v[5] * v[7] * iRh - v[1] * 2 * gmmo * v[3] * iRh2;
+  A[0][4][5] = -2 * this->parameters.gas_gamma * v[5] * v[1] * iRh + 2 * (-v[6] * v[2] - v[7] * v[3]) * iRh;
+  A[0][4][6] = -2 * this->parameters.gas_gamma * v[6] * v[1] * iRh + 2 * (v[6] * v[1] * iRh - E3);
+  A[0][4][7] = -2 * this->parameters.gas_gamma * v[7] * v[1] * iRh + 2 * (v[7] * v[1] * iRh + E2);
+  A[0][4][4] = this->parameters.gas_gamma * v[1] * iRh;
+  // A[0][4][8] = 0;
+  // A[0][4][9] = 2 * ETA * v[7];
+  // A[0][4][10] =  - 2 * ETA * v[6];
+
+  // A[0][8][0] = 0;
+  // A[0][8][1] = 0;
+  // A[0][8][2] = 0;
+  // A[0][8][3] = 0;
+  // A[0][8][5] = 0;
+  // A[0][8][6] = 0;
+  // A[0][8][7] = 0;
+  // A[0][8][4] = 0;
+  // A[0][8][8] = 0;
+  // A[0][8][9] = 0;
+  // A[0][8][10] = 0;
+
+  // A[0][9][0] = 0;
+  // A[0][9][1] = 0;
+  // A[0][9][2] = 0;
+  // A[0][9][3] = 0;
+  // A[0][9][5] = 0;
+  // A[0][9][6] = 0;
+  // A[0][9][7] = 1;
+  // A[0][9][4] = 0;
+  // A[0][9][8] = 0;
+  // A[0][9][9] = 0;
+  // A[0][9][10] = 0;
+
+  // A[0][10][0] = 0;
+  // A[0][10][1] = 0;
+  // A[0][10][2] = 0;
+  // A[0][10][3] = 0;
+  // A[0][10][5] = 0;
+  // A[0][10][6] =  - 1;
+  // A[0][10][7] = 0;
+  // A[0][10][4] = 0;
+  // A[0][10][8] = 0;
+  // A[0][10][9] = 0;
+  // A[0][10][10] = 0;
+
+  if (dim > 1) {
+    // A[1][0][0] = 0;
+    // A[1][0][1] = 0;
+    A[1][0][2] = 1;
+    // A[1][0][3] = 0;
+    // A[1][0][5] = 0;
+    // A[1][0][6] = 0;
+    // A[1][0][7] = 0;
+    // A[1][0][4] = 0;
+    // A[1][0][8] = 0;
+    // A[1][0][9] = 0;
+    // A[1][0][10] = 0;
+
+    A[1][1][0] = -v[1] * v[2] * iRh2;
+    A[1][1][1] = v[2] * iRh;
+    A[1][1][2] = v[1] * iRh;
+    // A[1][1][3] = 0;
+    A[1][1][5] = -v[6];
+    A[1][1][6] = -v[5];
+    // A[1][1][7] = 0;
+    // A[1][1][4] = 0;
+    // A[1][1][8] = 0;
+    // A[1][1][9] = 0;
+    // A[1][1][10] = 0;
+
+    A[1][2][0] = -v[2] * v[2] * iRh2 + gmmo * Uk * .5 * iRh;
+    A[1][2][1] = -gmmo * v[1] * iRh;
+    A[1][2][2] = (2 - gmmo) * v[2] * iRh;
+    A[1][2][3] = -gmmo * v[3] * iRh;
+    A[1][2][5] = (1 - gmmo) * v[5];
+    A[1][2][6] = -this->parameters.gas_gamma * v[6];
+    A[1][2][7] = (1 - gmmo) * v[7];
+    A[1][2][4] = 0.5 * gmmo;
+    // A[1][2][8] = 0;
+    // A[1][2][9] = 0;
+    // A[1][2][10] = 0;
+
+    A[1][3][0] = -v[2] * v[3] * iRh2;
+    // A[1][3][1] = 0;
+    A[1][3][2] = v[3] * iRh;
+    A[1][3][3] = v[2] * iRh;
+    // A[1][3][5] = 0;
+    A[1][3][6] = -v[7];
+    A[1][3][7] = -v[6];
+    // A[1][3][4] = 0;
+    // A[1][3][8] = 0;
+    // A[1][3][9] = 0;
+    // A[1][3][10] = 0;
+
+    A[1][5][0] = -Ec3 * iRh;
+    A[1][5][1] = -v[6] * iRh;
+    A[1][5][2] = v[5] * iRh;
+    // A[1][5][3] = 0;
+    A[1][5][5] = v[2] * iRh;
+    A[1][5][6] = -v[1] * iRh;
+    // A[1][5][7] = 0;
+    // A[1][5][4] = 0;
+    // A[1][5][8] = 0;
+    // A[1][5][9] = 0;
+    // A[1][5][10] = ETA;
+
+    // A[1][6][0] = 0;
+    // A[1][6][1] = 0;
+    // A[1][6][2] = 0;
+    // A[1][6][3] = 0;
+    // A[1][6][5] = 0;
+    // A[1][6][6] = 0;
+    // A[1][6][7] = 0;
+    // A[1][6][4] = 0;
+    // A[1][6][8] = 0;
+    // A[1][6][9] = 0;
+    // A[1][6][10] = 0;
+
+    A[1][7][0] = Ec1 * iRh;
+    // A[1][7][1] = 0;
+    A[1][7][2] = v[7] * iRh;
+    A[1][7][3] = -v[6] * iRh;
+    // A[1][7][5] = 0;
+    A[1][7][6] = -v[3] * iRh;
+    A[1][7][7] = v[2] * iRh;
+    // A[1][7][4] = 0;
+    // A[1][7][8] =  - ETA;
+    // A[1][7][9] = 0;
+    // A[1][7][10] = 0;
+
+    A[1][4][0] = 2 * iRh * (-v[5] * Ec3 + v[7] * Ec1) + v[2] * gmmo * Uk * iRh2 - v[2] * (Uk + p) * iRh2;
+    A[1][4][1] = -2 * v[5] * v[6] * iRh - 2 * gmmo * v[1] * v[2] * iRh2;
+    A[1][4][2] = 2 * (v[5] * v[5] + v[7] * v[7]) * iRh - 2 * v[2] * gmmo * v[2] * iRh2 + (Uk + p) * iRh;
+    A[1][4][3] = -2 * v[6] * v[7] * iRh - 2 * gmmo * v[2] * v[3] * iRh2;
+    A[1][4][5] = -2 * this->parameters.gas_gamma * v[5] * v[2] * iRh + 2 * (v[5] * v[2] * iRh + E3);
+    A[1][4][6] = -2 * this->parameters.gas_gamma * v[6] * v[2] * iRh + 2 * (-v[5] * v[1] - v[7] * v[3]) * iRh;
+    A[1][4][7] = -2 * this->parameters.gas_gamma * v[7] * v[2] * iRh + 2 * (v[7] * v[2] * iRh - E1);
+    A[1][4][4] = this->parameters.gas_gamma * v[2] * iRh;
+    // A[1][4][8] =  - 2 * ETA * v[7];
+    // A[1][4][9] = 0;
+    // A[1][4][10] = 2 * ETA * v[5];
+
+    // A[1][8][0] 0;
+    // A[1][8][1] 0;
+    // A[1][8][2] 0;
+    // A[1][8][3] 0;
+    // A[1][8][5] 0;
+    // A[1][8][6] 0;
+    // A[1][8][7] =  - 1;
+    // A[1][8][4] 0;
+    // A[1][8][8] 0;
+    // A[1][8][9] 0;
+    // A[1][8][10] 0;
+
+    // A[1][9][0] = 0;
+    // A[1][9][1] = 0;
+    // A[1][9][2] = 0;
+    // A[1][9][3] = 0;
+    // A[1][9][5] = 0;
+    // A[1][9][6] = 0;
+    // A[1][9][7] = 0;
+    // A[1][9][4] = 0;
+    // A[1][9][8] = 0;
+    // A[1][9][9] = 0;
+    // A[1][9][10] = 0;
+
+    // A[1][10][0] - 0;
+    // A[1][10][1] - 0;
+    // A[1][10][2] - 0;
+    // A[1][10][3] - 0;
+    // A[1][10][5] = 1;
+    // A[1][10][6] - 0;
+    // A[1][10][7] - 0;
+    // A[1][10][4] - 0;
+    // A[1][10][8] - 0;
+    // A[1][10][9] - 0;
+    // A[1][10][10] - 0;
+  }
+
+  if (dim > 2) {
+    // A[2][0][0] = 0;
+    // A[2][0][1] = 0;
+    // A[2][0][2] = 0;
+    A[2][0][3] = 1;
+    // A[2][0][5] = 0;
+    // A[2][0][6] = 0;
+    // A[2][0][7] = 0;
+    // A[2][0][4] = 0;
+    // A[2][0][8] = 0;
+    // A[2][0][9] = 0;
+    // A[2][0][10] = 0;
+
+    A[2][1][0] = -v[1] * v[3] * iRh2;
+    A[2][1][1] = v[3] * iRh;
+    // A[2][1][2] = 0;
+    A[2][1][3] = v[1] * iRh;
+    A[2][1][5] = -v[7];
+    // A[2][1][6] = 0;
+    A[2][1][7] = -v[5];
+    // A[2][1][4] = 0;
+    // A[2][1][8] = 0;
+    // A[2][1][9] = 0;
+    // A[2][1][10] = 0;
+
+    A[2][2][0] = -v[2] * v[3] * iRh2;
+    // A[2][2][1] = 0;
+    A[2][2][2] = v[3] * iRh;
+    A[2][2][3] = v[2] * iRh;
+    // A[2][2][5] = 0;
+    A[2][2][6] = -v[7];
+    A[2][2][7] = -v[6];
+    // A[2][2][4] = 0;
+    // A[2][2][8] = 0;
+    // A[2][2][9] = 0;
+    // A[2][2][10] = 0;
+
+    A[2][3][0] = -v[3] * v[3] * iRh2 + (gmmo * Uk) * .5 * iRh;
+    A[2][3][1] = -gmmo * v[1] * iRh;
+    A[2][3][2] = -gmmo * v[2] * iRh;
+    A[2][3][3] = (2 - gmmo) * v[3] * iRh;
+    A[2][3][5] = (1 - gmmo) * v[5];
+    A[2][3][6] = (1 - gmmo) * v[6];
+    A[2][3][7] = -this->parameters.gas_gamma * v[7];
+    A[2][3][4] = 0.5 * gmmo;
+    // A[2][3][8] = 0;
+    // A[2][3][9] = 0;
+    // A[2][3][10] = 0;
+
+    A[2][5][0] = Ec2 * iRh;
+    A[2][5][1] = -v[7] * iRh;
+    // A[2][5][2] = 0;
+    A[2][5][3] = v[5] * iRh;
+    A[2][5][5] = v[3] * iRh;
+    // A[2][5][6] = 0;
+    A[2][5][7] = -v[1] * iRh;
+    // A[2][5][4] = 0;
+    // A[2][5][8] = 0;
+    // A[2][5][9] =  - ETA;
+    // A[2][5][10] = 0;
+
+    A[2][6][0] = -Ec1 * iRh;
+    // A[2][6][1] = 0;
+    A[2][6][2] = -v[7] * iRh;
+    A[2][6][3] = v[6] * iRh;
+    // A[2][6][5] = 0;
+    A[2][6][6] = v[3] * iRh;
+    A[2][6][7] = -v[2] * iRh;
+    // A[2][6][4] = 0;
+    // A[2][6][8] = ETA;
+    // A[2][6][9] = 0;
+    // A[2][6][10] = 0;
+
+    // A[2][7][0] = 0;
+    // A[2][7][1] = 0;
+    // A[2][7][2] = 0;
+    // A[2][7][3] = 0;
+    // A[2][7][5] = 0;
+    // A[2][7][6] = 0;
+    // A[2][7][7] = 0;
+    // A[2][7][4] = 0;
+    // A[2][7][8] = 0;
+    // A[2][7][9] = 0;
+    // A[2][7][10] = 0;
+
+    A[2][4][0] = 2 * iRh * (v[5] * Ec2 - v[6] * Ec1) + v[3] * gmmo * Uk * iRh2 - v[3] * (Uk + p) * iRh2;
+    A[2][4][1] = -2 * v[5] * v[7] * iRh - 2 * gmmo * v[1] * v[3] * iRh2;
+    A[2][4][2] = -2 * v[6] * v[7] * iRh - 2 * gmmo * v[2] * v[3] * iRh2;
+    A[2][4][3] = 2 * (v[5] * v[5] + v[6] * v[6]) * iRh + 2 * v[3] * gmmo * v[3] * iRh2 + (Uk + p) * iRh;
+    A[2][4][5] = -2 * this->parameters.gas_gamma * v[5] * v[3] * iRh + 2 * (v[5] * v[3] * iRh - E2);
+    A[2][4][6] = -2 * this->parameters.gas_gamma * v[6] * v[3] * iRh + 2 * (v[6] * v[3] * iRh + E1);
+    A[2][4][7] = -2 * this->parameters.gas_gamma * v[7] * v[3] * iRh + 2 * (-v[5] * v[1] - v[6] * v[2]) * iRh;
+    A[2][4][4] = this->parameters.gas_gamma * v[3] * iRh;
+    // A[2][4][8] = 2 * ETA * v[6];
+    // A[2][4][9] =  - 2 * ETA * v[5];
+    // A[2][4][10] = 0;
+
+    // A[2][8][0] = 0;
+    // A[2][8][1] = 0;
+    // A[2][8][2] = 0;
+    // A[2][8][3] = 0;
+    // A[2][8][5] = 0;
+    // A[2][8][6] = 1;
+    // A[2][8][7] = 0;
+    // A[2][8][4] = 0;
+    // A[2][8][8] = 0;
+    // A[2][8][9] = 0;
+    // A[2][8][10] = 0;
+
+    // A[2][9][0] = 0;
+    // A[2][9][1] = 0;
+    // A[2][9][2] = 0;
+    // A[2][9][3] = 0;
+    // A[2][9][5] =  - 1;
+    // A[2][9][6] = 0;
+    // A[2][9][7] = 0;
+    // A[2][9][4] = 0;
+    // A[2][9][8] = 0;
+    // A[2][9][9] = 0;
+    // A[2][9][10] = 0;
+
+    // A[2][10][0] = 0;
+    // A[2][10][1] = 0;
+    // A[2][10][2] = 0;
+    // A[2][10][3] = 0;
+    // A[2][10][5] = 0;
+    // A[2][10][6] = 0;
+    // A[2][10][7] = 0;
+    // A[2][10][4] = 0;
+    // A[2][10][8] = 0;
+    // A[2][10][9] = 0;
+    // A[2][10][10] = 0;
+  }
 }
 
 template class Problem<EquationsTypeMhd, 3>;

@@ -27,7 +27,7 @@ private:
   void setup_initial_solution();
 
   // Performs a single global assembly.
-  void assemble_system(bool only_rhs);
+  void assemble_system();
 
   // Performs a single global assembly.
   void postprocess();
@@ -87,18 +87,22 @@ private:
   const QGauss<dim> quadrature, initial_quadrature;
   const QGauss<dim - 1> face_quadrature;
 
+  // Jacobi matrixes of the fluxes
+  void JacobiM(double A[3][8][8], dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> lv);
+  static double A[dim][8][8];
+
   // Currently sought solution, the previous one, and the initial solution for newton's loop on the current time level.
-  TrilinosWrappers::MPI::Vector     limited_solution;
   TrilinosWrappers::MPI::Vector     current_limited_solution;
   TrilinosWrappers::MPI::Vector     current_unlimited_solution;
   TrilinosWrappers::MPI::Vector     prev_solution;
+  TrilinosWrappers::MPI::Vector     lin_solution;
   
   // The system being assembled.
   TrilinosWrappers::MPI::Vector system_rhs;
   TrilinosWrappers::SparseMatrix system_matrix;
 
   // Rest is technical.
-  ConditionalOStream              verbose_cout;
+  ConditionalOStream verbose_cout;
 
   ConstraintMatrix constraints;
 

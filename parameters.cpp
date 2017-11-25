@@ -8,19 +8,17 @@ Parameters<dim>::Parameters(parallel::distributed::Triangulation<dim> &triangula
 Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 #endif
 {
-  this->initCond = 0;
+  this->initCond = 4;
   this->num_flux_type = hlld;
-  this->cfl_constant = .1;
+  this->cfl_constant = .01;
   this->corner_a = Point<dim>(-0.0, -0.0, 0.);
   this->corner_b = Point<dim>(.3 , .3, .01);
-  this->refinements = { 15, 15, 1 };
+  this->refinements = { 5, 5, 1 };
   this->quadrature_order = 5;
-  this->initial_quadrature_order = 12;
-  this->polynomial_order_dg = 0;
+  this->initial_quadrature_order = 10;
+  this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
 
-  this->theta = 0.0;
-  this->postprocess_in_newton_loop = true;
   this->patches = 2;
   this->output_step = -1.e-3;
 
