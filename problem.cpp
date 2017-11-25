@@ -386,10 +386,9 @@ void Problem<equationsType, dim>::assemble_system()
 
               fe_v_subface.reinit(cell, face_no, subface_no);
               fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
+              neighbor_child->get_dof_indices(dof_indices_neighbor);
 
               assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs);
-
-              constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
             }
           }
           // Here the neighbor face is less split than the current one, there is some transformation needed.
@@ -398,6 +397,7 @@ void Problem<equationsType, dim>::assemble_system()
           {
             const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
             Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
+            neighbor->get_dof_indices(dof_indices_neighbor);
 
             const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
             const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
