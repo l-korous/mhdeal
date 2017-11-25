@@ -1,9 +1,6 @@
 #include "problem.h"
 
 template <EquationsType equationsType, int dim>
-double Problem<equationsType, dim>::A[dim][8][8];
-
-template <EquationsType equationsType, int dim>
 Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equationsType, dim>& equations,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation,
@@ -33,13 +30,6 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   last_output_time(0.), last_snapshot_time(0.), time(0.),
   time_step(0)
 {
-  for (unsigned int k = 0; k < dim; k++) {
-    for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++) {
-      for (unsigned int j = 0; j < Equations<equationsType, dim>::n_components; j++) {
-        A[k][i][j] = 0.0;
-      }
-    }
-  }
 }
 
 template <EquationsType equationsType, int dim>
@@ -252,7 +242,7 @@ void Problem<equationsType, dim>::postprocess()
             visited_faces.insert(neighbor->face_index(neighbor_face_no));
 
             if (neighbor->at_boundary(neighbor_face_no))
-              continue;
+              continue; 
 
             // Look at the right neighbor's neighbor (h-adaptivity)
             // (!!!) Assuming there is no division at this point (no adaptivity)
@@ -335,7 +325,7 @@ void Problem<equationsType, dim>::assemble_system()
   // What values we need for the assembly.
   const UpdateFlags update_flags = update_values | update_q_points | update_JxW_values | update_gradients;
   const UpdateFlags face_update_flags = update_values | update_q_points | update_JxW_values | update_normal_vectors;
-  const UpdateFlags neighbor_face_update_flags = update_q_points | update_values;
+  const UpdateFlags neighbor_face_update_flags = update_JxW_values | update_q_points | update_values | update_normal_vectors;
 
   // DOF indices both on the currently assembled element and the neighbor.
   FEValues<dim> fe_v(mapping, fe, this->initial_step ? initial_quadrature : quadrature, update_flags);
@@ -346,9 +336,7 @@ void Problem<equationsType, dim>::assemble_system()
 
   // Local (cell) matrices and rhs - for the currently assembled element and the neighbor
   FullMatrix<double> cell_matrix(dofs_per_cell, dofs_per_cell);
-  FullMatrix<double> cell_matrix_neighbor(dofs_per_cell, dofs_per_cell);
   Vector<double> cell_rhs(dofs_per_cell);
-  Vector<double> cell_rhs_neighbor(dofs_per_cell);
 
   // Loop through all cells.
   int ith_cell = 0;
@@ -375,14 +363,11 @@ void Problem<equationsType, dim>::assemble_system()
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        cell_matrix_neighbor = 0;
-        cell_rhs_neighbor = 0;
-
         // Boundary face - here we pass the boundary id
         if (cell->at_boundary(face_no))
         {
           fe_v_face.reinit(cell, face_no);
-          assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
+          assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs);
         }
         else
         {
@@ -402,11 +387,9 @@ void Problem<equationsType, dim>::assemble_system()
               fe_v_subface.reinit(cell, face_no, subface_no);
               fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
 
-              neighbor_child->get_dof_indices(dof_indices_neighbor);
+              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs);
 
-              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
-
-              constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+              constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
             }
           }
           // Here the neighbor face is less split than the current one, there is some transformation needed.
@@ -416,8 +399,6 @@ void Problem<equationsType, dim>::assemble_system()
             const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
             Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
 
-            neighbor->get_dof_indices(dof_indices_neighbor);
-
             const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
             const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
 
@@ -426,9 +407,7 @@ void Problem<equationsType, dim>::assemble_system()
             fe_v_face.reinit(cell, face_no);
             fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
 
-            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
-
-            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs);
           }
           // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
           // This is the only face assembly case performed without adaptivity.
@@ -440,9 +419,7 @@ void Problem<equationsType, dim>::assemble_system()
             fe_v_face.reinit(cell, face_no);
             fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
 
-            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, cell_matrix_neighbor, cell_rhs_neighbor);
-
-            constraints.distribute_local_to_global(cell_matrix_neighbor, cell_rhs_neighbor, dof_indices_neighbor, system_matrix, system_rhs);
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs);
           }
         }
       }
@@ -463,9 +440,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
   const unsigned int n_q_points = fe_v.n_quadrature_points;
 
   Table<2, double> W_prev(n_q_points, Equations<equationsType, dim>::n_components);
-  Table<3, double> grad_W_prev(n_q_points, Equations<equationsType, dim>::n_components, dim);
   Table<2, double> W_lin(n_q_points, Equations<equationsType, dim>::n_components);
-  Table<3, double> grad_W_lin(n_q_points, Equations<equationsType, dim>::n_components, dim);
 
   if (initial_step)
   {
@@ -486,14 +461,6 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       {
         W_prev[q][c] = 0.;
         W_lin[q][c] = 0.;
-        if (!initial_step)
-        {
-          for (unsigned int d = 0; d < dim; ++d)
-          {
-            grad_W_prev[q][c][d] = 0.;
-            grad_W_lin[q][c][d] = 0.;
-          }
-        }
       }
 
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
@@ -503,17 +470,11 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         if (component_i == 1)
         {
           dealii::Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
-          dealii::Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
 
           for (unsigned int d = 0; d < dim; d++)
           {
             W_prev[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
             W_lin[q][5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
-            for (unsigned int d1 = 0; d1 < dim; d1++)
-            {
-              grad_W_prev[q][5 + d][d1] += prev_solution(dof_indices[i]) * fe_v_grad[d][d1];
-              grad_W_lin[q][5 + d][d1] += lin_solution(dof_indices[i]) * fe_v_grad[d][d1];
-            }
           }
         }
         else
@@ -522,12 +483,6 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
           W_prev[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
           W_lin[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-
-          for (unsigned int d = 0; d < dim; d++)
-          {
-            grad_W_prev[q][component_ii][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
-            grad_W_lin[q][component_ii][d] += lin_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
-          }
         }
       }
     }
@@ -543,36 +498,19 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-
-      // RHS
+      
       cell_rhs(i) += fe_v.JxW(q) * W_prev[q][component_ii] * fe_v.shape_value(i, q);
-
       if (!initial_step)
       {
-        double val = 0.;
-        
         for (int d = 0; d < dim; d++)
-          val += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
-
-        cell_rhs(i) += val;
+          cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
       }
-      // MATRIX
+      
       for (unsigned int j = 0; j < dofs_per_cell; ++j)
       {
         const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
-
         if (component_ii == component_jj)
           cell_matrix(i, j) += fe_v.JxW(q) * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
-
-        if (!initial_step)
-        {
-        //  for (int d = 0; d < dim; d++)
-          //  cell_matrix(i, j) += fe_v.JxW(q) * parameters.time_step * A[d][component_ii][component_jj] * fe_v.shape_value(i, q) * fe_v.shape_grad(j, q)[d];
-        }
-        if (std::isnan(cell_matrix(i, j)))
-        {
-          std::cout << "NaN: " << i << ", " << j << ": " << cell_matrix(i, j) << std::endl;
-        }
       }
     }
   }
@@ -588,7 +526,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
   const bool                   external_face,
   const unsigned int           boundary_id,
   const double                 face_diameter,
-  FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, FullMatrix<double>& cell_matrix_neighbor, Vector<double>& cell_rhs_neighbor)
+  FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs)
 {
   const unsigned int n_q_points = fe_v.n_quadrature_points;
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
@@ -989,7 +927,8 @@ void Problem<equationsType, dim>::run()
       newton_update -= lin_solution;
 
       lin_solution = current_limited_solution;
-      std::cout << "\tLin step #" << linStep << ", error: " << newton_update.linfty_norm() << std::endl;
+      if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+        std::cout << "\tLin step #" << linStep << ", error: " << newton_update.linfty_norm() << std::endl;
       if (newton_update.linfty_norm() < parameters.newton_residual_norm_threshold)
         break;
   }
@@ -1028,429 +967,6 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
   ++time_step;
   time += parameters.time_step;
   initial_step = false;
-}
-
-template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::JacobiM(double A[3][8][8], dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> lv)
-{
-  double v[8], iRh, iRh2, Uk, p, gmmo, Ec1, Ec2, Ec3, E1, E2, E3;
-
-  // using shorter notation for old solution
-  // order of the variables is following: rho, v(3), B(3), U, J(3)
-  for (unsigned int i = 0; i < 8; i++)
-    v[i] = lv[i];
-
-  iRh = 1.0 / v[0];
-  iRh2 = iRh * iRh;
-  Uk = iRh * (v[1] * v[1] + v[2] * v[2] + v[3] * v[3]);
-  p = this->parameters.gas_gamma * (v[4] - (v[5] * v[5] + v[6] * v[6] + v[7] * v[7]) - Uk);
-  gmmo = this->parameters.gas_gamma - 1.0;
-  Ec1 = (v[3] * v[6] - v[2] * v[7]) * iRh;
-  Ec2 = (v[1] * v[7] - v[3] * v[5]) * iRh;
-  Ec3 = (v[2] * v[5] - v[1] * v[6]) * iRh;
-  E1 = Ec1; //   + ETA * v[8];
-  E2 = Ec2; //   + ETA * v[9];
-  E3 = Ec3; //   + ETA * v[10];
-
-            // A[0][0][0] = 0;
-  A[0][0][1] = 1;
-  // A[0][0][2] = 0;
-  // A[0][0][3] = 0;
-  // A[0][0][5] = 0;
-  // A[0][0][6] = 0;
-  // A[0][0][7] = 0;
-  // A[0][0][4] = 0;
-  // A[0][0][8] = 0;
-  // A[0][0][9] = 0;
-  // A[0][0][10] = 0;
-
-  A[0][1][0] = -(v[1] * v[1] * iRh2) + gmmo * Uk * .5 * iRh;
-  A[0][1][1] = (2 - gmmo) * v[1] * iRh;
-  A[0][1][2] = -gmmo * v[2] * iRh;
-  A[0][1][3] = -gmmo * v[3] * iRh;
-  A[0][1][5] = -this->parameters.gas_gamma * v[5];
-  A[0][1][6] = (1 - gmmo) * v[6];
-  A[0][1][7] = (1 - gmmo) * v[7];
-  A[0][1][4] = 0.5 * gmmo;
-  // A[0][1][8] = 0;
-  // A[0][1][9] = 0;
-  // A[0][1][10] = 0;
-
-  A[0][2][0] = -v[1] * v[2] * iRh2;
-  A[0][2][1] = v[2] * iRh;
-  A[0][2][2] = v[1] * iRh;
-  // A[0][2][3] = 0;
-  A[0][2][5] = -v[6];
-  A[0][2][6] = -v[5];
-  // A[0][2][7] = 0;
-  // A[0][2][4] = 0;
-  // A[0][2][8] = 0;
-  // A[0][2][9] = 0;
-  // A[0][2][10] = 0;
-
-  A[0][3][0] = -v[1] * v[3] * iRh2;
-  A[0][3][1] = v[3] * iRh;
-  // A[0][3][2] = 0;
-  A[0][3][3] = v[1] * iRh;
-  A[0][3][5] = -v[7];
-  // A[0][3][6] = 0;
-  A[0][3][7] = -v[5];
-  // A[0][3][4] = 0;
-  // A[0][3][8] = 0;
-  // A[0][3][9] = 0;
-  // A[0][3][10] = 0;
-
-  // A[0][5][0] = 0;
-  // A[0][5][1] = 0;
-  // A[0][5][2] = 0;
-  // A[0][5][3] = 0;
-  // A[0][5][5] = 0;
-  // A[0][5][6] = 0;
-  // A[0][5][7] = 0;
-  // A[0][5][4] = 0;
-  // A[0][5][8] = 0;
-  // A[0][5][9] = 0;
-  // A[0][5][10] = 0;
-
-  A[0][6][0] = Ec3 * iRh;
-  A[0][6][1] = v[6] * iRh;
-  A[0][6][2] = -v[5] * iRh;
-  // A[0][6][3] = 0;
-  A[0][6][5] = -v[2] * iRh;
-  A[0][6][6] = v[1] * iRh;
-  // A[0][6][7] = 0;
-  // A[0][6][4] = 0;
-  // A[0][6][8] = 0;
-  // A[0][6][9] = 0;
-  // A[0][6][10] =  - ETA;
-
-  A[0][7][0] = -Ec2 * iRh;
-  A[0][7][1] = v[7] * iRh;
-  // A[0][7][2] = 0;
-  A[0][7][3] = -v[5] * iRh;
-  A[0][7][5] = -v[3] * iRh;
-  // A[0][7][6] = 0;
-  A[0][7][7] = v[1] * iRh;
-  // A[0][7][4] = 0;
-  // A[0][7][8] = 0;
-  // A[0][7][9] = ETA;
-  // A[0][7][10] = 0;
-
-  A[0][4][0] = 2 * iRh * (v[6] * Ec3 - v[7] * Ec2) + v[1] * gmmo * Uk * iRh2 - v[1] * (Uk + p) * iRh2;
-  A[0][4][1] = 2 * (v[6] * v[6] + v[7] * v[7]) * iRh - 2 * v[1] * gmmo * v[1] * iRh2 + (Uk + p) * iRh;
-  A[0][4][2] = -2 * v[5] * v[6] * iRh - v[1] * 2 * gmmo * v[2] * iRh2;
-  A[0][4][3] = -2 * v[5] * v[7] * iRh - v[1] * 2 * gmmo * v[3] * iRh2;
-  A[0][4][5] = -2 * this->parameters.gas_gamma * v[5] * v[1] * iRh + 2 * (-v[6] * v[2] - v[7] * v[3]) * iRh;
-  A[0][4][6] = -2 * this->parameters.gas_gamma * v[6] * v[1] * iRh + 2 * (v[6] * v[1] * iRh - E3);
-  A[0][4][7] = -2 * this->parameters.gas_gamma * v[7] * v[1] * iRh + 2 * (v[7] * v[1] * iRh + E2);
-  A[0][4][4] = this->parameters.gas_gamma * v[1] * iRh;
-  // A[0][4][8] = 0;
-  // A[0][4][9] = 2 * ETA * v[7];
-  // A[0][4][10] =  - 2 * ETA * v[6];
-
-  // A[0][8][0] = 0;
-  // A[0][8][1] = 0;
-  // A[0][8][2] = 0;
-  // A[0][8][3] = 0;
-  // A[0][8][5] = 0;
-  // A[0][8][6] = 0;
-  // A[0][8][7] = 0;
-  // A[0][8][4] = 0;
-  // A[0][8][8] = 0;
-  // A[0][8][9] = 0;
-  // A[0][8][10] = 0;
-
-  // A[0][9][0] = 0;
-  // A[0][9][1] = 0;
-  // A[0][9][2] = 0;
-  // A[0][9][3] = 0;
-  // A[0][9][5] = 0;
-  // A[0][9][6] = 0;
-  // A[0][9][7] = 1;
-  // A[0][9][4] = 0;
-  // A[0][9][8] = 0;
-  // A[0][9][9] = 0;
-  // A[0][9][10] = 0;
-
-  // A[0][10][0] = 0;
-  // A[0][10][1] = 0;
-  // A[0][10][2] = 0;
-  // A[0][10][3] = 0;
-  // A[0][10][5] = 0;
-  // A[0][10][6] =  - 1;
-  // A[0][10][7] = 0;
-  // A[0][10][4] = 0;
-  // A[0][10][8] = 0;
-  // A[0][10][9] = 0;
-  // A[0][10][10] = 0;
-
-  if (dim > 1) {
-    // A[1][0][0] = 0;
-    // A[1][0][1] = 0;
-    A[1][0][2] = 1;
-    // A[1][0][3] = 0;
-    // A[1][0][5] = 0;
-    // A[1][0][6] = 0;
-    // A[1][0][7] = 0;
-    // A[1][0][4] = 0;
-    // A[1][0][8] = 0;
-    // A[1][0][9] = 0;
-    // A[1][0][10] = 0;
-
-    A[1][1][0] = -v[1] * v[2] * iRh2;
-    A[1][1][1] = v[2] * iRh;
-    A[1][1][2] = v[1] * iRh;
-    // A[1][1][3] = 0;
-    A[1][1][5] = -v[6];
-    A[1][1][6] = -v[5];
-    // A[1][1][7] = 0;
-    // A[1][1][4] = 0;
-    // A[1][1][8] = 0;
-    // A[1][1][9] = 0;
-    // A[1][1][10] = 0;
-
-    A[1][2][0] = -v[2] * v[2] * iRh2 + gmmo * Uk * .5 * iRh;
-    A[1][2][1] = -gmmo * v[1] * iRh;
-    A[1][2][2] = (2 - gmmo) * v[2] * iRh;
-    A[1][2][3] = -gmmo * v[3] * iRh;
-    A[1][2][5] = (1 - gmmo) * v[5];
-    A[1][2][6] = -this->parameters.gas_gamma * v[6];
-    A[1][2][7] = (1 - gmmo) * v[7];
-    A[1][2][4] = 0.5 * gmmo;
-    // A[1][2][8] = 0;
-    // A[1][2][9] = 0;
-    // A[1][2][10] = 0;
-
-    A[1][3][0] = -v[2] * v[3] * iRh2;
-    // A[1][3][1] = 0;
-    A[1][3][2] = v[3] * iRh;
-    A[1][3][3] = v[2] * iRh;
-    // A[1][3][5] = 0;
-    A[1][3][6] = -v[7];
-    A[1][3][7] = -v[6];
-    // A[1][3][4] = 0;
-    // A[1][3][8] = 0;
-    // A[1][3][9] = 0;
-    // A[1][3][10] = 0;
-
-    A[1][5][0] = -Ec3 * iRh;
-    A[1][5][1] = -v[6] * iRh;
-    A[1][5][2] = v[5] * iRh;
-    // A[1][5][3] = 0;
-    A[1][5][5] = v[2] * iRh;
-    A[1][5][6] = -v[1] * iRh;
-    // A[1][5][7] = 0;
-    // A[1][5][4] = 0;
-    // A[1][5][8] = 0;
-    // A[1][5][9] = 0;
-    // A[1][5][10] = ETA;
-
-    // A[1][6][0] = 0;
-    // A[1][6][1] = 0;
-    // A[1][6][2] = 0;
-    // A[1][6][3] = 0;
-    // A[1][6][5] = 0;
-    // A[1][6][6] = 0;
-    // A[1][6][7] = 0;
-    // A[1][6][4] = 0;
-    // A[1][6][8] = 0;
-    // A[1][6][9] = 0;
-    // A[1][6][10] = 0;
-
-    A[1][7][0] = Ec1 * iRh;
-    // A[1][7][1] = 0;
-    A[1][7][2] = v[7] * iRh;
-    A[1][7][3] = -v[6] * iRh;
-    // A[1][7][5] = 0;
-    A[1][7][6] = -v[3] * iRh;
-    A[1][7][7] = v[2] * iRh;
-    // A[1][7][4] = 0;
-    // A[1][7][8] =  - ETA;
-    // A[1][7][9] = 0;
-    // A[1][7][10] = 0;
-
-    A[1][4][0] = 2 * iRh * (-v[5] * Ec3 + v[7] * Ec1) + v[2] * gmmo * Uk * iRh2 - v[2] * (Uk + p) * iRh2;
-    A[1][4][1] = -2 * v[5] * v[6] * iRh - 2 * gmmo * v[1] * v[2] * iRh2;
-    A[1][4][2] = 2 * (v[5] * v[5] + v[7] * v[7]) * iRh - 2 * v[2] * gmmo * v[2] * iRh2 + (Uk + p) * iRh;
-    A[1][4][3] = -2 * v[6] * v[7] * iRh - 2 * gmmo * v[2] * v[3] * iRh2;
-    A[1][4][5] = -2 * this->parameters.gas_gamma * v[5] * v[2] * iRh + 2 * (v[5] * v[2] * iRh + E3);
-    A[1][4][6] = -2 * this->parameters.gas_gamma * v[6] * v[2] * iRh + 2 * (-v[5] * v[1] - v[7] * v[3]) * iRh;
-    A[1][4][7] = -2 * this->parameters.gas_gamma * v[7] * v[2] * iRh + 2 * (v[7] * v[2] * iRh - E1);
-    A[1][4][4] = this->parameters.gas_gamma * v[2] * iRh;
-    // A[1][4][8] =  - 2 * ETA * v[7];
-    // A[1][4][9] = 0;
-    // A[1][4][10] = 2 * ETA * v[5];
-
-    // A[1][8][0] 0;
-    // A[1][8][1] 0;
-    // A[1][8][2] 0;
-    // A[1][8][3] 0;
-    // A[1][8][5] 0;
-    // A[1][8][6] 0;
-    // A[1][8][7] =  - 1;
-    // A[1][8][4] 0;
-    // A[1][8][8] 0;
-    // A[1][8][9] 0;
-    // A[1][8][10] 0;
-
-    // A[1][9][0] = 0;
-    // A[1][9][1] = 0;
-    // A[1][9][2] = 0;
-    // A[1][9][3] = 0;
-    // A[1][9][5] = 0;
-    // A[1][9][6] = 0;
-    // A[1][9][7] = 0;
-    // A[1][9][4] = 0;
-    // A[1][9][8] = 0;
-    // A[1][9][9] = 0;
-    // A[1][9][10] = 0;
-
-    // A[1][10][0] - 0;
-    // A[1][10][1] - 0;
-    // A[1][10][2] - 0;
-    // A[1][10][3] - 0;
-    // A[1][10][5] = 1;
-    // A[1][10][6] - 0;
-    // A[1][10][7] - 0;
-    // A[1][10][4] - 0;
-    // A[1][10][8] - 0;
-    // A[1][10][9] - 0;
-    // A[1][10][10] - 0;
-  }
-
-  if (dim > 2) {
-    // A[2][0][0] = 0;
-    // A[2][0][1] = 0;
-    // A[2][0][2] = 0;
-    A[2][0][3] = 1;
-    // A[2][0][5] = 0;
-    // A[2][0][6] = 0;
-    // A[2][0][7] = 0;
-    // A[2][0][4] = 0;
-    // A[2][0][8] = 0;
-    // A[2][0][9] = 0;
-    // A[2][0][10] = 0;
-
-    A[2][1][0] = -v[1] * v[3] * iRh2;
-    A[2][1][1] = v[3] * iRh;
-    // A[2][1][2] = 0;
-    A[2][1][3] = v[1] * iRh;
-    A[2][1][5] = -v[7];
-    // A[2][1][6] = 0;
-    A[2][1][7] = -v[5];
-    // A[2][1][4] = 0;
-    // A[2][1][8] = 0;
-    // A[2][1][9] = 0;
-    // A[2][1][10] = 0;
-
-    A[2][2][0] = -v[2] * v[3] * iRh2;
-    // A[2][2][1] = 0;
-    A[2][2][2] = v[3] * iRh;
-    A[2][2][3] = v[2] * iRh;
-    // A[2][2][5] = 0;
-    A[2][2][6] = -v[7];
-    A[2][2][7] = -v[6];
-    // A[2][2][4] = 0;
-    // A[2][2][8] = 0;
-    // A[2][2][9] = 0;
-    // A[2][2][10] = 0;
-
-    A[2][3][0] = -v[3] * v[3] * iRh2 + (gmmo * Uk) * .5 * iRh;
-    A[2][3][1] = -gmmo * v[1] * iRh;
-    A[2][3][2] = -gmmo * v[2] * iRh;
-    A[2][3][3] = (2 - gmmo) * v[3] * iRh;
-    A[2][3][5] = (1 - gmmo) * v[5];
-    A[2][3][6] = (1 - gmmo) * v[6];
-    A[2][3][7] = -this->parameters.gas_gamma * v[7];
-    A[2][3][4] = 0.5 * gmmo;
-    // A[2][3][8] = 0;
-    // A[2][3][9] = 0;
-    // A[2][3][10] = 0;
-
-    A[2][5][0] = Ec2 * iRh;
-    A[2][5][1] = -v[7] * iRh;
-    // A[2][5][2] = 0;
-    A[2][5][3] = v[5] * iRh;
-    A[2][5][5] = v[3] * iRh;
-    // A[2][5][6] = 0;
-    A[2][5][7] = -v[1] * iRh;
-    // A[2][5][4] = 0;
-    // A[2][5][8] = 0;
-    // A[2][5][9] =  - ETA;
-    // A[2][5][10] = 0;
-
-    A[2][6][0] = -Ec1 * iRh;
-    // A[2][6][1] = 0;
-    A[2][6][2] = -v[7] * iRh;
-    A[2][6][3] = v[6] * iRh;
-    // A[2][6][5] = 0;
-    A[2][6][6] = v[3] * iRh;
-    A[2][6][7] = -v[2] * iRh;
-    // A[2][6][4] = 0;
-    // A[2][6][8] = ETA;
-    // A[2][6][9] = 0;
-    // A[2][6][10] = 0;
-
-    // A[2][7][0] = 0;
-    // A[2][7][1] = 0;
-    // A[2][7][2] = 0;
-    // A[2][7][3] = 0;
-    // A[2][7][5] = 0;
-    // A[2][7][6] = 0;
-    // A[2][7][7] = 0;
-    // A[2][7][4] = 0;
-    // A[2][7][8] = 0;
-    // A[2][7][9] = 0;
-    // A[2][7][10] = 0;
-
-    A[2][4][0] = 2 * iRh * (v[5] * Ec2 - v[6] * Ec1) + v[3] * gmmo * Uk * iRh2 - v[3] * (Uk + p) * iRh2;
-    A[2][4][1] = -2 * v[5] * v[7] * iRh - 2 * gmmo * v[1] * v[3] * iRh2;
-    A[2][4][2] = -2 * v[6] * v[7] * iRh - 2 * gmmo * v[2] * v[3] * iRh2;
-    A[2][4][3] = 2 * (v[5] * v[5] + v[6] * v[6]) * iRh + 2 * v[3] * gmmo * v[3] * iRh2 + (Uk + p) * iRh;
-    A[2][4][5] = -2 * this->parameters.gas_gamma * v[5] * v[3] * iRh + 2 * (v[5] * v[3] * iRh - E2);
-    A[2][4][6] = -2 * this->parameters.gas_gamma * v[6] * v[3] * iRh + 2 * (v[6] * v[3] * iRh + E1);
-    A[2][4][7] = -2 * this->parameters.gas_gamma * v[7] * v[3] * iRh + 2 * (-v[5] * v[1] - v[6] * v[2]) * iRh;
-    A[2][4][4] = this->parameters.gas_gamma * v[3] * iRh;
-    // A[2][4][8] = 2 * ETA * v[6];
-    // A[2][4][9] =  - 2 * ETA * v[5];
-    // A[2][4][10] = 0;
-
-    // A[2][8][0] = 0;
-    // A[2][8][1] = 0;
-    // A[2][8][2] = 0;
-    // A[2][8][3] = 0;
-    // A[2][8][5] = 0;
-    // A[2][8][6] = 1;
-    // A[2][8][7] = 0;
-    // A[2][8][4] = 0;
-    // A[2][8][8] = 0;
-    // A[2][8][9] = 0;
-    // A[2][8][10] = 0;
-
-    // A[2][9][0] = 0;
-    // A[2][9][1] = 0;
-    // A[2][9][2] = 0;
-    // A[2][9][3] = 0;
-    // A[2][9][5] =  - 1;
-    // A[2][9][6] = 0;
-    // A[2][9][7] = 0;
-    // A[2][9][4] = 0;
-    // A[2][9][8] = 0;
-    // A[2][9][9] = 0;
-    // A[2][9][10] = 0;
-
-    // A[2][10][0] = 0;
-    // A[2][10][1] = 0;
-    // A[2][10][2] = 0;
-    // A[2][10][3] = 0;
-    // A[2][10][5] = 0;
-    // A[2][10][6] = 0;
-    // A[2][10][7] = 0;
-    // A[2][10][4] = 0;
-    // A[2][10][8] = 0;
-    // A[2][10][9] = 0;
-    // A[2][10][10] = 0;
-  }
 }
 
 template class Problem<EquationsTypeMhd, 3>;

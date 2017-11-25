@@ -42,7 +42,7 @@ private:
   // i.e. face terms calculated on all faces - internal and boundary
   void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const std::vector<types::global_dof_index>& local_dofs,
     const std::vector<types::global_dof_index>& local_dofs_neighbor, const bool external_face, const unsigned int boundary_id, const double face_diameter, FullMatrix<double>& cell_matrix,
-    Vector<double>& cell_rhs, FullMatrix<double>& cell_matrix_neighbor, Vector<double>& cell_rhs_neighbor);
+    Vector<double>& cell_rhs);
   
   // Output
   void output_results(const char* prefix = "") const;
@@ -86,10 +86,6 @@ private:
   DoFHandler<dim> dof_handler;
   const QGauss<dim> quadrature, initial_quadrature;
   const QGauss<dim - 1> face_quadrature;
-
-  // Jacobi matrixes of the fluxes
-  void JacobiM(double A[3][8][8], dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> lv);
-  static double A[dim][8][8];
 
   // Currently sought solution, the previous one, and the initial solution for newton's loop on the current time level.
   TrilinosWrappers::MPI::Vector     current_limited_solution;
