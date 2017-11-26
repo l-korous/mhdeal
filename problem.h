@@ -27,7 +27,7 @@ private:
   void setup_initial_solution();
 
   // Performs a single global assembly.
-  void assemble_system();
+  void assemble_system(bool assemble_matrix = true);
 
   // Performs a single global assembly.
   void postprocess();
@@ -36,13 +36,13 @@ private:
   void calculate_cfl_condition();
 
   // Performs a local assembly for all volumetric contributions on the local cell.
-  void assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& local_dofs, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs);
+  void assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& local_dofs, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix);
   
   // Performs a local assembly for all surface contributions on the local cell.
   // i.e. face terms calculated on all faces - internal and boundary
   void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const std::vector<types::global_dof_index>& local_dofs,
     const std::vector<types::global_dof_index>& local_dofs_neighbor, const bool external_face, const unsigned int boundary_id, const double face_diameter, FullMatrix<double>& cell_matrix,
-    Vector<double>& cell_rhs);
+    Vector<double>& cell_rhs, bool assemble_matrix);
   
   // Output
   void output_results(const char* prefix = "") const;
@@ -50,7 +50,7 @@ private:
   void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step, int newton_step = -1) const;
 
   // Solves the assembled system
-  void solve(TrilinosWrappers::MPI::Vector &newton_update);
+  void solve(TrilinosWrappers::MPI::Vector &newton_update, bool reset_matrix = true);
 
   void move_time_step_handle_outputs();
 
@@ -112,4 +112,5 @@ private:
   double last_output_time, last_snapshot_time, time;
   int time_step;
   double cfl_time_step;
+  AztecOO solver;
 };

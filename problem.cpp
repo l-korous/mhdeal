@@ -311,7 +311,7 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::assemble_system()
+void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 {
   this->cfl_time_step = 1.e6;
 
@@ -346,7 +346,8 @@ void Problem<equationsType, dim>::assemble_system()
     if (!cell->is_locally_owned())
       continue;
 
-    cell_matrix = 0;
+    if(assemble_matrix)
+      cell_matrix = 0;
     cell_rhs = 0;
 
     fe_v.reinit(cell);
@@ -356,7 +357,7 @@ void Problem<equationsType, dim>::assemble_system()
       std::cout << "NEW CELL: " << ith_cell++ << std::endl;
 
     // Assemble the volumetric integrals.
-    assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs);
+    assemble_cell_term(fe_v, dof_indices, cell_matrix, cell_rhs, assemble_matrix);
 
     // Assemble the face integrals - ONLY if this is not the initial step (where we do the projection of the initial condition).
     if (!initial_step)
@@ -367,7 +368,7 @@ void Problem<equationsType, dim>::assemble_system()
         if (cell->at_boundary(face_no))
         {
           fe_v_face.reinit(cell, face_no);
-          assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs);
+          assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
         }
         else
         {
@@ -388,7 +389,7 @@ void Problem<equationsType, dim>::assemble_system()
               fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
               neighbor_child->get_dof_indices(dof_indices_neighbor);
 
-              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs);
+              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, neighbor_child->face(neighbor2)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
             }
           }
           // Here the neighbor face is less split than the current one, there is some transformation needed.
@@ -407,7 +408,7 @@ void Problem<equationsType, dim>::assemble_system()
             fe_v_face.reinit(cell, face_no);
             fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
 
-            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs);
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
           }
           // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
           // This is the only face assembly case performed without adaptivity.
@@ -419,22 +420,26 @@ void Problem<equationsType, dim>::assemble_system()
             fe_v_face.reinit(cell, face_no);
             fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
 
-            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs);
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, numbers::invalid_unsigned_int, cell->face(face_no)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
           }
         }
       }
     }
 
-    constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
+    if(assemble_matrix)
+      constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
+    else
+      constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
   }
 
-  system_matrix.compress(VectorOperation::add);
+  if (assemble_matrix)
+    system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
 }
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& dof_indices, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs)
+Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& dof_indices, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix)
 {
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
   const unsigned int n_q_points = fe_v.n_quadrature_points;
@@ -506,6 +511,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
       }
 
+      if(assemble_matrix)
       for (unsigned int j = 0; j < dofs_per_cell; ++j)
       {
         const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
@@ -526,7 +532,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
   const bool                   external_face,
   const unsigned int           boundary_id,
   const double                 face_diameter,
-  FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs)
+  FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix)
 {
   const unsigned int n_q_points = fe_v.n_quadrature_points;
   const unsigned int dofs_per_cell = fe_v.dofs_per_cell;
@@ -662,7 +668,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
+Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update, bool reset_matrix)
 {
   // Direct solver is only usable without MPI, as it is not distributed.
 #ifndef HAVE_MPI
@@ -682,7 +688,6 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
     Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), completely_distributed_solution.begin());
     Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
 
-    AztecOO solver;
     solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
     solver.SetAztecOption(AZ_solver, AZ_gmres);
     solver.SetRHS(&b);
@@ -697,7 +702,8 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update)
     solver.SetAztecParam(AZ_athresh, parameters.ilut_atol);
     solver.SetAztecParam(AZ_rthresh, parameters.ilut_rtol);
 
-    solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
+    if(reset_matrix)
+      solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
 
     solver.Iterate(parameters.max_iterations, parameters.linear_residual);
 
@@ -904,16 +910,17 @@ void Problem<equationsType, dim>::run()
 
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
-      system_matrix = 0;
       system_rhs = 0;
-      assemble_system();
+      if (linStep == 0 && initial_step)
+        system_matrix = 0;
+      assemble_system((linStep == 0 && initial_step));
 
       if (parameters.output_matrix)
         output_matrix(system_matrix, "matrix", time_step, linStep);
       if (parameters.output_rhs)
         output_vector(system_rhs, "rhs", time_step, linStep);
 
-      solve(current_unlimited_solution);
+      solve(current_unlimited_solution, (linStep == 0 && initial_step));
 
       if (parameters.output_solution)
         output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
