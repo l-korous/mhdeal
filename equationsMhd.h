@@ -18,19 +18,26 @@ public:
 
   static double compute_kinetic_energy(const InputVector &W);
 
-  double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const;
-
   static double compute_magnetic_energy(const InputVector &W);
 
   // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
   double compute_pressure(const InputVector &W) const;
+
+  static double compute_kinetic_energy(const std_cxx11::array<double, n_components> &W);
+
+  static double compute_magnetic_energy(const std_cxx11::array<double, n_components> &W);
+
+  // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
+  double compute_pressure(const std_cxx11::array<double, n_components> &W) const;
 
   // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
   double compute_total_pressure(const InputVector &W) const;
 
   // Compute pressure, and use the passed values of kinetic energy and magnetic energy.
   double compute_pressure(const InputVector &W, const double& Uk, const double& Um) const;
-  
+
+  double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const;
+
   void Q(std_cxx11::array<double, n_components> &result, const InputVector &W, const Tensor<1, 3> &normal) const;
   void Q_inv(std_cxx11::array<double, n_components> &result, std_cxx11::array<double, n_components> &F, const Tensor<1, dim> &normal) const;
 

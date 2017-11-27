@@ -33,17 +33,6 @@ double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVecto
   return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
 }
 
-template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const
-{
-  double divergence = 0.;
-
-  for (unsigned int d = 0; d < dim; ++d)
-    divergence += W[d + 5][d];
-
-  return divergence;
-}
-
 template <>
 double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W)
 {
@@ -52,6 +41,24 @@ double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector
 
 template <int dim>
 double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
+{
+  return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
+}
+
+template <int dim>
+double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const std_cxx11::array<double, n_components> &W)
+{
+  return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
+}
+
+template <>
+double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const std_cxx11::array<double, n_components> &W)
+{
+  return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
+}
+
+template <int dim>
+double Equations<EquationsTypeMhd, dim>::compute_pressure(const std_cxx11::array<double, n_components> &W) const
 {
   return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
@@ -67,6 +74,17 @@ template <int dim>
 double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const double& Uk, const double& Um) const
 {
   return (this->parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
+}
+
+template <int dim>
+double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const
+{
+  double divergence = 0.;
+
+  for (unsigned int d = 0; d < dim; ++d)
+    divergence += W[d + 5][d];
+
+  return divergence;
 }
 
 template <int dim>
@@ -506,15 +524,11 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
     for (unsigned int d = 0; d < dim; ++d)
       computed_quantities[q](d) = uh[q](1 + d) / density;
 
-    /*
     std_cxx11::array<double, n_components> uh_q;
     for (unsigned int d = 0; d < n_components; ++d)
       uh_q[d] = uh[q][d];
 
     computed_quantities[q](dim) = equations.compute_pressure(uh_q);
-    */
-    computed_quantities[q](dim) = 0.;
-    //
     computed_quantities[q](dim + 1) = equations.compute_magnetic_field_divergence(duh[q]);
   }
 }
