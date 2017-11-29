@@ -939,12 +939,11 @@ void Problem<equationsType, dim>::run()
       }
       else
       {
-        current_limited_solution -= lin_solution;
-        current_limited_solution *= parameters.newton_damping;
-        current_limited_solution += lin_solution;
         newton_update = current_limited_solution;
         newton_update -= lin_solution;
-        lin_solution = current_limited_solution;
+
+        newton_update *= parameters.newton_damping;
+        lin_solution += newton_update;
       }
 
       double res_norm = newton_update.linfty_norm();
