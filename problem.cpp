@@ -508,7 +508,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       if (!initial_step)
       {
         for (int d = 0; d < dim; d++)
-          cell_rhs(i) += 0.5 * fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
+          cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
       }
 
       if(assemble_matrix)
@@ -661,7 +661,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
         }
       }
 
-      cell_rhs(i) -= 0.5 * val;
+      cell_rhs(i) -= val;
     }
   }
 }
@@ -908,6 +908,7 @@ void Problem<equationsType, dim>::run()
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
+    double res_norm_prev;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
       system_rhs = 0;
@@ -925,20 +926,34 @@ void Problem<equationsType, dim>::run()
       if (parameters.output_solution)
         output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
 
-      if (parameters.polynomial_order_dg > 0)
+      if (parameters.polynomial_order_dg > 0 && parameters.limit_in_nonlin_loop)
         postprocess();
       else
         current_limited_solution = current_unlimited_solution;
 
-      newton_update = current_limited_solution;
-      newton_update -= lin_solution;
+      if (this->parameters.newton_damping > (1. - 1.e-8))
+      {
+        newton_update = current_limited_solution;
+        newton_update -= lin_solution;
+        lin_solution = current_limited_solution;
+      }
+      else
+      {
+        current_limited_solution -= lin_solution;
+        current_limited_solution *= parameters.newton_damping;
+        current_limited_solution += lin_solution;
+        newton_update = current_limited_solution;
+        newton_update -= lin_solution;
+        lin_solution = current_limited_solution;
+      }
 
-      lin_solution = current_limited_solution;
       double res_norm = newton_update.linfty_norm();
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
-      if (res_norm < parameters.newton_residual_norm_threshold)
+      if (res_norm < parameters.newton_residual_norm_threshold || (linStep > 0 && res_norm > res_norm_prev))
         break;
+      else
+        res_norm_prev = res_norm;
     }
 
     move_time_step_handle_outputs();
@@ -948,6 +963,12 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
+  if (parameters.polynomial_order_dg > 0 && !parameters.limit_in_nonlin_loop)
+  {
+    postprocess();
+    lin_solution = current_limited_solution;
+  }
+
   this->prev_solution = this->lin_solution;
 
   if (parameters.output_solution)

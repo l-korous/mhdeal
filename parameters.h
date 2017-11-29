@@ -41,6 +41,7 @@ public:
   // Nonlinear solver
   // Damping factor in Newton
   double newton_damping;
+  bool limit_in_nonlin_loop;
   // Maximum allowed nonlinear iterations count, fail if exceeded
   int newton_max_iterations;
   // Tolerance for nonlinear residual norm, succeed the nonlinear loop if norm < newton_residual_norm_threshold

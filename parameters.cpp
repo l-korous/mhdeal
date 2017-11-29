@@ -18,6 +18,8 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->initial_quadrature_order = 10;
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
+  this->limit_in_nonlin_loop = false;
+  this->newton_damping = .8;
 
   this->patches = 2;
   this->output_step = 1.e-3;
@@ -46,7 +48,6 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->gas_gamma = 1.4;
 
-  this->newton_damping = 1.;
   this->newton_max_iterations = 30;
   this->newton_residual_norm_threshold = 1e-8;
 
