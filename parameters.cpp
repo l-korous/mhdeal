@@ -10,17 +10,17 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->initCond = 0;
   this->num_flux_type = hlld;
-  this->cfl_constant = .01;
-  this->corner_a = Point<dim>(-0.4, -0.4, 0.);
-  this->corner_b = Point<dim>(.4 , .4, .01);
-  this->refinements = { 50, 50, 1 };
+  this->cfl_constant = .05;
+  this->corner_a = Point<dim>(-0.5, -0.5, 0.);
+  this->corner_b = Point<dim>(.5 , .5, .01);
+  this->refinements = { 150, 150, 1 };
   this->quadrature_order = 5;
   this->initial_quadrature_order = 10;
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
 
   this->patches = 2;
-  this->output_step = -1.e-3;
+  this->output_step = 1.e-3;
 
   this->debug = false;
   this->debug_limiter = false;

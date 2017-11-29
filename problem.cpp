@@ -508,7 +508,7 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
       if (!initial_step)
       {
         for (int d = 0; d < dim; d++)
-          cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
+          cell_rhs(i) += 0.5 * fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
       }
 
       if(assemble_matrix)
@@ -661,7 +661,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
         }
       }
 
-      cell_rhs(i) -= val;
+      cell_rhs(i) -= 0.5 * val;
     }
   }
 }
