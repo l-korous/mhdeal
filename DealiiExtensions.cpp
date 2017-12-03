@@ -98,20 +98,23 @@ namespace DealIIExtensions
           typename DH::face_iterator this_face = cell->face(face);
           typename DH::face_iterator other_face;
           typename DH::cell_iterator neighbor(cell);
-          typename DH::cell_iterator test_cell;
           unsigned int neighbor_face = 1000;
           if (cell->at_boundary(face))
           {
-            for(int p = 0; p < boundaries.size(); p++)
+            for (int p = 0; p < boundaries.size(); p++)
             {
-              if(boundaries[p][0] == this_face->boundary_id())
+              if (boundaries[p][0] == this_face->boundary_id() || boundaries[p][1] == this_face->boundary_id())
               {
                 const FacePair<DH::dimension>& face_pair = cell_map.find(cell)->second;
                 Assert(cell_map.find(cell) != cell_map.end(), ExcMessage("Something wrong"));
 
+                std::cout << "Neighbor search" << std::endl;
                 neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+                std::cout << "Neighbor found" << std::endl;
                 neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
+                std::cout << "Neighbor face found" << std::endl;
                 other_face = neighbor->face(neighbor_face);
+                std::cout << "Other face found" << std::endl;
                 break;
               }
             }
@@ -142,13 +145,6 @@ namespace DealIIExtensions
               }
             }
           }
-          // in 1d, we do not need to worry whether the neighbor
-          // might have children and then loop over those children.
-          // rather, we may as well go straight to to cell behind
-          // this particular cell's most terminal child
-          if (DH::dimension == 1)
-            while (neighbor->has_children())
-              neighbor = neighbor->child(face == 0 ? 1 : 0);
 
           if (neighbor->has_children())
           {
@@ -232,19 +228,12 @@ namespace DealIIExtensions
             // identify which neighbor face belongs to this face
             if (neighbor_face == 1000)
             {
-              for (neighbor_face = 0;
-                neighbor_face
-                < GeometryInfo<DH::dimension>::faces_per_cell;
-                ++neighbor_face)
+              for (neighbor_face = 0; neighbor_face < GeometryInfo<DH::dimension>::faces_per_cell; ++neighbor_face)
               {
                 other_face = neighbor->face(neighbor_face);
                 if (*other_face == *this_face)
-                {
                   break;
-                }
-                Assert(
-                  neighbor_face + 1 < GeometryInfo<DH::dimension>::faces_per_cell,
-                  ExcMessage("Neighbor face was not found, but needed for constructing the sparsity pattern"));
+                Assert(neighbor_face + 1 < GeometryInfo<DH::dimension>::faces_per_cell, ExcMessage("Neighbor face was not found, but needed for constructing the sparsity pattern"));
               }
             }
 
@@ -254,21 +243,14 @@ namespace DealIIExtensions
               dofs_on_other_face.clear();
               for (size_t i = 0; i < n_dofs_on_neighbor; i++)
               {
-                if (neighbor->get_fe().has_support_on_face(i,
-                  neighbor_face))
-                {
-                  dofs_on_other_face.push_back(
-                    dofs_on_other_cell.at(i));
-                }
+                if (neighbor->get_fe().has_support_on_face(i, neighbor_face))
+                  dofs_on_other_face.push_back(dofs_on_other_cell.at(i));
               }
               Assert(
-                dofs_on_this_face.size() * dofs_on_other_face.size() > 0,
-                ExcMessage("Size of at least one dof vector is 0."));
+                dofs_on_this_face.size() * dofs_on_other_face.size() > 0, ExcMessage("Size of at least one dof vector is 0."));
 
               // Add entries to sparsity pattern
-              constraints.add_entries_local_to_global(
-                dofs_on_this_face, dofs_on_other_face, sparsity,
-                keep_constrained_dofs);
+              constraints.add_entries_local_to_global(dofs_on_this_face, dofs_on_other_face, sparsity, keep_constrained_dofs);
             }
             else {
               // Method 2) if possible: make unique relation between neighboring dofs
@@ -277,14 +259,12 @@ namespace DealIIExtensions
               for (size_t i = 0; i < n_dofs_on_this_cell; i++)
               {
                 int unique = 0;
-                for (size_t q = 0; q < fe_face->n_quadrature_points;
-                  q++)
+                for (size_t q = 0; q < fe_face->n_quadrature_points; q++)
                 {
                   if (fe_face->shape_value(i, q) > 1e-10)
                   {
                     unique += 1;
-                    dofs_on_this_face.push_back(
-                      dofs_on_this_cell.at(i));
+                    dofs_on_this_face.push_back(dofs_on_this_cell.at(i));
                   }
                 }
                 // Test, if the relationship doF <-> quadrature points in unique
@@ -295,14 +275,12 @@ namespace DealIIExtensions
               for (size_t i = 0; i < n_dofs_on_neighbor; i++)
               {
                 int unique = 0;
-                for (size_t q = 0; q < fe_face->n_quadrature_points;
-                  q++)
+                for (size_t q = 0; q < fe_face->n_quadrature_points; q++)
                 {
                   if (fe_face->shape_value(i, q) > 1e-10)
                   {
                     unique += 1;
-                    dofs_on_other_face.push_back(
-                      dofs_on_other_cell.at(i));
+                    dofs_on_other_face.push_back(dofs_on_other_cell.at(i));
                   }
                 }
                 // Test, if the relationship doF <-> quadrature points in unique
@@ -311,17 +289,13 @@ namespace DealIIExtensions
 
               if (2 == DH::dimension)
               {
-                AssertDimension(dofs_on_this_face.size(),
-                  sqrt(n_dofs_on_this_cell));
+                AssertDimension(dofs_on_this_face.size(), sqrt(n_dofs_on_this_cell));
               }
               else if (3 == DH::dimension)
               {
-                AssertDimension(
-                  dofs_on_this_face.size()* sqrt(dofs_on_this_face.size()),
-                  n_dofs_on_this_cell);
+                AssertDimension(dofs_on_this_face.size()* sqrt(dofs_on_this_face.size()), n_dofs_on_this_cell);
               }
-              AssertDimension(dofs_on_other_face.size(),
-                dofs_on_this_face.size());
+              AssertDimension(dofs_on_other_face.size(), dofs_on_this_face.size());
 
               // couple only individual dofs with each other
               std::vector<types::global_dof_index> dof_this(1);
@@ -332,8 +306,7 @@ namespace DealIIExtensions
                 dof_other.at(0) = dofs_on_other_face.at(i);
 
                 // Add entries to sparsity pattern
-                constraints.add_entries_local_to_global(dof_this,
-                  dof_other, sparsity, keep_constrained_dofs);
+                constraints.add_entries_local_to_global(dof_this, dof_other, sparsity, keep_constrained_dofs);
               }
             }
             // only need to add these in case the neighbor cell
@@ -345,37 +318,30 @@ namespace DealIIExtensions
             {
               if (!pairwise_coupling_valid)
               {
-                constraints.add_entries_local_to_global(
-                  dofs_on_other_face, dofs_on_this_face,
-                  sparsity, keep_constrained_dofs);
+                constraints.add_entries_local_to_global(dofs_on_other_face, dofs_on_this_face, sparsity, keep_constrained_dofs);
               }
               else
               {
                 // couple only individual dofs with each other
                 std::vector<types::global_dof_index> dof_this(1);
                 std::vector<types::global_dof_index> dof_other(1);
-                for (size_t i = 0; i < dofs_on_this_face.size();
-                  i++)
+                for (size_t i = 0; i < dofs_on_this_face.size(); i++)
                 {
                   dof_this.at(0) = dofs_on_this_face.at(i);
                   dof_other.at(0) = dofs_on_other_face.at(i);
 
                   // Add entries to sparsity pattern
-                  constraints.add_entries_local_to_global(
-                    dof_this, dof_other, sparsity,
-                    keep_constrained_dofs);
+                  constraints.add_entries_local_to_global(dof_this, dof_other, sparsity, keep_constrained_dofs);
                 }
               }
               if (neighbor->subdomain_id() != cell->subdomain_id())
-                constraints.add_entries_local_to_global(
-                  dofs_on_other_cell, sparsity,
-                  keep_constrained_dofs);
+                constraints.add_entries_local_to_global(dofs_on_other_cell, sparsity, keep_constrained_dofs);
             }
           }
         }
       }
     }
-}
+  }
 
   template<typename DH>
   void make_periodicity_map_dg(const typename DH::cell_iterator &cell_1, const typename identity<typename DH::cell_iterator>::type &cell_2, size_t face_nr_1, size_t face_nr_2,
