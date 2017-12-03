@@ -10,7 +10,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->initCond = 0;
   this->num_flux_type = hlld;
-  this->cfl_constant = .01;
+  this->cfl_constant = .1;
   this->corner_a = Point<dim>(-0.2, -0.2, 0.);
   this->corner_b = Point<dim>(.2, .2, .01);
   this->refinements = { 75, 75, 1 };
@@ -19,7 +19,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
   this->limit_in_nonlin_loop = false;
-  this->newton_damping = 1.;
+  this->newton_damping = .8;
   periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   
   this->patches = 2;
