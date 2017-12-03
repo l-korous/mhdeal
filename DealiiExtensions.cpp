@@ -107,14 +107,9 @@ namespace DealIIExtensions
               {
                 const FacePair<DH::dimension>& face_pair = cell_map.find(cell)->second;
                 Assert(cell_map.find(cell) != cell_map.end(), ExcMessage("Something wrong"));
-
-                std::cout << "Neighbor search" << std::endl;
                 neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
-                std::cout << "Neighbor found" << std::endl;
                 neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
-                std::cout << "Neighbor face found" << std::endl;
                 other_face = neighbor->face(neighbor_face);
-                std::cout << "Other face found" << std::endl;
                 break;
               }
             }
