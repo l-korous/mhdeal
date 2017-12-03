@@ -3,6 +3,7 @@
 #include "parameters.h"
 #include "initialCondition.h"
 #include "boundaryConditions.h"
+#include "DealiiExtensions.h"
 
 // Class that accepts all input from the user, provides interface for output, etc.
 // Should not be changed.
@@ -113,4 +114,6 @@ private:
   int time_step;
   double cfl_time_step;
   AztecOO solver;
+
+  DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
 };

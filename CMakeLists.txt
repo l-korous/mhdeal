@@ -20,6 +20,8 @@ SET(TARGET_SRC
   util.h
   equations.h
   equationsMhd.cpp
+  DealiiExtensions.cpp
+  DealiiExtensions.h
   equationsMhd.h
   parameters.cpp
   parameters.h

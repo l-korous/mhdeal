@@ -93,6 +93,9 @@ public:
 
   // Debugging purposes
   bool debug, debug_limiter, debug_dofs;
+
+  // Periodic boundaries.
+  std::vector<std::array<int, 3> > periodic_boundaries;
 };
 
 #endif

@@ -45,9 +45,15 @@ void Problem<equationsType, dim>::setup_system()
   DoFTools::make_hanging_node_constraints(dof_handler, constraints);
   DynamicSparsityPattern dsp(locally_relevant_dofs);
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
+  if (this->parameters.periodic_boundaries.size() > 0)
+  {
+    for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
+      DealIIExtensions::make_periodicity_map_dg(dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
+    DealIIExtensions::make_sparser_flux_sparsity_pattern(dof_handler, dsp, constraints, parameters.periodic_boundaries, periodic_cell_map);
+  }
   constraints.close();
 
-#ifdef HAVE_MPI
+#ifdef HAVE_MPI 
   SparsityTools::distribute_sparsity_pattern(dsp, dof_handler.n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
 #endif
 
@@ -346,7 +352,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     if (!cell->is_locally_owned())
       continue;
 
-    if(assemble_matrix)
+    if (assemble_matrix)
       cell_matrix = 0;
     cell_rhs = 0;
 
@@ -367,8 +373,35 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
         // Boundary face - here we pass the boundary id
         if (cell->at_boundary(face_no))
         {
-          fe_v_face.reinit(cell, face_no);
-          assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
+          bool is_periodic_boundary = false;
+          for (int pb = 0; pb < this->parameters.periodic_boundaries.size(); pb++)
+          {
+            if (this->parameters.periodic_boundaries[pb][0] == cell->face(face_no)->boundary_id() || this->parameters.periodic_boundaries[pb][1] == cell->face(face_no)->boundary_id())
+            {
+              is_periodic_boundary = true;
+              break;
+            }
+          }
+
+          if (is_periodic_boundary)
+          {
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(cell)->second;
+            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+            neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+            const unsigned int neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
+
+            neighbor->get_dof_indices(dof_indices_neighbor);
+
+            fe_v_face.reinit(cell, face_no);
+            fe_v_face_neighbor.reinit(neighbor, neighbor_face);
+
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, dof_indices, dof_indices_neighbor, false, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
+          }
+          else
+          {
+            fe_v_face.reinit(cell, face_no);
+            assemble_face_term(face_no, fe_v_face, fe_v_face, dof_indices, std::vector<types::global_dof_index>(), true, cell->face(face_no)->boundary_id(), cell->face(face_no)->diameter(), cell_matrix, cell_rhs, assemble_matrix);
+          }
         }
         else
         {
@@ -426,7 +459,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
       }
     }
 
-    if(assemble_matrix)
+    if (assemble_matrix)
       constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
     else
       constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
@@ -511,13 +544,13 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
           cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
       }
 
-      if(assemble_matrix)
-      for (unsigned int j = 0; j < dofs_per_cell; ++j)
-      {
-        const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
-        if (component_ii == component_jj)
-          cell_matrix(i, j) += fe_v.JxW(q) * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
-      }
+      if (assemble_matrix)
+        for (unsigned int j = 0; j < dofs_per_cell; ++j)
+        {
+          const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
+          if (component_ii == component_jj)
+            cell_matrix(i, j) += fe_v.JxW(q) * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
+        }
     }
   }
 }
@@ -702,7 +735,7 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update,
     solver.SetAztecParam(AZ_athresh, parameters.ilut_atol);
     solver.SetAztecParam(AZ_rthresh, parameters.ilut_rtol);
 
-    if(reset_matrix)
+    if (reset_matrix)
       solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
 
     solver.Iterate(parameters.max_iterations, parameters.linear_residual);
@@ -845,7 +878,7 @@ void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& 
   m.open(ssm.str());
   mat.print(m);
   m.close();
-}
+      }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step, int newton_step) const
@@ -906,7 +939,7 @@ void Problem<equationsType, dim>::run()
       if (initial_step)
         std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
-    }
+  }
 
     double res_norm_prev;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
@@ -956,8 +989,8 @@ void Problem<equationsType, dim>::run()
     }
 
     move_time_step_handle_outputs();
-  }
 }
+    }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()

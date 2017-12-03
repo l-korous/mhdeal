@@ -10,19 +10,20 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->initCond = 0;
   this->num_flux_type = hlld;
-  this->cfl_constant = .05;
-  this->corner_a = Point<dim>(-0.5, -0.5, 0.);
-  this->corner_b = Point<dim>(.5 , .5, .01);
-  this->refinements = { 150, 150, 1 };
+  this->cfl_constant = .01;
+  this->corner_a = Point<dim>(-0.2, -0.2, 0.);
+  this->corner_b = Point<dim>(.2, .2, .01);
+  this->refinements = { 75, 75, 1 };
   this->quadrature_order = 5;
   this->initial_quadrature_order = 10;
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
   this->limit_in_nonlin_loop = false;
-  this->newton_damping = .8;
-
+  this->newton_damping = 1.;
+  periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
+  
   this->patches = 2;
-  this->output_step = 1.e-3;
+  this->output_step = -1.e-3;
 
   this->debug = false;
   this->debug_limiter = false;
@@ -33,11 +34,11 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->output_rhs = false;
   this->output_solution = false;
 
-  this->snapshot_step = 1.; 
-  
+  this->snapshot_step = 1.;
+
   this->time_step = 1.e-5;
   this->final_time = 10.;
-  
+
   this->solver = gmres;
   this->linear_residual = 1e-10;
   this->max_iterations = 10000;
@@ -57,7 +58,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->needs_gradients = false;
   this->needs_forcing = false;
-  
+
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b, true);
 }
 
