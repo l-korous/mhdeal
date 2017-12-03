@@ -106,7 +106,11 @@ namespace DealIIExtensions
               if (boundaries[p][0] == this_face->boundary_id() || boundaries[p][1] == this_face->boundary_id())
               {
                 const FacePair<DH::dimension>& face_pair = cell_map.find(cell)->second;
-                Assert(cell_map.find(cell) != cell_map.end(), ExcMessage("Something wrong"));
+                if (cell_map.find(cell) == cell_map.end())
+                {
+                  std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
+                  continue;
+                }
                 neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
                 neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
                 other_face = neighbor->face(neighbor_face);
@@ -563,8 +567,7 @@ namespace DealIIExtensions
     std::vector<GridTools::PeriodicFacePair<typename DH::cell_iterator> > matched_pairs;
 
     // Collect matching periodic cells on the coarsest level:
-    GridTools::collect_periodic_faces(dof_handler, b_id1, b_id2, direction,
-      matched_pairs);
+    GridTools::collect_periodic_faces(dof_handler, b_id1, b_id2, direction, matched_pairs);
 
     // call function to make the periodicity map
     make_periodicity_map_dg<DH>(matched_pairs, cell_map);
