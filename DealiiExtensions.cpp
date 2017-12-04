@@ -51,10 +51,7 @@ namespace DealIIExtensions
 #endif
 
     if (fe_face != NULL)
-    {
-      Assert(fe_face->get_fe().has_support_points(),
-        ExcMessage("Sparser flux sparsity pattern makes only sense for elements with support points"));
-    }
+      Assert(fe_face->get_fe().has_support_points(), ExcMessage("Sparser flux sparsity pattern makes only sense for elements with support points"));
 
     std::vector<types::global_dof_index> dofs_on_this_cell;
     std::vector<types::global_dof_index> dofs_on_other_cell;
@@ -321,20 +318,16 @@ namespace DealIIExtensions
     Assert(face_1->at_boundary() && face_2->at_boundary(),
       ExcMessage("Faces for periodicity constraints must be on the " "boundary"));
 
-    // A lookup table on how to go through the child cells depending on the
-    // orientation:
+    // A lookup table on how to go through the child cells depending on the orientation:
     // see Documentation of GeometryInfo for details
-
     static const int lookup_table_2d[2][2] =
     {
-      //          flip:
           { 0, 1 }, //  false
           { 1, 0 }, //  true
     };
 
     static const int lookup_table_3d[2][2][2][4] =
     {
-      //                    orientation flip  rotation
           { { { 0, 2, 1, 3 }, //  false       false false
               { 2, 3, 0, 1 }, //  false       false true
               }, { { 3, 1, 2, 0 }, //  false       true  false
@@ -563,19 +556,13 @@ namespace DealIIExtensions
     {
       if (cell->is_locally_owned())
       {
-        for (unsigned int face = 0;
-          face < GeometryInfo<DH::dimension>::faces_per_cell;
-          ++face)
+        for (unsigned int face = 0; face < GeometryInfo<DH::dimension>::faces_per_cell; ++face)
         {
           if (cell->at_boundary(face))
           {
-            if (!check_boundary_id
-              || (boundary_ids.find(
-                cell->face(face)->boundary_id())
-                != boundary_ids.end()))
+            if (!check_boundary_id || (boundary_ids.find(cell->face(face)->boundary_id()) != boundary_ids.end()))
             {
-              const FiniteElement<DH::dimension, DH::space_dimension> &fe =
-                cell->get_fe();
+              const FiniteElement<DH::dimension, DH::space_dimension> &fe = cell->get_fe();
 
               const unsigned int dofs_per_cell = fe.dofs_per_cell;
               cell_dof_indices.resize(dofs_per_cell);

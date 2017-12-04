@@ -1,5 +1,6 @@
 #include "parameters.h"
 #include "equationsMhd.h"
+#include "DealiiExtensions.h"
 
 template <int dim>
 #ifdef HAVE_MPI
@@ -60,6 +61,10 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->needs_forcing = false;
 
   GridGenerator::subdivided_hyper_rectangle(triangulation, this->refinements, this->corner_a, this->corner_b, true);
+  std::vector<DealIIExtensions::FacePair<dim> > matched_pairs;
+  for (std::vector<std::array<int, 3> >::const_iterator it = periodic_boundaries.begin(); it != periodic_boundaries.end(); it++)
+    dealii::GridTools::collect_periodic_faces(triangulation, (*it)[0], (*it)[1], (*it)[2], matched_pairs);
+  triangulation.add_periodicity(matched_pairs);
 }
 
 template class Parameters<2>;
