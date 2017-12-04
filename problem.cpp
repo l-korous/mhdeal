@@ -1000,9 +1000,9 @@ void Problem<equationsType, dim>::run()
 
     if (!bad_step)
     {
-      this->parameters.newton_damping *= 1.25;
+      this->parameters.newton_damping = std::max(1., this->parameters.newton_damping * 1.25);
       if (this->parameters.newton_damping < .5)
-        this->parameters.cfl_constant *= 1.5;
+        this->parameters.cfl_constant *= std::max(1., this->parameters.cfl_constant * 1.25);
       move_time_step_handle_outputs();
     }
   }
