@@ -985,11 +985,15 @@ void Problem<equationsType, dim>::run()
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
       if (res_norm < parameters.newton_residual_norm_threshold)
         break;
-      else if (res_norm > res_norm_prev && linStep > 0)
+      else if ((res_norm > res_norm_prev) && (linStep > 0))
       {
         this->parameters.newton_damping *= .5;
+        std::cout << "\t\tWorse damping coefficient: " << this->parameters.newton_damping << std::endl;
         if (this->parameters.newton_damping < .5)
+        {
           this->parameters.cfl_constant *= .5;
+          std::cout << "\t\tWorse CFL coefficient: " << this->parameters.cfl_constant << std::endl;
+        }
         this->lin_solution = this->prev_solution;
         bad_step = true;
         break;
@@ -1001,8 +1005,12 @@ void Problem<equationsType, dim>::run()
     if (!bad_step)
     {
       this->parameters.newton_damping = std::max(1., this->parameters.newton_damping * 1.25);
+      std::cout << "\t\tBetter damping coefficient: " << this->parameters.newton_damping << std::endl;
       if (this->parameters.newton_damping < .5)
+      {
         this->parameters.cfl_constant *= std::max(1., this->parameters.cfl_constant * 1.25);
+        std::cout << "\t\tBetter CFL coefficient: " << this->parameters.cfl_constant << std::endl;
+      }
       move_time_step_handle_outputs();
     }
   }
