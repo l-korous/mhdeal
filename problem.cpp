@@ -985,7 +985,7 @@ void Problem<equationsType, dim>::run()
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
       if (res_norm < parameters.newton_residual_norm_threshold)
         break;
-      else if (res_norm > res_norm_prev)
+      else if (res_norm > res_norm_prev && linStep > 0)
       {
         this->parameters.newton_damping *= .5;
         if (this->parameters.newton_damping < .5)
