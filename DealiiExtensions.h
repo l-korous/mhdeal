@@ -54,8 +54,7 @@ namespace DealIIExtensions {
       const std::vector<std::array<int, 3> >& boundaries,
       const PeriodicCellMap<DH::dimension>& cell_map,
       FEFaceValues<DH::dimension>* fe_face = NULL,
-      const bool keep_constrained_dofs = true,
-      const types::subdomain_id subdomain_id = numbers::invalid_unsigned_int);
+      const bool keep_constrained_dofs = true);
 
   /**
    *  @short 	Gathers cell pairs at a periodic boundary. This function starts at the coarsest level and

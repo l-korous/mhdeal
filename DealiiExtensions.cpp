@@ -42,7 +42,7 @@ namespace DealIIExtensions
 
   template<class DH, class SparsityPattern>
   void make_sparser_flux_sparsity_pattern(const DH &dof, SparsityPattern &sparsity, const ConstraintMatrix &constraints, const std::vector<std::array<int, 3> >& boundaries,
-    const PeriodicCellMap<DH::dimension>& cell_map, FEFaceValues<DH::dimension>* fe_face, const bool keep_constrained_dofs, const types::subdomain_id subdomain_id)
+    const PeriodicCellMap<DH::dimension>& cell_map, FEFaceValues<DH::dimension>* fe_face, const bool keep_constrained_dofs)
   {
 #ifdef DEBUG
     const types::global_dof_index n_dofs = dof.n_dofs();
@@ -55,13 +55,6 @@ namespace DealIIExtensions
       Assert(fe_face->get_fe().has_support_points(),
         ExcMessage("Sparser flux sparsity pattern makes only sense for elements with support points"));
     }
-
-    // If we have a distributed::Mesh only allow locally_owned
-    // subdomain. Not setting a subdomain is also okay, because we skip
-    // ghost cells in the loop below.
-    Assert(
-      (dof.get_tria().locally_owned_subdomain() == numbers::invalid_subdomain_id) || (subdomain_id == numbers::invalid_subdomain_id) || (subdomain_id == dof.get_tria().locally_owned_subdomain()),
-      ExcMessage("For parallel::distributed::Mesh objects and " "associated DoF handler objects, asking for any subdomain other " "than the locally owned one does not make sense."));
 
     std::vector<types::global_dof_index> dofs_on_this_cell;
     std::vector<types::global_dof_index> dofs_on_other_cell;
@@ -82,7 +75,7 @@ namespace DealIIExtensions
     // the calling processor. Otherwise, just continue.
     for (typename DH::active_cell_iterator cell = dof.begin_active(); cell != dof.end(); ++cell)
     {
-      if (((subdomain_id == numbers::invalid_subdomain_id) || (subdomain_id == cell->subdomain_id())) && cell->is_locally_owned())
+      if (cell->is_locally_owned())
       {
         const unsigned int n_dofs_on_this_cell = cell->get_fe().dofs_per_cell;
         dofs_on_this_cell.resize(n_dofs_on_this_cell);
@@ -110,7 +103,7 @@ namespace DealIIExtensions
                 {
                   std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
                   continue;
-                }
+                } 
                 neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
                 neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
                 other_face = neighbor->face(neighbor_face);
@@ -138,89 +131,55 @@ namespace DealIIExtensions
             for (size_t i = 0; i < n_dofs_on_this_cell; i++)
             {
               if (cell->get_fe().has_support_on_face(i, face))
-              {
-                dofs_on_this_face.push_back(
-                  dofs_on_this_cell.at(i));
-              }
+                dofs_on_this_face.push_back(dofs_on_this_cell.at(i));
             }
           }
 
           if (neighbor->has_children())
           {
-            for (unsigned int sub_nr = 0;
-              sub_nr != this_face->number_of_children();
-              ++sub_nr)
+            for (unsigned int sub_nr = 0; sub_nr != this_face->number_of_children(); ++sub_nr)
             {
-              const typename DH::cell_iterator sub_neighbor =
-                cell->neighbor_child_on_subface(face, sub_nr);
+              const typename DH::cell_iterator sub_neighbor = cell->neighbor_child_on_subface(face, sub_nr);
 
-              const unsigned int n_dofs_on_neighbor =
-                sub_neighbor->get_fe().dofs_per_cell;
+              const unsigned int n_dofs_on_neighbor = sub_neighbor->get_fe().dofs_per_cell;
               dofs_on_other_cell.resize(n_dofs_on_neighbor);
               sub_neighbor->get_dof_indices(dofs_on_other_cell);
 
               // identify which sub_neighbor face is child to this face
               unsigned int sub_neighbor_face;
-              for (sub_neighbor_face = 0;
-                sub_neighbor_face
-                < GeometryInfo<DH::dimension>::faces_per_cell;
-                ++sub_neighbor_face)
+              for (sub_neighbor_face = 0; sub_neighbor_face < GeometryInfo<DH::dimension>::faces_per_cell; ++sub_neighbor_face)
               {
                 other_face = sub_neighbor->face(sub_neighbor_face);
-                if (sub_neighbor->neighbor(sub_neighbor_face)
-                  == cell)
-                {
+                if (sub_neighbor->neighbor(sub_neighbor_face) == cell)
                   break;
-                }
-                Assert(
-                  sub_neighbor_face + 1 < GeometryInfo<DH::dimension>::faces_per_cell,
-                  ExcMessage("Neighbor face was not found, but needed for constructing the sparsity pattern"));
+                Assert(sub_neighbor_face + 1 < GeometryInfo<DH::dimension>::faces_per_cell, ExcMessage("Neighbor face was not found, but needed for constructing the sparsity pattern"));
               }
 
               // Couple all dofs on common face
               dofs_on_other_face.clear();
               for (size_t i = 0; i < n_dofs_on_neighbor; i++)
               {
-                if (sub_neighbor->get_fe().has_support_on_face(i,
-                  sub_neighbor_face))
-                {
-                  dofs_on_other_face.push_back(
-                    dofs_on_other_cell.at(i));
-                }
+                if (sub_neighbor->get_fe().has_support_on_face(i, sub_neighbor_face))
+                  dofs_on_other_face.push_back( dofs_on_other_cell.at(i));
               }
-              Assert(
-                dofs_on_this_face.size() * dofs_on_other_face.size() > 0,
-                ExcMessage("Size of at least one dof vector is 0."));
+              Assert(dofs_on_this_face.size() * dofs_on_other_face.size() > 0, ExcMessage("Size of at least one dof vector is 0."));
 
               // Add entries to sparsity pattern
-              constraints.add_entries_local_to_global(
-                dofs_on_this_face, dofs_on_other_face, sparsity,
-                keep_constrained_dofs);
-              constraints.add_entries_local_to_global(
-                dofs_on_other_face, dofs_on_this_face, sparsity,
-                keep_constrained_dofs);
+              constraints.add_entries_local_to_global(dofs_on_this_face, dofs_on_other_face, sparsity, keep_constrained_dofs);
+              constraints.add_entries_local_to_global(dofs_on_other_face, dofs_on_this_face, sparsity, keep_constrained_dofs);
               // only need to add this when the neighbor is not
               // owned by the current processor, otherwise we add
               // the entries for the neighbor there
-              if (sub_neighbor->subdomain_id()
-                != cell->subdomain_id())
-                constraints.add_entries_local_to_global(
-                  dofs_on_other_cell, sparsity,
-                  keep_constrained_dofs);
+              if (sub_neighbor->subdomain_id() != cell->subdomain_id())
+                constraints.add_entries_local_to_global(dofs_on_other_cell, sparsity, keep_constrained_dofs);
             }
           }
           else {
             // Refinement edges are taken care of by coarser
             // cells
-            if (!cell->at_boundary(face))
-            {
-              if (cell->neighbor_is_coarser(face)
-                && neighbor->subdomain_id()
-                == cell->subdomain_id())
+            if (!cell->at_boundary(face) && (cell->neighbor_is_coarser(face) && neighbor->subdomain_id() == cell->subdomain_id()))
                 continue;
-            }
-            const unsigned int n_dofs_on_neighbor =
-              neighbor->get_fe().dofs_per_cell;
+            const unsigned int n_dofs_on_neighbor = neighbor->get_fe().dofs_per_cell;
             dofs_on_other_cell.resize(n_dofs_on_neighbor);
             neighbor->get_dof_indices(dofs_on_other_cell);
 
@@ -245,8 +204,7 @@ namespace DealIIExtensions
                 if (neighbor->get_fe().has_support_on_face(i, neighbor_face))
                   dofs_on_other_face.push_back(dofs_on_other_cell.at(i));
               }
-              Assert(
-                dofs_on_this_face.size() * dofs_on_other_face.size() > 0, ExcMessage("Size of at least one dof vector is 0."));
+              Assert(dofs_on_this_face.size() * dofs_on_other_face.size() > 0, ExcMessage("Size of at least one dof vector is 0."));
 
               // Add entries to sparsity pattern
               constraints.add_entries_local_to_global(dofs_on_this_face, dofs_on_other_face, sparsity, keep_constrained_dofs);
@@ -312,13 +270,10 @@ namespace DealIIExtensions
             // is not locally owned - otherwise, we touch each
             // face twice and hence put the indices the other way
             // around
-            if (!(neighbor->active())
-              || (neighbor->subdomain_id() != cell->subdomain_id()))
+            if (!(neighbor->active()) || (neighbor->subdomain_id() != cell->subdomain_id()))
             {
               if (!pairwise_coupling_valid)
-              {
                 constraints.add_entries_local_to_global(dofs_on_other_face, dofs_on_this_face, sparsity, keep_constrained_dofs);
-              }
               else
               {
                 // couple only individual dofs with each other
@@ -604,8 +559,7 @@ namespace DealIIExtensions
     // do not support boundaries of dimension dim-2, and so every isolated
     // boundary line is also part of a boundary face which we will be
     // visiting sooner || later
-    for (typename DH::active_cell_iterator cell = dof_handler.begin_active();
-      cell != dof_handler.end(); ++cell)
+    for (typename DH::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
     {
       if (cell->is_locally_owned())
       {
@@ -672,21 +626,21 @@ namespace DealIIExtensions
       SP &sparsity, const ConstraintMatrix &constraints,
       const std::vector<std::array<int, 3> >& boundaries,
       const PeriodicCellMap<2>& cell_map, FEFaceValues<2>* fe_face,
-      const bool, const unsigned int);
+      const bool);
 
   template void
     make_sparser_flux_sparsity_pattern<DoFHandler<3>, SP>(const DoFHandler<3> &dof,
       SP &sparsity, const ConstraintMatrix &constraints,
       const std::vector<std::array<int, 3> >& boundaries,
       const PeriodicCellMap<3>& cell_map, FEFaceValues<3>* fe_face,
-      const bool, const unsigned int);
+      const bool);
 
   template void
     make_sparser_flux_sparsity_pattern<DoFHandler<3>, dealii::DynamicSparsityPattern>(const DoFHandler<3> &dof,
       dealii::DynamicSparsityPattern &sparsity, const ConstraintMatrix &constraints,
       const std::vector<std::array<int, 3> >& boundaries,
       const PeriodicCellMap<3>& cell_map, FEFaceValues<3>* fe_face,
-      const bool, const unsigned int);
+      const bool);
 
   template
     void make_periodicity_map_dg<DoFHandler<2> >(
