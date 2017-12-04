@@ -1004,11 +1004,11 @@ void Problem<equationsType, dim>::run()
 
     if (!bad_step)
     {
-      this->parameters.newton_damping = std::max(1., this->parameters.newton_damping * 1.25);
+      this->parameters.newton_damping = std::min(1., this->parameters.newton_damping * 1.25);
       std::cout << "\t\tBetter damping coefficient: " << this->parameters.newton_damping << std::endl;
       if (this->parameters.newton_damping < .5)
       {
-        this->parameters.cfl_constant *= std::max(1., this->parameters.cfl_constant * 1.25);
+        this->parameters.cfl_constant *= std::min(1., this->parameters.cfl_constant * 1.25);
         std::cout << "\t\tBetter CFL coefficient: " << this->parameters.cfl_constant << std::endl;
       }
       move_time_step_handle_outputs();
