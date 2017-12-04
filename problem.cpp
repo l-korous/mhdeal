@@ -939,9 +939,10 @@ void Problem<equationsType, dim>::run()
       if (initial_step)
         std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
-  }
+    }
 
     double res_norm_prev;
+    bool bad_step = false;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
       system_rhs = 0;
@@ -964,7 +965,7 @@ void Problem<equationsType, dim>::run()
       else
         current_limited_solution = current_unlimited_solution;
 
-      if (this->parameters.newton_damping > (1. - 1.e-8))
+      if (initial_step || this->parameters.newton_damping > (1. - 1.e-8))
       {
         newton_update = current_limited_solution;
         newton_update -= lin_solution;
@@ -982,15 +983,30 @@ void Problem<equationsType, dim>::run()
       double res_norm = newton_update.linfty_norm();
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
-      if (res_norm < parameters.newton_residual_norm_threshold || (linStep > 0 && res_norm > res_norm_prev))
+      if (res_norm < parameters.newton_residual_norm_threshold)
         break;
+      else if (res_norm > res_norm_prev)
+      {
+        this->parameters.newton_damping *= .5;
+        if (this->parameters.newton_damping < .5)
+          this->parameters.cfl_constant *= .5;
+        this->lin_solution = this->prev_solution;
+        bad_step = true;
+        break;
+      }
       else
         res_norm_prev = res_norm;
     }
 
-    move_time_step_handle_outputs();
-}
+    if (!bad_step)
+    {
+      this->parameters.newton_damping *= 1.25;
+      if (this->parameters.newton_damping < .5)
+        this->parameters.cfl_constant *= 1.5;
+      move_time_step_handle_outputs();
     }
+  }
+}
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()

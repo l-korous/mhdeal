@@ -11,16 +11,16 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->initCond = 0;
   this->num_flux_type = hlld;
-  this->cfl_constant = .1;
-  this->corner_a = Point<dim>(-0.2, -0.2, 0.);
-  this->corner_b = Point<dim>(.2, .2, .01);
-  this->refinements = { 75, 75, 1 };
+  this->cfl_constant = .05;
+  this->corner_a = Point<dim>(-0.5, -0.75, 0.);
+  this->corner_b = Point<dim>(.5, .75, .01);
+  this->refinements = { 100, 100, 1 };
   this->quadrature_order = 5;
   this->initial_quadrature_order = 10;
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
   this->limit_in_nonlin_loop = false;
-  this->newton_damping = .8;
+  this->newton_damping = .9;
   periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   
   this->patches = 2;
@@ -50,7 +50,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 
   this->gas_gamma = 1.4;
 
-  this->newton_max_iterations = 30;
+  this->newton_max_iterations = 100;
   this->newton_residual_norm_threshold = 1e-8;
 
   this->lax_friedrich_stabilization_value = 0.;
