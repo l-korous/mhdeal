@@ -20,9 +20,13 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->polynomial_order_dg = 1;
   this->polynomial_order_hdiv = 0;
   this->limit_in_nonlin_loop = false;
-  this->newton_damping = .9;
   periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   
+  this->initial_and_max_newton_damping = .9;
+  this->decrease_factor = .8;
+  this->increase_factor = 1.1;
+
+
   this->patches = 2;
   this->output_step = -1.e-3;
 

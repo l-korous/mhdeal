@@ -930,6 +930,7 @@ void Problem<equationsType, dim>::run()
   TrilinosWrappers::MPI::Vector newton_update(locally_relevant_dofs, mpi_communicator);
 
   // Time loop.
+  double newton_damping = this->parameters.initial_and_max_newton_damping;
   while (time < parameters.final_time)
   {
     // Some output.
@@ -965,7 +966,7 @@ void Problem<equationsType, dim>::run()
       else
         current_limited_solution = current_unlimited_solution;
 
-      if (initial_step || this->parameters.newton_damping > (1. - 1.e-8))
+      if (initial_step || newton_damping > (1. - 1.e-8))
       {
         newton_update = current_limited_solution;
         newton_update -= lin_solution;
@@ -976,7 +977,7 @@ void Problem<equationsType, dim>::run()
         newton_update = current_limited_solution;
         newton_update -= lin_solution;
 
-        newton_update *= parameters.newton_damping;
+        newton_update *= newton_damping;
         lin_solution += newton_update;
       }
 
@@ -987,15 +988,9 @@ void Problem<equationsType, dim>::run()
         break;
       else if ((res_norm > res_norm_prev) && (linStep > 0))
       {
-        this->parameters.newton_damping *= .5;
+        newton_damping *= this->parameters.decrease_factor;
         if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-          std::cout << "\t\tWorse damping coefficient: " << this->parameters.newton_damping << std::endl;
-        if (this->parameters.newton_damping < .5)
-        {
-          this->parameters.cfl_constant *= .5;
-          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-            std::cout << "\t\tWorse CFL coefficient: " << this->parameters.cfl_constant << std::endl;
-        }
+          std::cout << "\t\tWorse damping coefficient: " << newton_damping << std::endl;
         this->lin_solution = this->prev_solution;
         bad_step = true;
         break;
@@ -1006,15 +1001,9 @@ void Problem<equationsType, dim>::run()
 
     if (!bad_step)
     {
-      this->parameters.newton_damping = std::min(1., this->parameters.newton_damping * 1.25);
+      newton_damping = std::min(this->parameters.initial_and_max_newton_damping, newton_damping * parameters.increase_factor);
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-        std::cout << "\t\tBetter damping coefficient: " << this->parameters.newton_damping << std::endl;
-      if (this->parameters.newton_damping < .5)
-      {
-        this->parameters.cfl_constant *= std::min(1., this->parameters.cfl_constant * 1.25);
-        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-          std::cout << "\t\tBetter CFL coefficient: " << this->parameters.cfl_constant << std::endl;
-      }
+        std::cout << "\t\tBetter damping coefficient: " << newton_damping << std::endl;
       move_time_step_handle_outputs();
     }
   }

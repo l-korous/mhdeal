@@ -40,7 +40,9 @@ public:
 
   // Nonlinear solver
   // Damping factor in Newton
-  double newton_damping;
+  double initial_and_max_newton_damping;
+  double decrease_factor;
+  double increase_factor;
   bool limit_in_nonlin_loop;
   // Maximum allowed nonlinear iterations count, fail if exceeded
   int newton_max_iterations;
