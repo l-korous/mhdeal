@@ -995,7 +995,7 @@ void Problem<equationsType, dim>::run()
         bad_step = false;
         break;
       }
-      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm_prev[1] - res_norm) / res_norm) < .1)))
+      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm_prev[1] - res_norm) / res_norm) < -.1)))
       {
         newton_damping *= this->parameters.decrease_factor;
         parameters.cfl_constant *= this->parameters.decrease_factor;
