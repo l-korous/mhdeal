@@ -945,7 +945,7 @@ void Problem<equationsType, dim>::run()
 
     double res_norm_prev[2] = { 0., 0. };
     double res_norm_initial;
-    bool bad_step = false, res_norm_not_decreased_in_three_steps = false;
+    bool bad_step = false;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
       system_rhs = 0;
@@ -1000,10 +1000,13 @@ void Problem<equationsType, dim>::run()
         bad_step = false;
         break;
       }
-      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((res_norm > res_norm_prev[0]) && (linStep > 0) && (res_norm / res_norm_initial) > 1.e-5))
+      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((res_norm > res_norm_prev[0] * 1.1) && (linStep > 0) && (res_norm / res_norm_initial) > 1.e-5))
       {
         newton_damping *= this->parameters.decrease_factor;
         parameters.cfl_constant *= this->parameters.decrease_factor;
+        time -= parameters.time_step;
+        parameters.time_step *= this->parameters.decrease_factor;
+        time += parameters.time_step;
         if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
         {
           std::cout << "\t\tWorse damping coefficient: " << newton_damping << std::endl;
