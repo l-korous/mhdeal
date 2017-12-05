@@ -995,7 +995,7 @@ void Problem<equationsType, dim>::run()
         bad_step = false;
         break;
       }
-      else if ((linStep > 1) && ((res_norm / res_norm_initial) < 1.e-5) && (((res_norm - res_norm_prev[1]) / res_norm) < 1.e-2))
+      else if ((linStep > 1) && ((res_norm / res_norm_initial) < 1.e-5) && (((res_norm_prev[1] - res_norm) / res_norm) < 1.e-6))
       {
         bad_step = false;
         break;
