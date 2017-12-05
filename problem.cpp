@@ -1020,7 +1020,7 @@ void Problem<equationsType, dim>::run()
       }
     }
 
-    if (!previous_bad_step && !initial_step)
+    if (!bad_step && !previous_bad_step && !initial_step)
     {
       newton_damping = std::min(this->parameters.initial_and_max_newton_damping, newton_damping * parameters.increase_factor);
       parameters.cfl_constant = std::min(this->parameters.initial_and_max_cfl_constant, parameters.cfl_constant * parameters.increase_factor);
@@ -1029,10 +1029,10 @@ void Problem<equationsType, dim>::run()
         std::cout << "\t\tBetter damping coefficient: " << newton_damping << std::endl;
         std::cout << "\t\tBetter CFL coefficient: " << parameters.cfl_constant << std::endl;
       }
+      move_time_step_handle_outputs();
     }
 
     previous_bad_step = bad_step;
-    move_time_step_handle_outputs();
   }
 }
 
