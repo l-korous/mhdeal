@@ -11,7 +11,7 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
 {
   this->initCond = 0;
   this->num_flux_type = hlld;
-  this->cfl_constant = .05;
+  this->initial_and_max_cfl_constant = this->cfl_constant = .05;
   this->corner_a = Point<dim>(-0.5, -0.75, 0.);
   this->corner_b = Point<dim>(.5, .75, .01);
   this->refinements = { 100, 100, 1 };
@@ -25,7 +25,6 @@ Parameters<dim>::Parameters(Triangulation<dim> &triangulation)
   this->initial_and_max_newton_damping = .9;
   this->decrease_factor = .8;
   this->increase_factor = 1.1;
-
 
   this->patches = 2;
   this->output_step = -1.e-3;

@@ -69,7 +69,7 @@ public:
   double ilut_drop;
 
   // Global - obvious
-  double time_step, final_time, cfl_constant;
+  double time_step, final_time, cfl_constant, initial_and_max_cfl_constant;
   // Flag whether this is a stationary problem.
   bool is_stationary;
   // Polynomial order for the flow part.
