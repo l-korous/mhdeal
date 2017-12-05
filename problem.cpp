@@ -943,8 +943,9 @@ void Problem<equationsType, dim>::run()
       std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
-    double res_norm_prev, res_norm_initial;
-    bool bad_step = false;
+    double res_norm_prev[2] = { 0., 0. };
+    double res_norm_initial;
+    bool bad_step = false, res_norm_not_decreased_in_three_steps = false;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
       system_rhs = 0;
@@ -994,7 +995,12 @@ void Problem<equationsType, dim>::run()
         bad_step = false;
         break;
       }
-      else if ((res_norm > res_norm_prev) && (linStep > 0) && (res_norm / res_norm_initial) > 1e-4)
+      else if ((linStep > 1) && ((res_norm / res_norm_initial) < 1.e-5) && (((res_norm - res_norm_prev[1]) / res_norm) < 1.e-2))
+      {
+        bad_step = false;
+        break;
+      }
+      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((res_norm > res_norm_prev[0]) && (linStep > 0) && (res_norm / res_norm_initial) > 1.e-5))
       {
         newton_damping *= this->parameters.decrease_factor;
         parameters.cfl_constant *= this->parameters.decrease_factor;
@@ -1008,22 +1014,25 @@ void Problem<equationsType, dim>::run()
         break;
       }
       else
-        res_norm_prev = res_norm;
+      {
+        res_norm_prev[1] = res_norm_prev[0];
+        res_norm_prev[0] = res_norm;
+      }
     }
 
-    if (!previous_bad_step)
+    if (!previous_bad_step && !initial_step)
     {
       newton_damping = std::min(this->parameters.initial_and_max_newton_damping, newton_damping * parameters.increase_factor);
       parameters.cfl_constant = std::min(this->parameters.initial_and_max_cfl_constant, parameters.cfl_constant * parameters.increase_factor);
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
       {
         std::cout << "\t\tBetter damping coefficient: " << newton_damping << std::endl;
-        std::cout << "\t\tWorse CFL coefficient: " << parameters.cfl_constant << std::endl;
+        std::cout << "\t\tBetter CFL coefficient: " << parameters.cfl_constant << std::endl;
       }
-      move_time_step_handle_outputs();
     }
 
     previous_bad_step = bad_step;
+    move_time_step_handle_outputs();
   }
 }
 
