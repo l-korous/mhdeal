@@ -28,50 +28,50 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
 }
 
 template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W)
+inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W)
 {
   return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
 }
 
-template <>
-double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const InputVector &W)
+template <int dim>
+inline double Equations<EquationsTypeMhd, dim>::compute_magnetic_energy(const InputVector &W)
 {
   return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
 }
 
 template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W) const
 {
   return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const std_cxx11::array<double, n_components> &W)
+inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const std::array<double, n_components> &W)
 {
   return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
 }
 
 template <>
-double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const std_cxx11::array<double, n_components> &W)
+inline double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const std::array<double, n_components> &W)
 {
   return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
 }
 
 template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_pressure(const std_cxx11::array<double, n_components> &W) const
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const std::array<double, n_components> &W) const
 {
   return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const InputVector &W) const
+inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const InputVector &W) const
 {
   const double magnetic_energy = compute_magnetic_energy(W);
   return compute_pressure(W, compute_kinetic_energy(W), magnetic_energy) + magnetic_energy;
 }
 
 template <int dim>
-double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const double& Uk, const double& Um) const
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const double& Uk, const double& Um) const
 {
   return (this->parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
 }
@@ -258,17 +258,17 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   double Udl[n_components], Udr[n_components], Ul[n_components], Ur[n_components], cl, cm, cr, ptl, ptr;
   double sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
 
-  std_cxx11::array<double, n_components> ul, ur;
+  std::array<double, n_components> ul, ur;
   Q(ul, Wplus_, normal);
   Q(ur, Wminus_, normal);
 
-  B = 0.5*(ul[5] + ur[5]);  // Simple average of mag. field in direction of normal vector
+  B = 0.5*(ul[5] + ur[5]);
   B2 = B*B;
 
   // Calculate left flux
   hl[0] = 1.0 / ul[0];
   Uk = 0.5*hl[0] * (ul[1] * ul[1] + ul[2] * ul[2] + ul[3] * ul[3]);
-  Um = 0.5*(ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);       // ifdef _Pb_ then use B2 instead of ul[5]^2
+  Um = 0.5*(ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);
   hl[1] = (parameters.gas_gamma - 1)*(ul[4] - Uk - Um);
   E2 = hl[0] * (ul[1] * ul[7] - ul[3] * ul[5]);
   E3 = hl[0] * (ul[2] * ul[5] - ul[1] * ul[6]);
@@ -285,7 +285,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // Calculate right flux
   hr[0] = 1.0 / ur[0];
   Uk = 0.5*hr[0] * (ur[1] * ur[1] + ur[2] * ur[2] + ur[3] * ur[3]);
-  Um = 0.5*(ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);       // ifdef _Pb_ then use B2 instead of ur[5]^2
+  Um = 0.5*(ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);
   hr[1] = (parameters.gas_gamma - 1)*(ur[4] - Uk - Um);
   E2 = hr[0] * (ur[1] * ur[7] - ur[3] * ur[5]);
   E3 = hr[0] * (ur[2] * ur[5] - ur[1] * ur[6]);
@@ -311,7 +311,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   ptr = hr[1] + pmr;
 
   // maximum of fast magnetoacoustic speeds L/R
-  cm = (cl>cr) ? cl : cr;
+  cm = (cl > cr) ? cl : cr;
   if (ul[1] * hl[0] <= ur[1] * hr[0]) {
     sp[0] = ul[1] * hl[0] - cm;
     sp[4] = ur[1] * hr[0] + cm;
@@ -324,7 +324,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   this->store_max_signal_speed(std::max(std::abs(sp[0]), std::abs(sp[4])));
 
   // Upwind flux in the case of supersonic flow
-  if (sp[0] >= 0.0) {  // use F_L
+  if (sp[0] >= 0.0) {
     for (int j = 0; j < 8; j++)
       normal_flux[j] = Fl[j];
     Q_inv(normal_flux, normal_flux, normal);
@@ -349,7 +349,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
 
   Ul[5] = Udl[5] = ul[5];
   Ur[5] = Udr[5] = ur[5];
-  Ul[5] = Ur[5] = Udl[5] = Udr[5] = B; // Magnetic field Bx (normal direction)
+  Ul[5] = Ur[5] = Udl[5] = Udr[5] = B;
   srdl = sqrt(Ul[0]);
   srdr = sqrt(Ur[0]);
 
@@ -363,7 +363,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   Ul[1] = Ul[0] * sp[2];
 
   cl = ul[0] * Sl*sml - Ul[5] * Ul[5];
-  if (fabs(cl)<NEGLIGIBLE*ptst) {
+  if (fabs(cl) < NEGLIGIBLE*ptst) {
     Ul[2] = Ul[0] * ul[2] * hl[0];
     Ul[3] = Ul[0] * ul[3] * hl[0];
 
@@ -387,7 +387,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   // F*_R
   Ur[1] = Ur[0] * sp[2];
   cl = ur[0] * Sr*smr - Ur[5] * Ur[5];
-  if (fabs(cl)<NEGLIGIBLE*ptstr) {
+  if (fabs(cl) < NEGLIGIBLE*ptstr) {
     Ur[2] = Ur[0] * ur[2] * hr[0];
     Ur[3] = Ur[0] * ur[3] * hr[0];
 
@@ -414,7 +414,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
     Q_inv(normal_flux, normal_flux, normal);
     return;
   }
-  if (sp[3] <= 0.0 && sp[2]<0.0) {
+  if (sp[3] <= 0.0 && sp[2] < 0.0) {
     for (int j = 0; j < 8; j++)
       normal_flux[j] = Fr[j] + sp[4] * (Ur[j] - ur[j]);
     Q_inv(normal_flux, normal_flux, normal);
@@ -422,7 +422,7 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
 
   // F**_L and F**_R
-  if (B2<NEGLIGIBLE*(ptst + ptstr)) {
+  if (B2 < NEGLIGIBLE*(ptst + ptstr)) {
     for (int j = 0; j < 8; j++) {
       Udl[j] = Ul[j];
       Udr[j] = Ur[j];
@@ -430,8 +430,8 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
   else {
     invsumd = 1.0 / (srdl + srdr);
-    Bsgnl = (Ul[5]>0.0) ? 1.0 : -1.0;
-    Bsgnr = (Ur[5]>0.0) ? 1.0 : -1.0;
+    Bsgnl = (Ul[5] > 0.0) ? 1.0 : -1.0;
+    Bsgnr = (Ur[5] > 0.0) ? 1.0 : -1.0;
 
     Udl[0] = Ul[0];
     Udr[0] = Ur[0];
@@ -524,7 +524,7 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
     for (unsigned int d = 0; d < dim; ++d)
       computed_quantities[q](d) = uh[q](1 + d) / density;
 
-    std_cxx11::array<double, n_components> uh_q;
+    std::array<double, n_components> uh_q;
     for (unsigned int d = 0; d < n_components; ++d)
       uh_q[d] = uh[q][d];
 

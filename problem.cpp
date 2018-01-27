@@ -15,21 +15,19 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
   mapping(),
-#ifdef USE_HDIV_FOR_B
-  fe(FE_DGT<dim>(parameters.polynomial_order_dg), 5,
-    FE_RaviartThomas<dim>(1), 1),
-#else
-  fe(FE_DGT<dim>(parameters.polynomial_order_dg), Equations<equationsType, dim>::n_components),
-#endif
-  dof_handler(triangulation),
+  fe(parameters.use_div_free_space_for_B ? FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 5, FE_DG_DivFree<dim>(), 1) : FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 8)), dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
   initial_quadrature(parameters.initial_quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
   last_output_time(0.), last_snapshot_time(0.), time(0.),
-  time_step(0)
+  time_step(0),
+  mag(dim + 2)
 {
+  update_flags = update_values | update_JxW_values | update_gradients;
+  face_update_flags = update_values | update_JxW_values | update_normal_vectors | update_q_points;
+  neighbor_face_update_flags = update_values | update_q_points;
 }
 
 template <EquationsType equationsType, int dim>
@@ -59,17 +57,13 @@ void Problem<equationsType, dim>::setup_system()
 
   system_rhs.reinit(locally_owned_dofs, mpi_communicator);
   system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
+
+  precalculate_global();
 }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::postprocess()
 {
-#ifdef USE_HDIV_FOR_B
-#define COMPONENTS_TO_LIMIT 5
-#else
-#define COMPONENTS_TO_LIMIT Equations<equationsType, dim>::n_components
-#endif
-
   // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
   const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
@@ -79,10 +73,6 @@ void Problem<equationsType, dim>::postprocess()
 
   // What values we need for the assembly.
   const UpdateFlags update_flags = update_values;
-
-  // DOF indices both on the currently assembled element and the neighbor.
-  FEValues<dim> fe_v(mapping, fe, quadrature, update_flags);
-  FEValues<dim> fe_v_neighbor(mapping, fe, quadrature, update_flags);
 
   // This is what we return.
   current_limited_solution = current_unlimited_solution;
@@ -95,42 +85,37 @@ void Problem<equationsType, dim>::postprocess()
     if (!cell->is_locally_owned())
       continue;
 
-    bool u_c_set[COMPONENTS_TO_LIMIT];
-    for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+    bool u_c_set[Equations<equationsType, dim>::n_components];
+    for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
       u_c_set[i] = false;
 
-    double u_c[COMPONENTS_TO_LIMIT];
-    std::vector<unsigned int> lambda_indices_to_multiply[COMPONENTS_TO_LIMIT];
+    double u_c[Equations<equationsType, dim>::n_components];
+    std::vector<unsigned int> lambda_indices_to_multiply[Equations<equationsType, dim>::n_components];
+    std::vector<unsigned int> lambda_indices_to_multiply_all_B_components;
 
-    fe_v.reinit(cell);
     cell->get_dof_indices(dof_indices);
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
-#ifdef USE_HDIV_FOR_B
-      const unsigned int component_i = fe_v.get_fe().system_to_base_index(i).first.first;
-      if (component_i != 1)
-#endif
+      if (!is_primitive[i])
+        lambda_indices_to_multiply_all_B_components.push_back(dof_indices[i]);
+      else
       {
-        unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-
-        if (!u_c_set[component_ii])
+        if (!u_c_set[component_ii[i]])
         {
-          u_c[component_ii] = current_unlimited_solution(dof_indices[i]);
-          u_c_set[component_ii] = true;
+          u_c[component_ii[i]] = current_unlimited_solution(dof_indices[i]);
+          u_c_set[component_ii[i]] = true;
         }
         else
-        {
-          lambda_indices_to_multiply[component_ii].push_back(dof_indices[i]);
-        }
+          lambda_indices_to_multiply[component_ii[i]].push_back(dof_indices[i]);
       }
     }
 
-    if (parameters.debug_limiter)
+    if (parameters.debug)
       std::cout << "cell: " << ++cell_count << " - center: " << cell->center() << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
 
-    double alpha_e[COMPONENTS_TO_LIMIT];
-    for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+    double alpha_e[Equations<equationsType, dim>::n_components];
+    for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
       alpha_e[i] = 1.;
 
     // For all vertices -> v_i
@@ -166,18 +151,18 @@ void Problem<equationsType, dim>::postprocess()
       Vector<double> u_i(Equations<equationsType, dim>::n_components);
       VectorTools::point_value(dof_handler, current_unlimited_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
 
-      if (this->parameters.debug_limiter)
+      if (parameters.debug)
       {
         std::cout << "\tv_i: " << cell->vertex(i) << ", values: ";
-        for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
-          std::cout << u_i[i] << (i == COMPONENTS_TO_LIMIT - 1 ? "" : ", ");
+        for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+          std::cout << u_i[i] << (i == Equations<equationsType, dim>::n_components - 1 ? "" : ", ");
         std::cout << std::endl;
       }
 
       // Init u_i_min, u_i_max
-      double u_i_min[COMPONENTS_TO_LIMIT];
-      double u_i_max[COMPONENTS_TO_LIMIT];
-      for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
+      double u_i_min[Equations<equationsType, dim>::n_components];
+      double u_i_max[Equations<equationsType, dim>::n_components];
+      for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
       {
         u_i_min[k] = u_c[k];
         u_i_max[k] = u_c[k];
@@ -206,35 +191,29 @@ void Problem<equationsType, dim>::postprocess()
         {
           // Update u_i_min, u_i_max
           const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-          fe_v_neighbor.reinit(neighbor);
           neighbor->get_dof_indices(dof_indices_neighbor);
 
-          bool u_i_extrema_set[COMPONENTS_TO_LIMIT];
-          for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+          bool u_i_extrema_set[Equations<equationsType, dim>::n_components];
+          for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
             u_i_extrema_set[i] = false;
 
-          for (unsigned int dof = 0; dof < dofs_per_cell; ++dof)
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
           {
-#ifdef USE_HDIV_FOR_B
-            const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
-            if (component_i != 1)
-#endif
+            if (is_primitive[i])
             {
-              unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-
-              if (!u_i_extrema_set[component_ii])
+              if (!u_i_extrema_set[component_ii[i]])
               {
-                double val = current_unlimited_solution(dof_indices_neighbor[dof]);
-                if (this->parameters.debug_limiter)
+                double val = current_unlimited_solution(dof_indices_neighbor[i]);
+                if (parameters.debug)
                 {
-                  if (val < u_i_min[component_ii])
+                  if (val < u_i_min[component_ii[i]])
                     std::cout << "\tdecreasing u_i_min to: " << val << std::endl;
-                  if (val > u_i_max[component_ii])
+                  if (val > u_i_max[component_ii[i]])
                     std::cout << "\tincreasing u_i_max to: " << val << std::endl;
                 }
-                u_i_min[component_ii] = std::min(u_i_min[component_ii], val);
-                u_i_max[component_ii] = std::max(u_i_max[component_ii], val);
-                u_i_extrema_set[component_ii] = true;
+                u_i_min[component_ii[i]] = std::min(u_i_min[component_ii[i]], val);
+                u_i_max[component_ii[i]] = std::max(u_i_max[component_ii[i]], val);
+                u_i_extrema_set[component_ii[i]] = true;
               }
             }
           }
@@ -263,26 +242,20 @@ void Problem<equationsType, dim>::postprocess()
             {
               // Update u_i_min, u_i_max
               const typename DoFHandler<dim>::cell_iterator neighbor_neighbor = neighbor->neighbor(neighbor_face_no);
-              fe_v_neighbor.reinit(neighbor_neighbor);
               neighbor_neighbor->get_dof_indices(dof_indices_neighbor);
 
-              bool u_i_extrema_set_neighbor[COMPONENTS_TO_LIMIT];
-              for (int i = 0; i < COMPONENTS_TO_LIMIT; i++)
+              bool u_i_extrema_set_neighbor[Equations<equationsType, dim>::n_components];
+              for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
                 u_i_extrema_set_neighbor[i] = false;
-              for (unsigned int dof = 0; dof < dofs_per_cell; ++dof)
+              for (unsigned int i = 0; i < dofs_per_cell; ++i)
               {
-#ifdef USE_HDIV_FOR_B
-                const unsigned int component_i = fe_v_neighbor.get_fe().system_to_base_index(dof).first.first;
-                if (component_i != 1)
-#endif
+                if (is_primitive[i])
                 {
-                  unsigned int component_ii = fe_v_neighbor.get_fe().system_to_component_index(dof).first;
-
-                  if (!u_i_extrema_set_neighbor[component_ii])
+                  if (!u_i_extrema_set_neighbor[component_ii[i]])
                   {
-                    u_i_min[component_ii] = std::min(u_i_min[component_ii], (double)current_unlimited_solution(dof_indices_neighbor[dof]));
-                    u_i_max[component_ii] = std::max(u_i_max[component_ii], (double)current_unlimited_solution(dof_indices_neighbor[dof]));
-                    u_i_extrema_set_neighbor[component_ii] = true;
+                    u_i_min[component_ii[i]] = std::min(u_i_min[component_ii[i]], (double)current_unlimited_solution(dof_indices_neighbor[i]));
+                    u_i_max[component_ii[i]] = std::max(u_i_max[component_ii[i]], (double)current_unlimited_solution(dof_indices_neighbor[i]));
+                    u_i_extrema_set_neighbor[component_ii[i]] = true;
                   }
                 }
               }
@@ -294,19 +267,23 @@ void Problem<equationsType, dim>::postprocess()
       if (!is_boundary_vertex)
       {
         // Based on u_i_min, u_i_max, u_i, get alpha_e
-        for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
+        for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
           if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
           {
             alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
-            if (this->parameters.debug_limiter)
+            if (parameters.debug)
               std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
           }
       }
     }
 
-    for (int k = 0; k < COMPONENTS_TO_LIMIT; k++)
+    for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
       for (int i = 0; i < lambda_indices_to_multiply[k].size(); i++)
         current_limited_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
+
+    double alpha_e_B = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
+    for (int i = 0; i < lambda_indices_to_multiply_all_B_components.size(); i++)
+      current_limited_solution(lambda_indices_to_multiply_all_B_components[i]) *= alpha_e_B;
   }
 }
 
@@ -317,21 +294,35 @@ void Problem<equationsType, dim>::calculate_cfl_condition()
 }
 
 template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::precalculate_global()
+{
+  dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
+
+  for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  {
+    const unsigned int component_i = this->fe.system_to_base_index(i).first.first;
+    is_primitive[i] = this->fe.is_primitive(i);
+    if (is_primitive[i])
+    {
+      component_ii[i] = this->fe.system_to_component_index(i).first;
+      basis_fn_is_constant[i] = dynamic_cast<const FiniteElementIsConstantInterface<dim>*>(&(this->fe.base_element(component_i)))->is_constant(this->fe.system_to_component_index(i).second);
+    }
+    else
+    {
+      component_ii[i] = 999;
+      basis_fn_is_constant[i] = false;
+    }
+  }
+}
+
+template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 {
   this->cfl_time_step = 1.e6;
 
-  // Number of DOFs per cell - we assume uniform polynomial order (we will only do h-adaptivity)
-  const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-
   // DOF indices both on the currently assembled element and the neighbor.
   std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
   std::vector<types::global_dof_index> dof_indices_neighbor(dofs_per_cell);
-
-  // What values we need for the assembly.
-  const UpdateFlags update_flags = update_values | update_q_points | update_JxW_values | update_gradients;
-  const UpdateFlags face_update_flags = update_values | update_q_points | update_JxW_values | update_normal_vectors;
-  const UpdateFlags neighbor_face_update_flags = update_JxW_values | update_q_points | update_values | update_normal_vectors;
 
   // DOF indices both on the currently assembled element and the neighbor.
   FEValues<dim> fe_v(mapping, fe, this->initial_step ? initial_quadrature : quadrature, update_flags);
@@ -385,7 +376,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 
           if (is_periodic_boundary)
           {
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(cell)->second;
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
             typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
             neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
             const unsigned int neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
@@ -518,9 +509,8 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
         else
 #endif
         {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          W_prev[q][component_ii] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-          W_lin[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          W_prev[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          W_lin[q][component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
         }
       }
     }
@@ -535,20 +525,17 @@ Problem<equationsType, dim>::assemble_cell_term(const FEValues<dim> &fe_v, const
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
-      const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-
-      cell_rhs(i) += fe_v.JxW(q) * W_prev[q][component_ii] * fe_v.shape_value(i, q);
+      cell_rhs(i) += fe_v.JxW(q) * W_prev[q][component_ii[i]] * fe_v.shape_value(i, q);
       if (!initial_step)
       {
         for (int d = 0; d < dim; d++)
-          cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii][d] * fe_v.shape_grad(i, q)[d];
+          cell_rhs(i) += fe_v.JxW(q) * parameters.time_step * flux_old[q][component_ii[i]][d] * fe_v.shape_grad(i, q)[d];
       }
 
       if (assemble_matrix)
         for (unsigned int j = 0; j < dofs_per_cell; ++j)
         {
-          const unsigned int component_jj = fe_v.get_fe().system_to_component_index(j).first;
-          if (component_ii == component_jj)
+          if (component_ii[i] == component_ii[j])
             cell_matrix(i, j) += fe_v.JxW(q) * fe_v.shape_value(i, q) * fe_v.shape_value(j, q);
         }
     }
@@ -598,8 +585,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
         else
 #endif
         {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          Wplus_old[q][component_ii] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          Wplus_old[q][component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
         }
 
         if (!external_face)
@@ -615,8 +601,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
           else
 #endif
           {
-            const unsigned int component_ii_neighbor = fe_v_neighbor.get_fe().system_to_component_index(i).first;
-            Wminus_old[q][component_ii_neighbor] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+            Wminus_old[q][component_ii[i]] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
           }
         }
       }
@@ -673,10 +658,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no,
         }
         else
 #endif
-        {
-          const unsigned int component_ii = fe_v.get_fe().system_to_component_index(i).first;
-          val += this->parameters.time_step * normal_fluxes_old[q][component_ii] * fe_v.shape_value(i, q) * fe_v.JxW(q);
-        }
+          val += this->parameters.time_step * normal_fluxes_old[q][component_ii[i]] * fe_v.shape_value(i, q) * fe_v.JxW(q);
 
         if (std::isnan(val))
         {

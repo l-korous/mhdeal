@@ -6,6 +6,11 @@ SET(TARGET_SRC
   equationsMhd.cpp
   DealiiExtensions.cpp
   DealiiExtensions.h
+  fe_div_free.h
+  fe_div_free.cpp
+  fe_taylor.h
+  fe_taylor.cpp
+  fe_is_constant_interface.h
   equationsMhd.h
   parameters.h
   boundaryConditions.cpp

@@ -4,6 +4,8 @@
 #include "initialCondition.h"
 #include "boundaryConditions.h"
 #include "DealiiExtensions.h"
+#include "fe_div_free.h"
+#include "fe_taylor.h"
 
 // Class that accepts all input from the user, provides interface for output, etc.
 // Should not be changed.
@@ -116,6 +118,22 @@ private:
   AztecOO solver;
 
   DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
+  FEValuesExtractors::Vector mag;
+  void precalculate_global();
+  unsigned int dofs_per_cell;
+
+  // TODO Revise this for adaptivity (subface_flags, ...)
+  UpdateFlags update_flags;
+  UpdateFlags face_update_flags;
+  UpdateFlags neighbor_face_update_flags;
+
+  unsigned short n_quadrature_points_cell;
+
+  // May be increased, but for linear functions, it is exactly this.
+#define BASIS_FN_COUNT 100
+  std::array <unsigned short, BASIS_FN_COUNT> component_ii;
+  std::array <bool, BASIS_FN_COUNT> is_primitive;
+  std::array <bool, BASIS_FN_COUNT> basis_fn_is_constant;
 
   // This is here and not in the loop because of tests - we test by looking at the last res_norm.
   public:

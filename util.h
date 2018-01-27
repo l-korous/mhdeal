@@ -62,9 +62,13 @@
 #define NEGLIGIBLE 1e-12
 #endif
 
-#ifndef USE_HDIV_FOR_B
-//#define USE_HDIV_FOR_B
-#endif
+template <typename T>
+std::string to_string_with_precision(const T a_value, const int n = 6)
+{
+  std::ostringstream out;
+  out << std::setprecision(n) << a_value;
+  return out.str();
+}
 
 using namespace dealii;
 #endif

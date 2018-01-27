@@ -27,6 +27,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.corner_a = Point<DIMENSION>(-0.0, -0.0, 0.);
   parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.01);
   parameters.refinements = { 10, 10, 1 };
+  parameters.use_div_free_space_for_B = false;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.initial_and_max_cfl_constant = parameters.cfl_constant = .02;
@@ -119,7 +120,7 @@ int main(int argc, char *argv[])
 
     // The main point of this test.
     if (std::abs(problem.res_norm - 3.1004194767092486e-09) > 1e-14)
-      throw std::runtime_error(std::string("Test FAILED, the difference std::abs(problem.res_norm - 3.1004194767092486e-09) was ") + std::to_string(std::abs(problem.res_norm - 3.1004194767092486e-09)));
+      throw std::runtime_error(std::string("Test FAILED, the problem.res_norm should have been 3.1004194767092486e-09 and was ") + to_string_with_precision(problem.res_norm, 15));
   }
   catch (std::exception &exc)
   {

@@ -95,12 +95,13 @@ namespace DealIIExtensions
             {
               if (boundaries[p][0] == this_face->boundary_id() || boundaries[p][1] == this_face->boundary_id())
               {
-                const FacePair<DH::dimension>& face_pair = cell_map.find(cell)->second;
-                if (cell_map.find(cell) == cell_map.end())
+                typename PeriodicCellMap<DH::dimension>::const_iterator face_pair_it = cell_map.find(std::make_pair(cell, face));
+                if (face_pair_it == cell_map.end())
                 {
                   std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
                   continue;
-                } 
+                }
+                const FacePair<DH::dimension>& face_pair = face_pair_it->second;
                 neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
                 neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
                 other_face = neighbor->face(neighbor_face);
@@ -126,10 +127,7 @@ namespace DealIIExtensions
           {
             // get face dofs
             for (size_t i = 0; i < n_dofs_on_this_cell; i++)
-            {
-              if (cell->get_fe().has_support_on_face(i, face))
-                dofs_on_this_face.push_back(dofs_on_this_cell.at(i));
-            }
+              dofs_on_this_face.push_back(dofs_on_this_cell.at(i));
           }
 
           if (neighbor->has_children())
@@ -155,10 +153,7 @@ namespace DealIIExtensions
               // Couple all dofs on common face
               dofs_on_other_face.clear();
               for (size_t i = 0; i < n_dofs_on_neighbor; i++)
-              {
-                if (sub_neighbor->get_fe().has_support_on_face(i, sub_neighbor_face))
-                  dofs_on_other_face.push_back( dofs_on_other_cell.at(i));
-              }
+                dofs_on_other_face.push_back(dofs_on_other_cell.at(i));
               Assert(dofs_on_this_face.size() * dofs_on_other_face.size() > 0, ExcMessage("Size of at least one dof vector is 0."));
 
               // Add entries to sparsity pattern
@@ -175,7 +170,7 @@ namespace DealIIExtensions
             // Refinement edges are taken care of by coarser
             // cells
             if (!cell->at_boundary(face) && (cell->neighbor_is_coarser(face) && neighbor->subdomain_id() == cell->subdomain_id()))
-                continue;
+              continue;
             const unsigned int n_dofs_on_neighbor = neighbor->get_fe().dofs_per_cell;
             dofs_on_other_cell.resize(n_dofs_on_neighbor);
             neighbor->get_dof_indices(dofs_on_other_cell);
@@ -197,10 +192,7 @@ namespace DealIIExtensions
               // Method 1) Couple all dofs on common face
               dofs_on_other_face.clear();
               for (size_t i = 0; i < n_dofs_on_neighbor; i++)
-              {
-                if (neighbor->get_fe().has_support_on_face(i, neighbor_face))
-                  dofs_on_other_face.push_back(dofs_on_other_cell.at(i));
-              }
+                dofs_on_other_face.push_back(dofs_on_other_cell.at(i));
               Assert(dofs_on_this_face.size() * dofs_on_other_face.size() > 0, ExcMessage("Size of at least one dof vector is 0."));
 
               // Add entries to sparsity pattern
@@ -447,20 +439,12 @@ namespace DealIIExtensions
       face_pair.orientation[1] = face_flip;
       face_pair.orientation[2] = face_rotation;
       cell_map.insert(
-        std::pair<
-        dealii::TriaIterator<dealii::CellAccessor<dim, spacedim> >,
-        dealii::GridTools::PeriodicFacePair<
-        dealii::TriaIterator<
-        dealii::CellAccessor<dim, spacedim> > > >(
-          cell_1, face_pair));
+        std::make_pair(
+          std::make_pair(cell_1, face_nr_1), face_pair));
 
       cell_map.insert(
-        std::pair<
-        dealii::TriaIterator<dealii::CellAccessor<dim, spacedim> >,
-        dealii::GridTools::PeriodicFacePair<
-        dealii::TriaIterator<
-        dealii::CellAccessor<dim, spacedim> > > >(
-          cell_2, face_pair));
+        std::make_pair(
+          std::make_pair(cell_2, face_nr_2), face_pair));
     }
   }
 
@@ -570,30 +554,27 @@ namespace DealIIExtensions
 
               for (unsigned int i = 0; i < fe.dofs_per_cell; ++i)
               {
-                if (fe.has_support_on_face(i, face))
+                if (!check_vector_component)
+                  selected_dofs[cell_dof_indices[i]] = true;
+                else
+                  // check for component is required. somewhat tricky
+                  // as usual for the case that the shape function is
+                  // non-primitive, but use usual convention (see docs)
                 {
-                  if (!check_vector_component)
-                    selected_dofs[cell_dof_indices[i]] = true;
-                  else
-                    // check for component is required. somewhat tricky
-                    // as usual for the case that the shape function is
-                    // non-primitive, but use usual convention (see docs)
+                  if (fe.is_primitive(i))
+                    selected_dofs[cell_dof_indices[i]] =
+                    (component_mask[fe.system_to_component_index(
+                      i).first] == true);
+                  else // not primitive
                   {
-                    if (fe.is_primitive(i))
-                      selected_dofs[cell_dof_indices[i]] =
-                      (component_mask[fe.system_to_component_index(
-                        i).first] == true);
-                    else // not primitive
-                    {
-                      const unsigned int first_nonzero_comp =
-                        fe.get_nonzero_components(i).first_selected_component();
-                      Assert(
-                        first_nonzero_comp < fe.n_components(),
-                        ExcInternalError());
-                      selected_dofs[cell_dof_indices[i]] =
-                        (component_mask[first_nonzero_comp]
-                          == true);
-                    }
+                    const unsigned int first_nonzero_comp =
+                      fe.get_nonzero_components(i).first_selected_component();
+                    Assert(
+                      first_nonzero_comp < fe.n_components(),
+                      ExcInternalError());
+                    selected_dofs[cell_dof_indices[i]] =
+                      (component_mask[first_nonzero_comp]
+                        == true);
                   }
                 }
               }

@@ -38,7 +38,7 @@ namespace DealIIExtensions {
   * @note	The order of cells in the Face Pair is of no meaning
   */
   template<size_t dim, size_t spacedim = dim>
-  using PeriodicCellMap = std::map<dealii::TriaIterator< dealii::CellAccessor<dim, spacedim> >, FacePair<dim, spacedim> >;
+  using PeriodicCellMap = std::map < std::pair<dealii::TriaIterator< dealii::CellAccessor<dim, spacedim> >, unsigned int>, FacePair<dim, spacedim> > ;
 
   using namespace dealii;
   
