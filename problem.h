@@ -47,8 +47,8 @@ private:
     const std::vector<types::global_dof_index>& local_dofs_neighbor, const bool external_face, const unsigned int boundary_id, const double face_diameter, FullMatrix<double>& cell_matrix,
     Vector<double>& cell_rhs, bool assemble_matrix);
   
-  // Output
-  void output_results(const char* prefix = "") const;
+  void output_base();
+  void output_results() const;
   void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step, int newton_step = -1) const;
   void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step, int newton_step = -1) const;
 

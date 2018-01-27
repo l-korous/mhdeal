@@ -728,7 +728,35 @@ Problem<equationsType, dim>::solve(TrilinosWrappers::MPI::Vector &newton_update,
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::output_results(const char* prefix) const
+void Problem<equationsType, dim>::output_base()
+{
+  for (int i = 0; i < prev_solution.size(); i++)
+  {
+    typename Equations<equationsType, dim>::Postprocessor postprocessor(equations);
+    DataOut<dim> data_out;
+    data_out.attach_dof_handler(dof_handler);
+
+    for (int j = 0; j < prev_solution.size(); j++)
+      prev_solution(j) = 0.;
+    prev_solution(i) = 1.;
+
+    // Solution components.
+    data_out.add_data_vector(prev_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
+
+    data_out.build_patches(7);
+
+    static unsigned int output_file_number_base = 0;
+
+    std::string filename = "solution-" + Utilities::int_to_string(output_file_number_base, 3) + ".vtk";
+    std::ofstream output(filename.c_str());
+    data_out.write_vtk(output);
+
+    ++output_file_number_base;
+  }
+}
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::output_results() const
 {
   typename Equations<equationsType, dim>::Postprocessor postprocessor(equations);
 
@@ -754,7 +782,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
   static unsigned int output_file_number = 0;
 
 #ifdef HAVE_MPI
-  const std::string filename_base = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3);
+  const std::string filename_base = "solution-" + Utilities::int_to_string(output_file_number, 3);
 
   const std::string filename = (filename_base + "-" + Utilities::int_to_string(triangulation.locally_owned_subdomain(), 4));
 
@@ -774,7 +802,7 @@ void Problem<equationsType, dim>::output_results(const char* prefix) const
     data_out.write_pvtu_record(visit_master_output, filenames);
   }
 #else
-  std::string filename = std::string(prefix) + "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
+  std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
   data_out.write_vtk(output);
 #endif
@@ -914,6 +942,12 @@ void Problem<equationsType, dim>::run()
   // Time loop.
   double newton_damping = this->parameters.initial_and_max_newton_damping;
   bool previous_bad_step = false;
+
+#ifdef OUTPUT_BASE
+  output_base();
+  exit(1);
+#endif
+
   while (time < parameters.final_time)
   {
     // Some output.
@@ -930,21 +964,26 @@ void Problem<equationsType, dim>::run()
     bool bad_step = false;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
+      // Assemble
       system_rhs = 0;
       if (linStep == 0 && initial_step)
         system_matrix = 0;
       assemble_system((linStep == 0 && initial_step));
 
+      // Output matrix & rhs if required.
       if (parameters.output_matrix)
         output_matrix(system_matrix, "matrix", time_step, linStep);
       if (parameters.output_rhs)
         output_vector(system_rhs, "rhs", time_step, linStep);
 
+      // Solve
       solve(current_unlimited_solution, (linStep == 0 && initial_step));
 
+      // Output solution if required
       if (parameters.output_solution)
         output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
 
+      // Postprocess if required
       if (parameters.polynomial_order_dg > 0 && parameters.limit_in_nonlin_loop)
         postprocess();
       else
@@ -965,6 +1004,7 @@ void Problem<equationsType, dim>::run()
         lin_solution += newton_update;
       }
 
+      // Get the residual norm.
       res_norm = newton_update.linfty_norm();
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;

@@ -70,5 +70,10 @@ std::string to_string_with_precision(const T a_value, const int n = 6)
   return out.str();
 }
 
+// For debug purposes only.
+#ifndef OUTPUT_BASE
+//#define OUTPUT_BASE
+#endif
+
 using namespace dealii;
 #endif
