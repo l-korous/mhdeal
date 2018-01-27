@@ -116,4 +116,8 @@ private:
   AztecOO solver;
 
   DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
+
+  // This is here and not in the loop because of tests - we test by looking at the last res_norm.
+  public:
+  double res_norm;
 };

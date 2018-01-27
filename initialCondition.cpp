@@ -122,7 +122,7 @@ void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> >
 }
 
 template <EquationsType equationsType, int dim>
-TitovDemoulinIC<equationsType, dim>::TitovDemoulinIC(Parameters<dim> &parameters) : 
+TitovDemoulinIC<equationsType, dim>::TitovDemoulinIC(Parameters<dim>& parameters) : 
                InitialCondition<equationsType,dim>(parameters)
 {
   // plasma beta
@@ -188,8 +188,7 @@ void TitovDemoulinIC<equationsType, dim>::vector_value(const std::vector<Point<d
           Fill the structure with gravity-stratified plasma. 
   ***************************************************************************/
 template <EquationsType equationsType, int dim>
-void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p, 
-                                                      Vector<double> &result) const
+void TitovDemoulinIC<equationsType, dim>::point_value(const Point<dim> &p, Vector<double> &result) const
 {
     //========== Calculate the vector potential for I_t-generated toroidal field 
     double xx,yy,zz;

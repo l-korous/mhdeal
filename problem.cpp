@@ -983,7 +983,7 @@ void Problem<equationsType, dim>::run()
         lin_solution += newton_update;
       }
 
-      double res_norm = newton_update.linfty_norm();
+      res_norm = newton_update.linfty_norm();
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
 

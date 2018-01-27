@@ -9,11 +9,7 @@ class Parameters
 {
 public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
-#ifdef HAVE_MPI
-  Parameters(parallel::distributed::Triangulation<dim> &triangulation);
-#else
-  Parameters(Triangulation<dim> &triangulation);
-#endif
+  Parameters() {};
 
   // Flux enumeration - for potentially adding more fluxes, decision which one to use is then made in Equations<>::numerical_normal_flux.
   enum NumFluxType { hlld, lax_friedrich };
@@ -31,9 +27,8 @@ public:
   // Output limited_solution after solve() in Problem::run().
   bool output_solution;
 
-  // initial conditions: 0 - MHD Blast, 1 - Titov&Demoulin flux rope
   // Number of patches
-  unsigned int initCond, patches; 
+  unsigned int patches; 
   
   // Gas gamma value.
   double gas_gamma;
@@ -83,20 +78,12 @@ public:
   // Do we have forcing (source) terms in the equations?
   bool needs_forcing;
 
-  // Mesh - string input
-  std::string mesh_filename;
-  // If we extrude a 2d mesh into 3d one, how many slices do we want thus created?
-  int mesh_extrusion_slices;
-
-  // Mesh - generation - two corners opposite in all dimensions.
-  Point<dim> corner_a, corner_b;
-  // Mesh - generation - how many refinements (in all dimensions) do we want?
-  std::vector<unsigned int> refinements;
-
   // Debugging purposes
   bool debug, debug_limiter, debug_dofs;
 
-  // Periodic boundaries.
+  Point<dim> corner_a;
+  Point<dim> corner_b;
+  std::vector<unsigned int> refinements;
   std::vector<std::array<int, 3> > periodic_boundaries;
 };
 
