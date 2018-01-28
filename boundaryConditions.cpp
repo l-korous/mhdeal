@@ -7,7 +7,7 @@ BoundaryConditions<EquationsTypeMhd, 3>::BoundaryConditions(Parameters<3>& param
 template <EquationsType equationsType, int dim>
 void BoundaryConditions<equationsType, dim>::bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus) const
 {
-  for (unsigned int di = 0; di < Equations<EquationsTypeMhd, 3>::n_components; ++di)
+  for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
     result[di] = W_plus[di];
 }
 

@@ -13,7 +13,7 @@ public:
 
   static const unsigned int n_components = 2 * dim + 2;
 
-  typedef dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> InputVector;
+  typedef std::array<double, n_components> InputVector;
 
   static double compute_kinetic_energy(const InputVector &W);
 
@@ -27,13 +27,6 @@ public:
 
   // Compute pressure, and use the passed values of kinetic energy and magnetic energy.
   double compute_pressure(const InputVector &W, const double& Uk, const double& Um) const;
-
-  static double compute_kinetic_energy(const std::array<double, n_components> &W);
-
-  static double compute_magnetic_energy(const std::array<double, n_components> &W);
-
-  // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
-  double compute_pressure(const std::array<double, n_components> &W) const;
 
   double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const;
 

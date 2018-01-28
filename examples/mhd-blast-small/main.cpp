@@ -15,7 +15,7 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 #endif
 {
   GridGenerator::subdivided_hyper_rectangle(triangulation, parameters.refinements, parameters.corner_a, parameters.corner_b, true);
-  
+
   std::vector<DealIIExtensions::FacePair<DIMENSION> > matched_pairs;
   for (std::vector<std::array<int, 3> >::const_iterator it = parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
     dealii::GridTools::collect_periodic_faces(triangulation, (*it)[0], (*it)[1], (*it)[2], matched_pairs);
@@ -24,10 +24,10 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.0, -0.0, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.01);
-  parameters.refinements = { 10, 10, 1 };
-  parameters.use_div_free_space_for_B = false;
+  parameters.corner_a = Point<DIMENSION>(-0.5, -0.5, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.5, 0.01);
+  parameters.refinements = { 50, 50, 1 };
+  parameters.use_div_free_space_for_B = true;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.initial_and_max_cfl_constant = parameters.cfl_constant = .02;
@@ -52,7 +52,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.snapshot_step = 1.;
 
   parameters.time_step = 1.e-5;
-  parameters.final_time = 0.00138649;
+  parameters.final_time = 10.;
 
   parameters.solver = Parameters<DIMENSION>::gmres;
   parameters.linear_residual = 1e-10;
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     Triangulation<DIMENSION> triangulation;
 #endif    
     set_triangulation(triangulation, parameters);
-    
+
     MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
@@ -106,12 +106,6 @@ int main(int argc, char *argv[])
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Run the problem - entire transient problem.
     problem.run();
-
-    // The main point of this test.
-    if (std::abs(problem.res_norm - 3.1004194767092486e-09) > 1e-14)
-      throw std::runtime_error(std::string("Test FAILED, the problem.res_norm should have been 3.1004194767092486e-09 and was ") + to_string_with_precision(problem.res_norm, 15));
-    else
-      std::cout << std::endl << "TEST SUCCESSFUL" << std::endl << std::endl << std::endl;
   }
   catch (std::exception &exc)
   {

@@ -85,7 +85,7 @@ private:
 
   const FESystem<dim> fe;
   DoFHandler<dim> dof_handler;
-  const QGauss<dim> quadrature, initial_quadrature;
+  const QGauss<dim> quadrature;
   const QGauss<dim - 1> face_quadrature;
 
   // Currently sought solution, the previous one, and the initial solution for newton's loop on the current time level.
@@ -131,6 +131,11 @@ private:
   FEFaceValues<dim> fe_v_face_neighbor;
   std::vector<types::global_dof_index> dof_indices;
   std::vector<types::global_dof_index> dof_indices_neighbor;
+  std::array<double, Equations<equationsType, dim>::n_components> Wplus_old, Wminus_old;
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> > normal_fluxes_old;
+  std::array<double, Equations<equationsType, dim>::n_components> W_lin;
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev;
+  std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > fluxes_old;
 
   // May be increased, but for linear functions, it is exactly this.
 #define BASIS_FN_COUNT 100

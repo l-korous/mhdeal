@@ -10,7 +10,7 @@ template <EquationsType equationsType, int dim>
 class BoundaryConditions
 {
 public:
-  typedef dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> InputVector;
+  typedef std::array<double, Equations<equationsType, dim>::n_components> InputVector;
 
   BoundaryConditions(Parameters<dim>& parameters);
 

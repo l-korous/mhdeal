@@ -46,24 +46,6 @@ inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVect
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const std::array<double, n_components> &W)
-{
-  return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
-}
-
-template <>
-inline double Equations<EquationsTypeMhd, 3>::compute_magnetic_energy(const std::array<double, n_components> &W)
-{
-  return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
-}
-
-template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const std::array<double, n_components> &W) const
-{
-  return std::max(0., (this->parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
-}
-
-template <int dim>
 inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const InputVector &W) const
 {
   const double magnetic_energy = compute_magnetic_energy(W);

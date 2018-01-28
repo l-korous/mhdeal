@@ -18,7 +18,6 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe(parameters.use_div_free_space_for_B ? FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 5, FE_DG_DivFree<dim>(), 1) : FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 8)), dof_handler(triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
-  initial_quadrature(parameters.initial_quadrature_order),
   verbose_cout(std::cout, false),
   initial_step(true),
   last_output_time(0.), last_snapshot_time(0.), time(0.),
@@ -32,7 +31,10 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 {
   fe_v_cell = new FEValues<dim>(mapping, fe, quadrature, update_flags);
   n_quadrature_points_cell = quadrature.get_points().size();
+  fluxes_old.resize(n_quadrature_points_cell);
+  W_prev.resize(n_quadrature_points_cell);
   n_quadrature_points_face = face_quadrature.get_points().size();
+  normal_fluxes_old.resize(n_quadrature_points_face);
 }
 
 template <EquationsType equationsType, int dim>
@@ -404,8 +406,6 @@ template <EquationsType equationsType, int dim>
 void
 Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix)
 {
-  Table<2, double> W_prev(n_quadrature_points_cell, Equations<equationsType, dim>::n_components);
-
   if (initial_step)
   {
     initial_condition.vector_value(fe_v_cell->get_quadrature_points(), W_prev);
@@ -415,25 +415,51 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
       double val = 0.;
       for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
       {
-        val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
+        if(is_primitive[i])
+          val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
+        else
+        {
+          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+          for (unsigned int d = 0; d < dim; d++)
+            val += fe_v_cell->JxW(q) * W_prev[q][5 + d] * fe_v_value[d];
+        }
 
         if (assemble_matrix)
+        {
           for (unsigned int j = 0; j < dofs_per_cell; ++j)
           {
-            if (component_ii[i] == component_ii[j])
-              cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_cell->shape_value(j, q);
+            if (is_primitive[i])
+            {
+              if (is_primitive[j] && (component_ii[i] == component_ii[j]))
+                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_cell->shape_value(j, q);
+              else if (!is_primitive[j] && (component_ii[i] >= 5))
+              {
+                dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(j, q);
+                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_value[component_ii[i] - 5];
+              }
+            }
+            else
+            {
+              if (is_primitive[j] && (component_ii[j] >= 5))
+              {
+                dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(j, q) * fe_v_value[component_ii[j] - 5];
+              }
+              else if (!is_primitive[j])
+                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_cell->shape_value(j, q);
+            }
           }
+        }
       }
       cell_rhs(i) += val;
     }
   }
   else
   {
-    Table<2, double> W_lin(n_quadrature_points_cell, Equations<equationsType, dim>::n_components);
     for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
     {
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
-        W_prev[q][c] = W_lin[q][c] = 0.;
+        W_prev[q][c] = W_lin[c] = 0.;
 
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
@@ -443,30 +469,41 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
           for (unsigned int d = 0; d < dim; d++)
           {
             W_prev[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
-            W_lin[q][5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
+            W_lin[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
           }
         }
         else
         {
           W_prev[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
-          W_lin[q][component_ii[i]] += lin_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
+          W_lin[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
         }
       }
+      equations.compute_flux_matrix(W_lin, fluxes_old[q]);
     }
-
-    std::vector < std_cxx11::array <std_cxx11::array <double, dim>, Equations<equationsType, dim>::n_components > > flux_old(n_quadrature_points_cell);
-
-    for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
-      equations.compute_flux_matrix(W_lin[q], flux_old[q]);
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       double val = 0.;
       for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
       {
-        val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
-        for (int d = 0; d < dim; d++)
-          val += fe_v_cell->JxW(q) * parameters.time_step * flux_old[q][component_ii[i]][d] * fe_v_cell->shape_grad(i, q)[d];
+        if (is_primitive[i])
+        {
+          val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
+          if (!basis_fn_is_constant[i])
+            for (int d = 0; d < dim; d++)
+              val += fe_v_cell->JxW(q) * parameters.time_step * fluxes_old[q][component_ii[i]][d] * fe_v_cell->shape_grad(i, q)[d];
+        }
+        else
+        {
+          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+          dealii::Tensor<2, dim> fe_v_grad = (*fe_v_cell)[mag].gradient(i, q);
+          for (unsigned int d = 0; d < dim; d++)
+          {
+            val += fe_v_cell->JxW(q) * W_prev[q][5 + d] * fe_v_value[d];
+            for (int e = 0; e < dim; e++)
+              val += fe_v_cell->JxW(q) * parameters.time_step * fluxes_old[q][5 + d][e] * fe_v_grad[d][e];
+          }
+        }
       }
       cell_rhs(i) += val;
     }
@@ -477,16 +514,15 @@ template <EquationsType equationsType, int dim>
 void
 Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs)
 {
-  Table<2, double> Wplus_old(n_quadrature_points_face, Equations<equationsType, dim>::n_components), Wminus_old(n_quadrature_points_face, Equations<equationsType, dim>::n_components);
-
-  std::vector< std_cxx11::array < double, Equations<equationsType, dim>::n_components> > normal_fluxes_old(n_quadrature_points_face);
-
   if (parameters.debug)
     std::cout << "\tEdqe: " << face_no << std::endl;
 
   // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
   for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
   {
+    for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
+      Wplus_old[c] = Wminus_old[c] = 0.;
+
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
@@ -495,10 +531,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
         {
           dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
           for (int d = 0; d < dim; d++)
-            Wplus_old[q][5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
+            Wplus_old[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
         }
         else
-          Wplus_old[q][component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          Wplus_old[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
 
         if (!external_face)
         {
@@ -506,19 +542,19 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
           {
             dealii::Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
             for (int d = 0; d < dim; d++)
-              Wminus_old[q][5 + d] += lin_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+              Wminus_old[5 + d] += lin_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
           }
           else
-            Wminus_old[q][component_ii[i]] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+            Wminus_old[component_ii[i]] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
         }
       }
     }
 
     if (external_face)
-      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q]);
+      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old, Wplus_old);
 
     // Once we have the states on both sides of the face, we need to calculate the numerical flux.
-    equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
+    equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old, Wminus_old, normal_fluxes_old[q]);
 
     // Some debugging outputs.
     if (parameters.debug)
@@ -527,12 +563,12 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
       std::cout << "\t\tq: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
       std::cout << "\t\tWplus: ";
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
+        std::cout << Wplus_old[i] << (i < 7 ? ", " : "");
       std::cout << std::endl;
 
       std::cout << "\t\tWminus: ";
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
+        std::cout << Wminus_old[i] << (i < 7 ? ", " : "");
       std::cout << std::endl;
 
       std::cout << "\t\tNum F: ";
@@ -560,13 +596,13 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
 
         if (std::isnan(val))
         {
-          equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q]);
+          equations.numerical_normal_flux(fe_v.normal_vector(q), Wplus_old, Wminus_old, normal_fluxes_old[q]);
           std::cout << "isnan: " << val << std::endl;
           std::cout << "i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
           std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
           std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
           for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
-            std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
+            std::cout << "W+ [" << j << "]: " << (double)Wplus_old[j] << ", W- [" << j << "]: " << (double)Wminus_old[j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
         }
       }
 

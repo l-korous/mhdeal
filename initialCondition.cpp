@@ -9,7 +9,7 @@ InitialCondition<equationsType, dim>::InitialCondition(Parameters<dim>& paramete
 
 
 template <EquationsType equationsType, int dim>
-void InitialCondition<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points, Table<2, double>& result) const
+void InitialCondition<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >& result) const
 {
 }
 
@@ -28,7 +28,7 @@ SimpleICEuler<equationsType, dim>::SimpleICEuler(Parameters<dim>& parameters) :
 
 template <EquationsType equationsType, int dim>
 void SimpleICEuler<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  Table<2, double>&result) const
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
 {
   for (unsigned int i = 0; i < points.size(); ++i)
   {
@@ -52,7 +52,7 @@ SimpleICMHD<equationsType, dim>::SimpleICMHD(Parameters<dim>& parameters) :
 
 template <EquationsType equationsType, int dim>
 void SimpleICMHD<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  Table<2, double>&result) const
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
 {
   for (unsigned int i = 0; i < points.size(); ++i)
   {
@@ -75,7 +75,7 @@ EulerBlastIC<equationsType, dim>::EulerBlastIC(Parameters<dim>& parameters) :
 
 template <EquationsType equationsType, int dim>
 void EulerBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  Table<2, double>&result) const
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
 {
   // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
   for (unsigned int i = 0; i < points.size(); ++i)
@@ -102,7 +102,7 @@ MHDBlastIC<equationsType, dim>::MHDBlastIC(Parameters<dim>& parameters) :
 
 template <EquationsType equationsType, int dim>
 void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  Table<2, double>&result) const
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
 {
   // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
   for (unsigned int i = 0; i < points.size(); ++i)
@@ -181,7 +181,7 @@ Calculate the field according to TD paper (A&A 351, 707, 1999)
 Fill the structure with gravity-stratified plasma.
 ***************************************************************************/
 template <EquationsType equationsType, int dim>
-void TitovDemoulinIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points, Table<2, double>& value_list) const
+void TitovDemoulinIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >& value_list) const
 {
   //========== Calculate the vector potential for I_t-generated toroidal field 
   double xx, yy, zz;

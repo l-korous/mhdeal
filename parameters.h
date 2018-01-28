@@ -67,21 +67,12 @@ public:
 
   // Global - obvious
   double time_step, final_time, cfl_constant, initial_and_max_cfl_constant;
-  // Flag whether this is a stationary problem.
-  bool is_stationary;
   // Polynomial order for the flow part.
   int polynomial_order_dg;
-  // Polynomial order for the mag field part.
-  int polynomial_order_hdiv;
   // Quadrature order.
-  int quadrature_order, initial_quadrature_order;
-  // Do we need calculated gradients? E.g. for resistivity.
-  bool needs_gradients;
-  // Do we have forcing (source) terms in the equations?
-  bool needs_forcing;
-
+  int quadrature_order;
   // Debugging purposes
-  bool debug, debug_limiter, debug_dofs;
+  bool debug;
 
   Point<dim> corner_a;
   Point<dim> corner_b;
