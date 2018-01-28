@@ -13,7 +13,6 @@ public:
 
   static const unsigned int n_components = 2 * dim + 2;
 
-
   typedef dealii::internal::TableBaseAccessors::Accessor<2, double, false, 1> InputVector;
 
   static double compute_kinetic_energy(const InputVector &W);

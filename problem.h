@@ -39,13 +39,11 @@ private:
   void calculate_cfl_condition();
 
   // Performs a local assembly for all volumetric contributions on the local cell.
-  void assemble_cell_term(const FEValues<dim> &fe_v, const std::vector<types::global_dof_index>& local_dofs, FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix);
+  void assemble_cell_term(FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix);
   
   // Performs a local assembly for all surface contributions on the local cell.
   // i.e. face terms calculated on all faces - internal and boundary
-  void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const std::vector<types::global_dof_index>& local_dofs,
-    const std::vector<types::global_dof_index>& local_dofs_neighbor, const bool external_face, const unsigned int boundary_id, const double face_diameter, FullMatrix<double>& cell_matrix,
-    Vector<double>& cell_rhs, bool assemble_matrix);
+  void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs);
   
   void output_base();
   void output_results() const;
@@ -121,13 +119,18 @@ private:
   FEValuesExtractors::Vector mag;
   void precalculate_global();
   unsigned int dofs_per_cell;
+  unsigned short n_quadrature_points_cell, n_quadrature_points_face;
 
   // TODO Revise this for adaptivity (subface_flags, ...)
-  UpdateFlags update_flags;
-  UpdateFlags face_update_flags;
-  UpdateFlags neighbor_face_update_flags;
-
-  unsigned short n_quadrature_points_cell;
+  const UpdateFlags update_flags;
+  const UpdateFlags face_update_flags;
+  const UpdateFlags neighbor_face_update_flags;
+  // DOF indices both on the currently assembled element and the neighbor.
+  FEValues<dim>* fe_v_cell;
+  FEFaceValues<dim> fe_v_face;
+  FEFaceValues<dim> fe_v_face_neighbor;
+  std::vector<types::global_dof_index> dof_indices;
+  std::vector<types::global_dof_index> dof_indices_neighbor;
 
   // May be increased, but for linear functions, it is exactly this.
 #define BASIS_FN_COUNT 100
@@ -136,6 +139,8 @@ private:
   std::array <bool, BASIS_FN_COUNT> basis_fn_is_constant;
 
   // This is here and not in the loop because of tests - we test by looking at the last res_norm.
+  // Utility
+  bool is_periodic_boundary(int boundary_id) const;
   public:
   double res_norm;
 };

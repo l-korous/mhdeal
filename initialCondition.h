@@ -7,14 +7,14 @@
 
 // Initial condition
 template <EquationsType equationsType, int dim>
-class InitialCondition : public Function<dim>
+class InitialCondition
 {
 public:
   // InitialCondition constructor takes parameters as an attribute - to set up whatever necessary and use it in the initial values definition
   InitialCondition(Parameters<dim>&);
 
   // To be overwritten.
-  virtual void vector_value(const std::vector<Point<dim> >& , std::vector<Vector<double> >&) const;
+  virtual void vector_value(const std::vector<Point<dim> >& , Table<2, double>&) const;
   Parameters<dim>& getParams() const;
 
 private:
@@ -26,7 +26,7 @@ class SimpleICEuler : public InitialCondition<equationsType, dim>
 {
 public:
   SimpleICEuler(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+  void vector_value(const std::vector<Point<dim> >&, Table<2, double>&) const;
 };
 
 template <EquationsType equationsType, int dim>
@@ -34,7 +34,7 @@ class SimpleICMHD : public InitialCondition<equationsType, dim>
 {
 public:
   SimpleICMHD(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+  void vector_value(const std::vector<Point<dim> >&, Table<2, double>&) const;
 };
 
 template <EquationsType equationsType, int dim>
@@ -42,7 +42,7 @@ class EulerBlastIC : public InitialCondition<equationsType, dim>
 {
 public:
   EulerBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+  void vector_value(const std::vector<Point<dim> >&, Table<2, double>&) const;
 };
 
 template <EquationsType equationsType, int dim>
@@ -50,7 +50,7 @@ class MHDBlastIC : public InitialCondition<equationsType, dim>
 {
 public:
   MHDBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
+  void vector_value(const std::vector<Point<dim> >&, Table<2, double>&) const;
 };
 
 
@@ -59,8 +59,7 @@ class TitovDemoulinIC : public InitialCondition<equationsType,dim>
 {
 public:
   TitovDemoulinIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<Vector<double> >&) const;
-  void point_value(const Point<dim>& , Vector<double>&) const;
+  void vector_value(const std::vector<Point<dim> >&, Table<2, double>&) const;
   
 private:
   double beta;
