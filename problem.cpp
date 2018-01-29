@@ -878,12 +878,12 @@ void Problem<equationsType, dim>::run()
       if (linStep == 0)
         res_norm_initial = res_norm;
 
-      if ((res_norm < parameters.newton_residual_norm_threshold) || ((linStep > 1) && ((std::abs(res_norm_prev[1] - res_norm) / res_norm) < 1.e-4)))
+      if ((res_norm < parameters.newton_residual_norm_threshold) || ((linStep > 1) && ((std::abs(res_norm_prev[1] - res_norm) / res_norm) < parameters.stagnation_coefficient)))
       {
         bad_step = false;
         break;
       }
-      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm - res_norm_prev[0]) / res_norm_prev[0]) > .1)))
+      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm - res_norm_prev[0]) / res_norm_prev[0]) > parameters.bad_step_coefficient)))
       {
         parameters.cfl_constant *= this->parameters.decrease_factor;
         time -= parameters.time_step;

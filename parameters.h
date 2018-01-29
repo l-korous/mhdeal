@@ -17,6 +17,7 @@ public:
   // A special value for lax_friedrich
   double lax_friedrich_stabilization_value;
 
+  double stagnation_coefficient, bad_step_coefficient;
   bool use_div_free_space_for_B;
 
   // Output step - either < 0 (output all steps), or > 0 (time difference between two outputs)

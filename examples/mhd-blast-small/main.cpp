@@ -38,6 +38,8 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 
   parameters.decrease_factor = .8;
   parameters.increase_factor = 1.1;
+  parameters.stagnation_coefficient = 1.e-4;
+  parameters.bad_step_coefficient = 1.;
 
   parameters.patches = 2;
   parameters.output_step = -1.e-3;

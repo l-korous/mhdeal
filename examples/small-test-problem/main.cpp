@@ -35,9 +35,10 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.polynomial_order_dg = 1;
   parameters.limit_in_nonlin_loop = false;
   parameters.initial_and_max_newton_damping = .8;
-
   parameters.decrease_factor = .8;
   parameters.increase_factor = 1.1;
+  parameters.stagnation_coefficient = 1.e-4;
+  parameters.bad_step_coefficient = 1.;
 
   parameters.patches = 2;
   parameters.output_step = -1.e-3;
