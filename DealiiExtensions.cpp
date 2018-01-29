@@ -102,8 +102,8 @@ namespace DealIIExtensions
                   continue;
                 }
                 const FacePair<DH::dimension>& face_pair = face_pair_it->second;
-                neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
-                neighbor_face = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
+                neighbor = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+                neighbor_face = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
                 other_face = neighbor->face(neighbor_face);
                 break;
               }

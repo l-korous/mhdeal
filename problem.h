@@ -33,6 +33,17 @@ private:
   void assemble_system(bool assemble_matrix = true);
 
   // Performs a single global assembly.
+  struct PostprocessData
+  {
+    Point<dim> center;
+    unsigned int vertexIndex[GeometryInfo<dim>::vertices_per_cell];
+    Point<dim> vertexPoint[GeometryInfo<dim>::vertices_per_cell];
+    std::vector<unsigned int> lambda_indices_to_multiply[Equations<equationsType, dim>::n_components];
+    std::vector<unsigned int> lambda_indices_to_multiply_all_B_components;
+    // TODO This may not work for adaptivity (max. number of cells sharing a vertes might be higher than 8)
+    std::vector<types::global_dof_index> neighbor_dof_indices[GeometryInfo<dim>::vertices_per_cell][GeometryInfo<dim>::vertices_per_cell];
+  };
+  std::map<unsigned int, PostprocessData> postprocessData;
   void postprocess();
 
   // Performs a single global assembly.

@@ -71,10 +71,6 @@ void Problem<equationsType, dim>::setup_system()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::postprocess()
 {
-  // DOF indices both on the currently assembled element and the neighbor.
-  std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
-  std::vector<types::global_dof_index> dof_indices_neighbor(dofs_per_cell);
-
   // This is what we return.
   current_limited_solution = current_unlimited_solution;
   constraints.distribute(current_limited_solution);
@@ -91,66 +87,74 @@ void Problem<equationsType, dim>::postprocess()
       u_c_set[i] = false;
 
     double u_c[Equations<equationsType, dim>::n_components];
-    std::vector<unsigned int> lambda_indices_to_multiply[Equations<equationsType, dim>::n_components];
-    std::vector<unsigned int> lambda_indices_to_multiply_all_B_components;
-
     cell->get_dof_indices(dof_indices);
+
+    PostprocessData* data = 0;
+    auto it = this->postprocessData.find(cell->active_cell_index());
+    if (it != this->postprocessData.end())
+      data = &(it->second);
+    else
+    {
+      data = &(((postprocessData.insert(std::make_pair(cell->active_cell_index(), PostprocessData()))).first)->second);
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        if (!is_primitive[i])
+          data->lambda_indices_to_multiply_all_B_components.push_back(dof_indices[i]);
+        else
+        {
+          if (!u_c_set[component_ii[i]])
+            u_c_set[component_ii[i]] = true;
+          else
+            data->lambda_indices_to_multiply[component_ii[i]].push_back(dof_indices[i]);
+        }
+      }
+      for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+        u_c_set[i] = false;
+
+      data->center = cell->center();
+      for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
+      {
+        data->vertexIndex[i] = cell->vertex_index(i);
+        data->vertexPoint[i] = data->center + (1. - NEGLIGIBLE) * (cell->vertex(i) - data->center);
+
+        unsigned short neighbor_i = 0;
+        for (auto neighbor_element : GridTools::find_cells_adjacent_to_vertex(triangulation, data->vertexIndex[i]))
+        {
+          typename DoFHandler<dim>::active_cell_iterator neighbor(&triangulation, neighbor_element->level(), neighbor_element->index(), &dof_handler);
+          if (neighbor->active_cell_index() != cell->active_cell_index())
+          {
+            data->neighbor_dof_indices[i][neighbor_i].resize(dofs_per_cell);
+            neighbor->get_dof_indices(data->neighbor_dof_indices[i][neighbor_i++]);
+          }
+        }
+      }
+    }
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
-      if (!is_primitive[i])
-        lambda_indices_to_multiply_all_B_components.push_back(dof_indices[i]);
-      else
+      if (is_primitive[i])
       {
         if (!u_c_set[component_ii[i]])
         {
           u_c[component_ii[i]] = current_unlimited_solution(dof_indices[i]);
           u_c_set[component_ii[i]] = true;
         }
-        else
-          lambda_indices_to_multiply[component_ii[i]].push_back(dof_indices[i]);
       }
     }
 
     if (parameters.debug)
-      std::cout << "cell: " << ++cell_count << " - center: " << cell->center() << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
+      std::cout << "cell: " << ++cell_count << " - center: " << data->center << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
 
     double alpha_e[Equations<equationsType, dim>::n_components];
     for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
       alpha_e[i] = 1.;
-
-    // For all vertices -> v_i
     for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
     {
-      unsigned int v_i = cell->vertex_index(i);
-
-      bool is_boundary_vertex = false;
-      // For all faces, such that the face contains the vertex
-      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
-      {
-        if (cell->at_boundary(face_no) && !boundary_conditions.should_limit_this_boundary_id(cell->face(face_no)->boundary_id()))
-        {
-          TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
-          for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
-          {
-            if (face->vertex_index(face_i) == v_i)
-            {
-              is_boundary_vertex = true;
-              break;
-            }
-          }
-          if (is_boundary_vertex)
-            break;
-        }
-      }
-      if (is_boundary_vertex)
-        continue;
-
       std::set<unsigned int> visited_faces;
 
       // (!!!) Find out u_i
       Vector<double> u_i(Equations<equationsType, dim>::n_components);
-      VectorTools::point_value(dof_handler, current_unlimited_solution, cell->center() + (1. - NEGLIGIBLE) * (cell->vertex(i) - cell->center()), u_i);
+      VectorTools::point_value(dof_handler, current_unlimited_solution, data->vertexPoint[i], u_i);
 
       if (parameters.debug)
       {
@@ -168,123 +172,55 @@ void Problem<equationsType, dim>::postprocess()
         u_i_min[k] = u_c[k];
         u_i_max[k] = u_c[k];
       }
-      // For all faces, such that the face contains the vertex
-      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+
+      // For all vertices -> v_i
+      for (auto dof_indices_neighbor : data->neighbor_dof_indices[i])
       {
-        if (visited_faces.find(cell->face_index(face_no)) != visited_faces.end())
+        if (dof_indices_neighbor.size() == 0)
           continue;
-
-        visited_faces.insert(cell->face_index(face_no));
-
-        // Look at the right neighbor (h-adaptivity)
-        // (!!!) Assuming there is no division at this point (no adaptivity)
-        if (cell->at_boundary(face_no))
-          continue;
-
-        TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
-        bool is_relevant_face = false;
-        for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
-        {
-          if (face->vertex_index(face_i) == v_i)
-            is_relevant_face = true;
-        }
-        if (is_relevant_face)
-        {
-          // Update u_i_min, u_i_max
-          const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-          neighbor->get_dof_indices(dof_indices_neighbor);
-
-          bool u_i_extrema_set[Equations<equationsType, dim>::n_components];
+        bool u_i_extrema_set[Equations<equationsType, dim>::n_components];
           for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
             u_i_extrema_set[i] = false;
 
-          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        for (unsigned int i = 0; i < dofs_per_cell; ++i)
+        {
+          if (is_primitive[i])
           {
-            if (is_primitive[i])
+            if (!u_i_extrema_set[component_ii[i]])
             {
-              if (!u_i_extrema_set[component_ii[i]])
+              double val = current_unlimited_solution(dof_indices_neighbor[i]);
+              if (parameters.debug)
               {
-                double val = current_unlimited_solution(dof_indices_neighbor[i]);
-                if (parameters.debug)
-                {
-                  if (val < u_i_min[component_ii[i]])
-                    std::cout << "\tdecreasing u_i_min to: " << val << std::endl;
-                  if (val > u_i_max[component_ii[i]])
-                    std::cout << "\tincreasing u_i_max to: " << val << std::endl;
-                }
-                u_i_min[component_ii[i]] = std::min(u_i_min[component_ii[i]], val);
-                u_i_max[component_ii[i]] = std::max(u_i_max[component_ii[i]], val);
-                u_i_extrema_set[component_ii[i]] = true;
+                if (val < u_i_min[component_ii[i]])
+                  std::cout << "\tdecreasing u_i_min to: " << val << std::endl;
+                if (val > u_i_max[component_ii[i]])
+                  std::cout << "\tincreasing u_i_max to: " << val << std::endl;
               }
-            }
-          }
-
-          // From the right neighbor, look at all faces, such that the face contains the vertex
-          for (unsigned int neighbor_face_no = 0; neighbor_face_no < GeometryInfo<dim>::faces_per_cell; ++neighbor_face_no)
-          {
-            if (visited_faces.find(neighbor->face_index(neighbor_face_no)) != visited_faces.end())
-              continue;
-
-            visited_faces.insert(neighbor->face_index(neighbor_face_no));
-
-            if (neighbor->at_boundary(neighbor_face_no))
-              continue;
-
-            // Look at the right neighbor's neighbor (h-adaptivity)
-            // (!!!) Assuming there is no division at this point (no adaptivity)
-            TriaIterator<TriaAccessor<dim - 1, dim, dim> > neighbor_face = neighbor->face(neighbor_face_no);
-            bool is_neighbor_relevant_face = false;
-            for (unsigned int neighbor_face_i = 0; neighbor_face_i < GeometryInfo<dim>::vertices_per_face; ++neighbor_face_i)
-            {
-              if (neighbor_face->vertex_index(neighbor_face_i) == v_i)
-                is_neighbor_relevant_face = true;
-            }
-            if (is_neighbor_relevant_face)
-            {
-              // Update u_i_min, u_i_max
-              const typename DoFHandler<dim>::cell_iterator neighbor_neighbor = neighbor->neighbor(neighbor_face_no);
-              neighbor_neighbor->get_dof_indices(dof_indices_neighbor);
-
-              bool u_i_extrema_set_neighbor[Equations<equationsType, dim>::n_components];
-              for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-                u_i_extrema_set_neighbor[i] = false;
-              for (unsigned int i = 0; i < dofs_per_cell; ++i)
-              {
-                if (is_primitive[i])
-                {
-                  if (!u_i_extrema_set_neighbor[component_ii[i]])
-                  {
-                    u_i_min[component_ii[i]] = std::min(u_i_min[component_ii[i]], (double)current_unlimited_solution(dof_indices_neighbor[i]));
-                    u_i_max[component_ii[i]] = std::max(u_i_max[component_ii[i]], (double)current_unlimited_solution(dof_indices_neighbor[i]));
-                    u_i_extrema_set_neighbor[component_ii[i]] = true;
-                  }
-                }
-              }
+              u_i_min[component_ii[i]] = std::min(u_i_min[component_ii[i]], val);
+              u_i_max[component_ii[i]] = std::max(u_i_max[component_ii[i]], val);
+              u_i_extrema_set[component_ii[i]] = true;
             }
           }
         }
       }
 
-      if (!is_boundary_vertex)
-      {
-        // Based on u_i_min, u_i_max, u_i, get alpha_e
-        for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
-          if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
-          {
-            alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
-            if (parameters.debug)
-              std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
-          }
-      }
+      // Based on u_i_min, u_i_max, u_i, get alpha_e
+      for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
+        if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
+        {
+          alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
+          if (parameters.debug)
+            std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
+        }
     }
 
     for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
-      for (int i = 0; i < lambda_indices_to_multiply[k].size(); i++)
-        current_limited_solution(lambda_indices_to_multiply[k][i]) *= alpha_e[k];
+      for (int i = 0; i < data->lambda_indices_to_multiply[k].size(); i++)
+        current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= alpha_e[k];
 
     double alpha_e_B = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
-    for (int i = 0; i < lambda_indices_to_multiply_all_B_components.size(); i++)
-      current_limited_solution(lambda_indices_to_multiply_all_B_components[i]) *= alpha_e_B;
+    for (int i = 0; i < data->lambda_indices_to_multiply_all_B_components.size(); i++)
+      current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= alpha_e_B;
   }
 }
 
@@ -415,7 +351,7 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
       double val = 0.;
       for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
       {
-        if(is_primitive[i])
+        if (is_primitive[i])
           val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
         else
         {
@@ -730,7 +666,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -796,7 +732,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
     remove("triangulation");
     remove("triangulation.info");
     remove("history");
-}
+  }
 #else
   prev_solution = 0;
 #endif

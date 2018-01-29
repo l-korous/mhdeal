@@ -17,9 +17,6 @@ public:
   // Values for this boundary identifier.
   void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus) const;
 
-  // Values for this boundary identifier.
-  bool should_limit_this_boundary_id(int boundary_no) const;
-
   double compute_energy_from_given_pressure(const InputVector &W, double pressure) const;
 
   // Passed as a constructor parameter
