@@ -11,14 +11,14 @@ public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
   Parameters() {};
 
+  // If relative change between the previous non-linear step and the current one is smaller than this, then we say that the current step was SUCCESSFUL
+  bool use_div_free_space_for_B;
+
   // Flux enumeration - for potentially adding more fluxes, decision which one to use is then made in Equations<>::numerical_normal_flux.
   enum NumFluxType { hlld, lax_friedrich };
   NumFluxType num_flux_type;
   // A special value for lax_friedrich
   double lax_friedrich_stabilization_value;
-
-  double stagnation_coefficient, bad_step_coefficient;
-  bool use_div_free_space_for_B;
 
   // Output step - either < 0 (output all steps), or > 0 (time difference between two outputs)
   double output_step, snapshot_step;
@@ -39,6 +39,10 @@ public:
   // Nonlinear solver
   // Damping factor in Newton
   double initial_and_max_newton_damping;
+  // Make damping factor variable
+  bool automatic_damping;
+  // Make CFL coefficient variable
+  bool automatic_cfl;
   double decrease_factor;
   double increase_factor;
   bool limit_in_nonlin_loop;
@@ -46,6 +50,10 @@ public:
   int newton_max_iterations;
   // Tolerance for nonlinear residual norm, succeed the nonlinear loop if norm < newton_residual_norm_threshold
   double newton_residual_norm_threshold;
+  // If relative change between the previous non-linear step and the current one is smaller than this, then we say that the current step was SUCCESSFUL.
+  double stagnation_coefficient;
+  // If relative change between the previous non-linear step and the current one is larger than this, then we say that the current step was NOT SUCCESSFUL.
+  double bad_step_coefficient;
 
   // Linear solver type enumeration
   enum SolverType { gmres, direct };
@@ -67,7 +75,7 @@ public:
   double ilut_drop;
 
   // Global - obvious
-  double time_step, final_time, cfl_constant, initial_and_max_cfl_constant;
+  double time_step, final_time, initial_and_max_cfl_coefficient;
   // Polynomial order for the flow part.
   int polynomial_order_dg;
   // Quadrature order.

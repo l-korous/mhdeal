@@ -179,8 +179,8 @@ void Problem<equationsType, dim>::postprocess()
         if (dof_indices_neighbor.size() == 0)
           continue;
         bool u_i_extrema_set[Equations<equationsType, dim>::n_components];
-          for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-            u_i_extrema_set[i] = false;
+        for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+          u_i_extrema_set[i] = false;
 
         for (unsigned int i = 0; i < dofs_per_cell; ++i)
         {
@@ -227,7 +227,7 @@ void Problem<equationsType, dim>::postprocess()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::calculate_cfl_condition()
 {
-  cfl_time_step = parameters.cfl_constant * GridTools::minimal_cell_diameter(this->triangulation) / this->equations.max_signal_speed;
+  cfl_time_step = cfl_coefficient * GridTools::minimal_cell_diameter(this->triangulation) / this->equations.max_signal_speed;
 }
 
 template <EquationsType equationsType, int dim>
@@ -807,6 +807,7 @@ void Problem<equationsType, dim>::run()
 
   // Time loop.
   double newton_damping = this->parameters.initial_and_max_newton_damping;
+    cfl_coefficient = this->parameters.initial_and_max_cfl_coefficient;
   bool previous_bad_step = false;
 
 #ifdef OUTPUT_BASE
@@ -826,7 +827,6 @@ void Problem<equationsType, dim>::run()
     }
 
     double res_norm_prev[2] = { 0., 0. };
-    double res_norm_initial;
     bool bad_step = false;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
@@ -865,7 +865,6 @@ void Problem<equationsType, dim>::run()
       {
         newton_update = current_limited_solution;
         newton_update -= lin_solution;
-
         newton_update *= newton_damping;
         lin_solution += newton_update;
       }
@@ -875,9 +874,6 @@ void Problem<equationsType, dim>::run()
       if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
         std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
 
-      if (linStep == 0)
-        res_norm_initial = res_norm;
-
       if ((res_norm < parameters.newton_residual_norm_threshold) || ((linStep > 1) && ((std::abs(res_norm_prev[1] - res_norm) / res_norm) < parameters.stagnation_coefficient)))
       {
         bad_step = false;
@@ -885,13 +881,20 @@ void Problem<equationsType, dim>::run()
       }
       else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm - res_norm_prev[0]) / res_norm_prev[0]) > parameters.bad_step_coefficient)))
       {
-        parameters.cfl_constant *= this->parameters.decrease_factor;
-        time -= parameters.time_step;
-        parameters.time_step *= this->parameters.decrease_factor;
-        time += parameters.time_step;
-        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+        if (this->parameters.automatic_cfl)
         {
-          std::cout << "\t\tWorse CFL coefficient: " << parameters.cfl_constant << std::endl;
+          this->cfl_coefficient *= this->parameters.decrease_factor;
+          time -= parameters.time_step;
+          parameters.time_step *= this->parameters.decrease_factor;
+          time += parameters.time_step;
+          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+            std::cout << "\t\tWorse CFL coefficient: " << this->cfl_coefficient << std::endl;
+        }
+        if (this->parameters.automatic_damping)
+        {
+          newton_damping *= this->parameters.decrease_factor;
+          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+            std::cout << "\t\tWorse Newton damping coefficient: " << newton_damping << std::endl;
         }
         this->lin_solution = this->prev_solution;
         bad_step = true;
@@ -908,9 +911,18 @@ void Problem<equationsType, dim>::run()
     {
       if (!initial_step)
       {
-        parameters.cfl_constant = std::min(this->parameters.initial_and_max_cfl_constant, parameters.cfl_constant * parameters.increase_factor);
-        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-          std::cout << "\t\tBetter CFL coefficient: " << parameters.cfl_constant << std::endl;
+        if (this->parameters.automatic_cfl)
+        {
+          this->cfl_coefficient = std::min(this->parameters.initial_and_max_cfl_coefficient, this->cfl_coefficient * parameters.increase_factor);
+          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+            std::cout << "\t\tBetter CFL coefficient: " << this->cfl_coefficient << std::endl;
+        }
+        if (this->parameters.automatic_damping)
+        {
+          newton_damping = std::min(this->parameters.initial_and_max_newton_damping, newton_damping * parameters.increase_factor);
+          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+            std::cout << "\t\tBetter Newton damping coefficient: " << newton_damping << std::endl;
+        }
       }
       move_time_step_handle_outputs();
     }

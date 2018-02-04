@@ -24,22 +24,24 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.5, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.5, 0.01);
-  parameters.refinements = { 50, 50, 1 };
+  parameters.corner_a = Point<DIMENSION>(-0.4, -0.4, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.4, 0.4, 0.01);
+  parameters.refinements = { 25, 25, 1 };
   parameters.use_div_free_space_for_B = true;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.initial_and_max_cfl_constant = parameters.cfl_constant = .02;
+  parameters.initial_and_max_cfl_coefficient = .01;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
-  parameters.limit_in_nonlin_loop = false;
-  parameters.initial_and_max_newton_damping = .8;
 
-  parameters.decrease_factor = .8;
-  parameters.increase_factor = 1.1;
-  parameters.stagnation_coefficient = 1.e-4;
-  parameters.bad_step_coefficient = 1.;
+  parameters.limit_in_nonlin_loop = false;
+  parameters.automatic_damping = false;
+  parameters.automatic_cfl = true;
+  parameters.initial_and_max_newton_damping = 1.;
+  parameters.decrease_factor = .9;
+  parameters.increase_factor = 1. / parameters.decrease_factor;
+  parameters.stagnation_coefficient = 1.e-2;
+  parameters.bad_step_coefficient = 2.;
 
   parameters.patches = 2;
   parameters.output_step = -1.e-3;
@@ -66,7 +68,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 
   parameters.gas_gamma = 1.4;
 
-  parameters.newton_max_iterations = 100;
+  parameters.newton_max_iterations = 30;
   parameters.newton_residual_norm_threshold = 1e-8;
 }
 

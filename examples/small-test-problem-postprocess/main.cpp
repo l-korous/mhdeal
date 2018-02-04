@@ -30,11 +30,12 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.use_div_free_space_for_B = true;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.initial_and_max_cfl_constant = parameters.cfl_constant = .02;
+  parameters.initial_and_max_cfl_coefficient = .02;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.limit_in_nonlin_loop = true;
   parameters.initial_and_max_newton_damping = .8;
+  parameters.automatic_damping = parameters.automatic_cfl = false;
 
   parameters.decrease_factor = .8;
   parameters.increase_factor = 1.1;

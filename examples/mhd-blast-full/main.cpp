@@ -30,19 +30,20 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.initial_and_max_cfl_constant = parameters.cfl_constant = .02;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
-  parameters.limit_in_nonlin_loop = false;
-  parameters.initial_and_max_newton_damping = .8;
-
-  parameters.decrease_factor = .8;
-  parameters.increase_factor = 1.1;
-  parameters.stagnation_coefficient = 1.e-4;
-  parameters.bad_step_coefficient = 1.;
+  
+  parameters.limit_in_nonlin_loop = true;
+  parameters.automatic_damping = true;
+  parameters.automatic_cfl = false;
+  parameters.initial_and_max_newton_damping = 1.;
+  parameters.decrease_factor = .9;
+  parameters.increase_factor = 1. / parameters.decrease_factor;
+  parameters.stagnation_coefficient = 1.e-2;
+  parameters.bad_step_coefficient = 2.;
 
   parameters.patches = 2;
-  parameters.output_step = 1.e-3;
+  parameters.output_step = 1.e-1;
 
   parameters.debug = false;
 
@@ -66,8 +67,8 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 
   parameters.gas_gamma = 1.4;
 
-  parameters.newton_max_iterations = 100;
-  parameters.newton_residual_norm_threshold = 1e-8;
+  parameters.newton_max_iterations = 50;
+  parameters.newton_residual_norm_threshold = 1e-7;
 }
 
 int main(int argc, char *argv[])

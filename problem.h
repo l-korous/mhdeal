@@ -158,5 +158,5 @@ private:
   // Utility
   bool is_periodic_boundary(int boundary_id) const;
   public:
-  double res_norm;
+  double res_norm, cfl_coefficient;
 };
