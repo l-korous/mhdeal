@@ -30,6 +30,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
+  parameters.initial_and_max_cfl_coefficient = .01;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   
