@@ -33,7 +33,8 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.initial_and_max_cfl_coefficient = .01;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
-  
+
+  parameters.use_iterative_improvement = true;
   parameters.limit_in_nonlin_loop = true;
   parameters.automatic_damping = true;
   parameters.automatic_cfl = false;

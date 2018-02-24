@@ -11,8 +11,11 @@ public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
   Parameters() {};
 
-  // If relative change between the previous non-linear step and the current one is smaller than this, then we say that the current step was SUCCESSFUL
+  // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
+
+  // Perform iterative improvements.
+  bool use_iterative_improvement;
 
   // Flux enumeration - for potentially adding more fluxes, decision which one to use is then made in Equations<>::numerical_normal_flux.
   enum NumFluxType { hlld, lax_friedrich };

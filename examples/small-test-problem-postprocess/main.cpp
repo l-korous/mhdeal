@@ -36,6 +36,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.limit_in_nonlin_loop = true;
   parameters.initial_and_max_newton_damping = .8;
   parameters.automatic_damping = parameters.automatic_cfl = false;
+  parameters.use_iterative_improvement = true;
 
   parameters.decrease_factor = .8;
   parameters.increase_factor = 1.1;

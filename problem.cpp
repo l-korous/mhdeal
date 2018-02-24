@@ -405,15 +405,21 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
           for (unsigned int d = 0; d < dim; d++)
           {
             W_prev[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
-            W_lin[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
+            if (this->parameters.use_iterative_improvement)
+              W_lin[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
           }
         }
         else
         {
           W_prev[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
-          W_lin[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
+          if (this->parameters.use_iterative_improvement)
+            W_lin[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
         }
       }
+      if (!this->parameters.use_iterative_improvement)
+        for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
+          W_lin[c] = W_prev[q][c];
+
       equations.compute_flux_matrix(W_lin, fluxes_old[q]);
     }
 
@@ -467,21 +473,40 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
         {
           dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
           for (int d = 0; d < dim; d++)
-            Wplus_old[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
+          {
+            if (this->parameters.use_iterative_improvement)
+              Wplus_old[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
+            else
+              Wplus_old[5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
+          }
         }
         else
-          Wplus_old[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-
+        {
+          if (this->parameters.use_iterative_improvement)
+            Wplus_old[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          else
+            Wplus_old[component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+        }
         if (!external_face)
         {
           if (!is_primitive[i])
           {
             dealii::Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
             for (int d = 0; d < dim; d++)
-              Wminus_old[5 + d] += lin_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+            {
+              if (this->parameters.use_iterative_improvement)
+                Wminus_old[5 + d] += lin_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+              else
+                Wminus_old[5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+            }
           }
           else
-            Wminus_old[component_ii[i]] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+          {
+            if (this->parameters.use_iterative_improvement)
+              Wminus_old[component_ii[i]] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+            else
+              Wminus_old[component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+          }
         }
       }
     }
@@ -666,7 +691,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-  }
+}
 #else
   std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -732,7 +757,7 @@ void Problem<equationsType, dim>::setup_initial_solution()
     remove("triangulation");
     remove("triangulation.info");
     remove("history");
-  }
+}
 #else
   prev_solution = 0;
 #endif
@@ -807,7 +832,7 @@ void Problem<equationsType, dim>::run()
 
   // Time loop.
   double newton_damping = this->parameters.initial_and_max_newton_damping;
-    cfl_coefficient = this->parameters.initial_and_max_cfl_coefficient;
+  cfl_coefficient = this->parameters.initial_and_max_cfl_coefficient;
   bool previous_bad_step = false;
 
 #ifdef OUTPUT_BASE
@@ -855,61 +880,68 @@ void Problem<equationsType, dim>::run()
       else
         current_limited_solution = current_unlimited_solution;
 
-      if (initial_step || newton_damping > (1. - 1.e-8))
+      if (this->parameters.use_iterative_improvement)
       {
-        newton_update = current_limited_solution;
-        newton_update -= lin_solution;
+        if (initial_step || newton_damping > (1. - 1.e-8))
+        {
+          newton_update = current_limited_solution;
+          newton_update -= lin_solution;
+          lin_solution = current_limited_solution;
+        }
+        else
+        {
+          newton_update = current_limited_solution;
+          newton_update -= lin_solution;
+          newton_update *= newton_damping;
+          lin_solution += newton_update;
+        }
+        // Get the residual norm.
+        res_norm = newton_update.linfty_norm();
+        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+          std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
+
+        if ((res_norm < parameters.newton_residual_norm_threshold) || ((linStep > 1) && ((std::abs(res_norm_prev[1] - res_norm) / res_norm) < parameters.stagnation_coefficient)))
+        {
+          bad_step = false;
+          break;
+        }
+        else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm - res_norm_prev[0]) / res_norm_prev[0]) > parameters.bad_step_coefficient)))
+        {
+          if (this->parameters.automatic_cfl)
+          {
+            this->cfl_coefficient *= this->parameters.decrease_factor;
+            time -= parameters.time_step;
+            parameters.time_step *= this->parameters.decrease_factor;
+            time += parameters.time_step;
+            if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+              std::cout << "\t\tWorse CFL coefficient: " << this->cfl_coefficient << std::endl;
+          }
+          if (this->parameters.automatic_damping)
+          {
+            newton_damping *= this->parameters.decrease_factor;
+            if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+              std::cout << "\t\tWorse Newton damping coefficient: " << newton_damping << std::endl;
+          }
+          this->lin_solution = this->prev_solution;
+          bad_step = true;
+          break;
+        }
+        else
+        {
+          res_norm_prev[1] = res_norm_prev[0];
+          res_norm_prev[0] = res_norm;
+        }
+      }
+      else
+      {
         lin_solution = current_limited_solution;
-      }
-      else
-      {
-        newton_update = current_limited_solution;
-        newton_update -= lin_solution;
-        newton_update *= newton_damping;
-        lin_solution += newton_update;
-      }
-
-      // Get the residual norm.
-      res_norm = newton_update.linfty_norm();
-      if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-        std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
-
-      if ((res_norm < parameters.newton_residual_norm_threshold) || ((linStep > 1) && ((std::abs(res_norm_prev[1] - res_norm) / res_norm) < parameters.stagnation_coefficient)))
-      {
-        bad_step = false;
         break;
-      }
-      else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm - res_norm_prev[0]) / res_norm_prev[0]) > parameters.bad_step_coefficient)))
-      {
-        if (this->parameters.automatic_cfl)
-        {
-          this->cfl_coefficient *= this->parameters.decrease_factor;
-          time -= parameters.time_step;
-          parameters.time_step *= this->parameters.decrease_factor;
-          time += parameters.time_step;
-          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-            std::cout << "\t\tWorse CFL coefficient: " << this->cfl_coefficient << std::endl;
-        }
-        if (this->parameters.automatic_damping)
-        {
-          newton_damping *= this->parameters.decrease_factor;
-          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-            std::cout << "\t\tWorse Newton damping coefficient: " << newton_damping << std::endl;
-        }
-        this->lin_solution = this->prev_solution;
-        bad_step = true;
-        break;
-      }
-      else
-      {
-        res_norm_prev[1] = res_norm_prev[0];
-        res_norm_prev[0] = res_norm;
       }
     }
 
-    if (!bad_step && !previous_bad_step)
+    if (!parameters.use_iterative_improvement || (!bad_step && !previous_bad_step))
     {
-      if (!initial_step)
+      if (!initial_step && parameters.use_iterative_improvement)
       {
         if (this->parameters.automatic_cfl)
         {
@@ -927,7 +959,8 @@ void Problem<equationsType, dim>::run()
       move_time_step_handle_outputs();
     }
 
-    previous_bad_step = bad_step;
+    if(parameters.use_iterative_improvement)
+      previous_bad_step = bad_step;
   }
 }
 

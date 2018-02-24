@@ -40,6 +40,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.stagnation_coefficient = 1.e-4;
   parameters.bad_step_coefficient = 1.;
   parameters.automatic_damping = parameters.automatic_cfl = false;
+  parameters.use_iterative_improvement = true;
 
   parameters.patches = 2;
   parameters.output_step = -1.e-3;
