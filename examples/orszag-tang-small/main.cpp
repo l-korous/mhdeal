@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 #endif    
     set_triangulation(triangulation, parameters);
 
-    MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionOT<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
