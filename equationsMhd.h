@@ -1,6 +1,8 @@
 #ifndef _EQUATIONS_MHD_H
 #define _EQUATIONS_MHD_H
 
+#define PI 3.14159265359
+
 #include "equations.h"
 #include "parameters.h"
 

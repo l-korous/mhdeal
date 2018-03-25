@@ -27,13 +27,13 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
   parameters.corner_b = Point<DIMENSION>(1., 1., 0.01);
-  parameters.refinements = { 25, 25, 1 };
-  parameters.use_div_free_space_for_B = true;
+  parameters.refinements = { 100, 100, 1 };
+  parameters.use_div_free_space_for_B = false;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.initial_and_max_cfl_coefficient = .05;
+  parameters.initial_and_max_cfl_coefficient = .03;
   parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.polynomial_order_dg = 0;
 
   parameters.use_iterative_improvement = false;
   parameters.limit_in_nonlin_loop = false;
