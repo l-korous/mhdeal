@@ -9,7 +9,7 @@ class Parameters
 {
 public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
-  Parameters() : limit(true) {
+  Parameters() : limit(true), output_file_prefix("") {
   };
 
   // Use exactly Div-Free space.
@@ -26,6 +26,8 @@ public:
 
   // Output step - either < 0 (output all steps), or > 0 (time difference between two outputs)
   double output_step, snapshot_step;
+  // File name
+  std::string output_file_prefix;
 
   // Output matrix after assemble_system() in Problem::run().
   bool output_matrix;

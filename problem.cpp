@@ -673,7 +673,7 @@ void Problem<equationsType, dim>::output_results() const
   static unsigned int output_file_number = 0;
 
 #ifdef HAVE_MPI
-  const std::string filename_base = "solution-" + Utilities::int_to_string(output_file_number, 3);
+  const std::string filename_base = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3);
 
   const std::string filename = (filename_base + "-" + Utilities::int_to_string(triangulation.locally_owned_subdomain(), 4));
 
@@ -693,7 +693,7 @@ void Problem<equationsType, dim>::output_results() const
     data_out.write_pvtu_record(visit_master_output, filenames);
 }
 #else
-  std::string filename = "solution-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
+  std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
   data_out.write_vtk(output);
 #endif

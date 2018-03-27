@@ -25,6 +25,7 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
+  parameters.output_file_prefix = "ot-solution";
   parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
   parameters.corner_b = Point<DIMENSION>(1., 1., 0.001);
   parameters.refinements = { 300, 300, 1 };
@@ -59,7 +60,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.snapshot_step = 1.;
 
   parameters.time_step = 1.e-5;
-  parameters.final_time = .5;
+  parameters.final_time = 3.;
 
   parameters.solver = Parameters<DIMENSION>::gmres;
   parameters.linear_residual = 1e-10;

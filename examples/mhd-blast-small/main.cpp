@@ -24,11 +24,12 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.4, -0.4, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.4, 0.4, 0.01);
-  parameters.refinements = { 80, 80, 1 };
+  parameters.corner_a = Point<DIMENSION>(0.0, 0.0, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.4, 0.4, 0.001);
+  parameters.refinements = { 40, 40, 1 };
+  parameters.limit = false;
   parameters.use_div_free_space_for_B = true;
-  parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
+  //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.initial_and_max_cfl_coefficient = .05;
   parameters.quadrature_order = 5;
