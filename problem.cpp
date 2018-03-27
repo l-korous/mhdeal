@@ -875,7 +875,7 @@ void Problem<equationsType, dim>::run()
         output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
 
       // Postprocess if required
-      if (parameters.polynomial_order_dg > 0 && parameters.limit_in_nonlin_loop)
+      if (parameters.limit && parameters.polynomial_order_dg > 0 && parameters.limit_in_nonlin_loop)
         postprocess();
       else
         current_limited_solution = current_unlimited_solution;
@@ -967,7 +967,7 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
-  if (parameters.polynomial_order_dg > 0 && !parameters.limit_in_nonlin_loop)
+  if (parameters.limit && parameters.polynomial_order_dg > 0 && !parameters.limit_in_nonlin_loop)
   {
     postprocess();
     lin_solution = current_limited_solution;

@@ -57,7 +57,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.snapshot_step = 1.;
 
   parameters.time_step = 1.e-5;
-  parameters.final_time = 10.;
+  parameters.final_time = 1.;
 
   parameters.solver = Parameters<DIMENSION>::gmres;
   parameters.linear_residual = 1e-10;

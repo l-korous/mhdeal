@@ -9,7 +9,8 @@ class Parameters
 {
 public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
-  Parameters() {};
+  Parameters() : limit(true) {
+  };
 
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
@@ -48,7 +49,7 @@ public:
   bool automatic_cfl;
   double decrease_factor;
   double increase_factor;
-  bool limit_in_nonlin_loop;
+  bool limit, limit_in_nonlin_loop;
   // Maximum allowed nonlinear iterations count, fail if exceeded
   int newton_max_iterations;
   // Tolerance for nonlinear residual norm, succeed the nonlinear loop if norm < newton_residual_norm_threshold

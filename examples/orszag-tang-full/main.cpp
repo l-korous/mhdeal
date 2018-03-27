@@ -2,6 +2,7 @@
 #include "problem.h"
 #include "equationsMhd.h"
 #include "parameters.h"
+#include "initialConditionOT.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
 #define DIMENSION 3
@@ -24,15 +25,16 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.01);
-  parameters.refinements = { 300, 450, 1 };
+  parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
+  parameters.corner_b = Point<DIMENSION>(1., 1., 0.001);
+  parameters.refinements = { 300, 300, 1 };
+  parameters.limit = false;
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.initial_and_max_cfl_coefficient = .05;
-  parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.initial_and_max_cfl_coefficient = .01;
+  parameters.quadrature_order = 3;
+  parameters.polynomial_order_dg = 0;
 
   parameters.use_iterative_improvement = false;
   parameters.limit_in_nonlin_loop = false;
@@ -44,7 +46,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.stagnation_coefficient = 1.e-2;
   parameters.bad_step_coefficient = 2.;
 
-  parameters.patches = 1;
+  parameters.patches = 2;
   parameters.output_step = 1.e-2;
 
   parameters.debug = false;
@@ -57,7 +59,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.snapshot_step = 1.;
 
   parameters.time_step = 1.e-5;
-  parameters.final_time = 1.;
+  parameters.final_time = .5;
 
   parameters.solver = Parameters<DIMENSION>::gmres;
   parameters.linear_residual = 1e-10;
@@ -67,7 +69,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.ilut_atol = 1e-6;
   parameters.ilut_rtol = 1.0;
 
-  parameters.gas_gamma = 1.4;
+  parameters.gas_gamma = 5. / 3.;
 
   parameters.newton_max_iterations = 30;
   parameters.newton_residual_norm_threshold = 1e-8;
@@ -102,7 +104,7 @@ int main(int argc, char *argv[])
 #endif    
     set_triangulation(triangulation, parameters);
 
-    MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionOT<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
