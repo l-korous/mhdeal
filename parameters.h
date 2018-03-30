@@ -9,7 +9,26 @@ class Parameters
 {
 public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
-  Parameters() : limit(true), output_file_prefix("") {
+  Parameters() {
+    this->limit = true;
+    this->output_file_prefix = "";
+    this->lax_friedrich_stabilization_value = .5;
+    this->snapshot_step = 1.;
+    this->time_step = 1.e-5;
+
+    this->debug = false;
+    this->output_matrix = false;
+    this->output = quiet_solver;
+    this->output_rhs = false;
+    this->output_solution = false;
+
+    this->solver = gmres;
+    this->linear_residual = 1e-10;
+    this->max_iterations = 10000;
+    this->ilut_fill = 1.5;
+    this->ilut_drop = 1e-6;
+    this->ilut_atol = 1e-6;
+    this->ilut_rtol = 1.0;
   };
 
   // Use exactly Div-Free space.

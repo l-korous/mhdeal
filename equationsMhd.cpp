@@ -236,64 +236,45 @@ template <int dim>
 void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus_, const InputVector &Wminus_,
   std_cxx11::array<double, n_components> &normal_flux)
 {
-  double srdl, srdr, Fl[n_components], Fr[n_components], hl[2], hr[2], Uk, Um, E2, E3, Sl, Sr, pml, pmr, B, B2;
-  double Udl[n_components], Udr[n_components], Ul[n_components], Ur[n_components], cl, cm, cr, ptl, ptr;
-  double sp[5], sml, smr, ptst, ptstr, vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
+  double Fl[n_components], Fr[n_components], hl[2], hr[2];
+  double Udl[n_components], Udr[n_components], Ul[n_components], Ur[n_components];
+  double sp[5], vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
 
   std::array<double, n_components> ul, ur;
   Q(ul, Wplus_, normal);
   Q(ur, Wminus_, normal);
 
-  B = 0.5*(ul[5] + ur[5]);
-  B2 = B*B;
+  double B = 0.5*(ul[5] + ur[5]);
+  double B2 = B*B;
 
-  // Calculate left flux
+  // Densities, energies.
   hl[0] = 1.0 / ul[0];
-  Uk = 0.5*hl[0] * (ul[1] * ul[1] + ul[2] * ul[2] + ul[3] * ul[3]);
-  Um = 0.5*(ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);
-  hl[1] = (parameters.gas_gamma - 1)*(ul[4] - Uk - Um);
-  E2 = hl[0] * (ul[1] * ul[7] - ul[3] * ul[5]);
-  E3 = hl[0] * (ul[2] * ul[5] - ul[1] * ul[6]);
+  double Ukl = 0.5 * hl[0] * (ul[1] * ul[1] + ul[2] * ul[2] + ul[3] * ul[3]);
+  double Uml = 0.5 * (ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);
+  hl[1] = (parameters.gas_gamma - 1) * (ul[4] - Ukl - Uml);
 
-  Fl[0] = ul[1];
-  Fl[1] = hl[0] * ul[1] * ul[1] - ul[5] * ul[5] + Um + hl[1];
-  Fl[2] = hl[0] * ul[1] * ul[2] - ul[5] * ul[6];
-  Fl[3] = hl[0] * ul[1] * ul[3] - ul[5] * ul[7];
-  Fl[5] = 0.0;
-  Fl[6] = -E3;
-  Fl[7] = E2;
-  Fl[4] = hl[0] * ul[1] * (hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*ul[7] - E3*ul[6]);
-
-  // Calculate right flux
   hr[0] = 1.0 / ur[0];
-  Uk = 0.5*hr[0] * (ur[1] * ur[1] + ur[2] * ur[2] + ur[3] * ur[3]);
-  Um = 0.5*(ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);
-  hr[1] = (parameters.gas_gamma - 1)*(ur[4] - Uk - Um);
-  E2 = hr[0] * (ur[1] * ur[7] - ur[3] * ur[5]);
-  E3 = hr[0] * (ur[2] * ur[5] - ur[1] * ur[6]);
+  double Ukr = 0.5 * hr[0] * (ur[1] * ur[1] + ur[2] * ur[2] + ur[3] * ur[3]);
+  double Umr = 0.5 * (ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);
+  hr[1] = (parameters.gas_gamma - 1) * (ur[4] - Ukr - Umr);
 
-  Fr[0] = ur[1];
-  Fr[1] = hr[0] * ur[1] * ur[1] - ur[5] * ur[5] + Um + hr[1];
-  Fr[2] = hr[0] * ur[1] * ur[2] - ur[5] * ur[6];
-  Fr[3] = hr[0] * ur[1] * ur[3] - ur[5] * ur[7];
-  Fr[5] = 0.0;
-  Fr[6] = -E3;
-  Fr[7] = E2;
-  Fr[4] = hr[0] * ur[1] * (hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Uk) + (E2*ur[7] - E3*ur[6]);
+  // sound speed
+  double al2 = parameters.gas_gamma * hl[1] * hl[0];
+  double ar2 = parameters.gas_gamma * hr[1] * hr[0];
 
-  pml = 0.5*(ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);
-  pmr = 0.5*(ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);
   // fast magnetoacoustic speed
-  cl = parameters.gas_gamma*hl[1] + 2.0*pml;
-  cl = sqrt(0.5*hl[0] * (cl + sqrt(cl*cl - 4.0*parameters.gas_gamma*hl[1] * ul[5] * ul[5])));
-  cr = parameters.gas_gamma*hr[1] + 2.0*pmr;
-  cr = sqrt(0.5*hr[0] * (cr + sqrt(cr*cr - 4.0*parameters.gas_gamma*hr[1] * ur[5] * ur[5])));
+  double cl = (al2 + (2. * Uml * hl[0]));
+  cl = sqrt(0.5 * (cl + sqrt((cl * cl) - (4.0 * al2 * ul[5] * ul[5] * hl[0]))));
 
-  ptl = hl[1] + pml;  // total pressure
-  ptr = hr[1] + pmr;
+  double cr = ar2 + (2. * Umr * hr[0]);
+  cr = sqrt(0.5 * (cr + sqrt((cr * cr) - (4.0 * ar2 * ur[5] * ur[5] * hr[0]))));
+
+  // total pressure
+  double ptl = hl[1] + Uml;
+  double ptr = hr[1] + Umr;
 
   // maximum of fast magnetoacoustic speeds L/R
-  cm = (cl > cr) ? cl : cr;
+  double cm = (cl > cr) ? cl : cr;
   if (ul[1] * hl[0] <= ur[1] * hr[0]) {
     sp[0] = ul[1] * hl[0] - cm;
     sp[4] = ur[1] * hr[0] + cm;
@@ -304,6 +285,54 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
 
   this->store_max_signal_speed(std::max(std::abs(sp[0]), std::abs(sp[4])));
+
+  // If we use Lax Friedrich's flux.
+  if (this->parameters.num_flux_type == Parameters<dim>::lax_friedrich)
+  {
+    std_cxx11::array<typename InputVector::value_type, n_components> normal_flux_lf;
+    std_cxx11::array<std_cxx11::array <typename InputVector::value_type, dim>, n_components > iflux, oflux;
+
+    compute_flux_matrix(Wplus_, iflux);
+    compute_flux_matrix(Wminus_, oflux);
+
+    for (unsigned int di = 0; di < n_components; ++di)
+    {
+      normal_flux[di] = 0.;
+      for (unsigned int d = 0; d < dim; ++d)
+        normal_flux[di] += 0.5 * (iflux[di][d] + oflux[di][d]) * normal[d];
+
+      normal_flux[di] += this->parameters.lax_friedrich_stabilization_value * (Wplus_[di] - Wminus_[di]);
+      normal_flux_lf[di] = normal_flux[di];
+    }
+
+    return;
+  }
+
+  // Calculate left flux
+  double E2 = hl[0] * (ul[1] * ul[7] - ul[3] * ul[5]);
+  double E3 = hl[0] * (ul[2] * ul[5] - ul[1] * ul[6]);
+
+  Fl[0] = ul[1];
+  Fl[1] = hl[0] * ul[1] * ul[1] - ul[5] * ul[5] + ptl;
+  Fl[2] = hl[0] * ul[1] * ul[2] - ul[5] * ul[6];
+  Fl[3] = hl[0] * ul[1] * ul[3] - ul[5] * ul[7];
+  Fl[5] = 0.0;
+  Fl[6] = -E3;
+  Fl[7] = E2;
+  Fl[4] = hl[0] * ul[1] * (hl[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Ukl) + (E2 * ul[7] - E3 * ul[6]);
+
+  // Calculate right flux
+  E2 = hr[0] * (ur[1] * ur[7] - ur[3] * ur[5]);
+  E3 = hr[0] * (ur[2] * ur[5] - ur[1] * ur[6]);
+
+  Fr[0] = ur[1];
+  Fr[1] = hr[0] * ur[1] * ur[1] - ur[5] * ur[5] + ptr;
+  Fr[2] = hr[0] * ur[1] * ur[2] - ur[5] * ur[6];
+  Fr[3] = hr[0] * ur[1] * ur[3] - ur[5] * ur[7];
+  Fr[5] = 0.0;
+  Fr[6] = -E3;
+  Fr[7] = E2;
+  Fr[4] = hr[0] * ur[1] * (hr[1] * parameters.gas_gamma / (parameters.gas_gamma - 1.0) + Ukr) + (E2*ur[7] - E3*ur[6]);
 
   // Upwind flux in the case of supersonic flow
   if (sp[0] >= 0.0) {
@@ -320,11 +349,11 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   }
 
   // Determine Alfven and middle speeds
-  Sl = sp[0] - ul[1] * hl[0];
-  Sr = sp[4] - ur[1] * hr[0];
+  double Sl = sp[0] - ul[1] * hl[0];
+  double Sr = sp[4] - ur[1] * hr[0];
   sp[2] = (ul[1] * Sl - ur[1] * Sr - ptl + ptr) / (ul[0] * Sl - ur[0] * Sr);
-  sml = sp[0] - sp[2];
-  smr = sp[4] - sp[2];
+  double sml = sp[0] - sp[2];
+  double smr = sp[4] - sp[2];
 
   Ul[0] = ul[0] * Sl / sml;  // Density
   Ur[0] = ur[0] * Sr / smr;
@@ -332,14 +361,14 @@ void Equations<EquationsTypeMhd, dim>::numerical_normal_flux(const Tensor<1, dim
   Ul[5] = Udl[5] = ul[5];
   Ur[5] = Udr[5] = ur[5];
   Ul[5] = Ur[5] = Udl[5] = Udr[5] = B;
-  srdl = sqrt(Ul[0]);
-  srdr = sqrt(Ur[0]);
+  double srdl = sqrt(Ul[0]);
+  double srdr = sqrt(Ur[0]);
 
   sp[1] = sp[2] - fabs(Ul[5]) / srdl;  // Sl*
   sp[3] = sp[2] + fabs(Ur[5]) / srdr;  // Sr*
 
-  ptst = ptl + ul[0] * Sl*(Sl - sml);
-  ptstr = ptr + ur[0] * Sr*(Sr - smr);
+  double ptst = ptl + ul[0] * Sl*(Sl - sml);
+  double ptstr = ptr + ur[0] * Sr*(Sr - smr);
 
   // F*_L
   Ul[1] = Ul[0] * sp[2];

@@ -96,20 +96,21 @@ void Problem<equationsType, dim>::postprocess()
     else
     {
       data = &(((postprocessData.insert(std::make_pair(cell->active_cell_index(), PostprocessData()))).first)->second);
+      for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+        u_c_set[i] = false;
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
         if (!is_primitive[i])
           data->lambda_indices_to_multiply_all_B_components.push_back(dof_indices[i]);
         else
         {
+          // Here we rely on the fact, that the constant basis fn is the first one and all other basis fns come after.
           if (!u_c_set[component_ii[i]])
             u_c_set[component_ii[i]] = true;
           else
             data->lambda_indices_to_multiply[component_ii[i]].push_back(dof_indices[i]);
         }
       }
-      for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        u_c_set[i] = false;
 
       data->center = cell->center();
       for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
@@ -118,6 +119,8 @@ void Problem<equationsType, dim>::postprocess()
         data->vertexPoint[i] = data->center + (1. - NEGLIGIBLE) * (cell->vertex(i) - data->center);
 
         unsigned short neighbor_i = 0;
+        // TODO: if on boundary which is periodic, get also the proper periodic neighbors
+        // TODO: is this enough?
         for (auto neighbor_element : GridTools::find_cells_adjacent_to_vertex(triangulation, data->vertexIndex[i]))
         {
           typename DoFHandler<dim>::active_cell_iterator neighbor(&triangulation, neighbor_element->level(), neighbor_element->index(), &dof_handler);
@@ -130,10 +133,15 @@ void Problem<equationsType, dim>::postprocess()
       }
     }
 
+    // Cell center value we must find in any case (new data or reused)
+    // - let us reuse this array for that.
+    for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+      u_c_set[i] = false;
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
       if (is_primitive[i])
       {
+        // Here we rely on the fact, that the constant basis fn is the first one and that all other basis fns have zero mean.
         if (!u_c_set[component_ii[i]])
         {
           u_c[component_ii[i]] = current_unlimited_solution(dof_indices[i]);
@@ -186,6 +194,7 @@ void Problem<equationsType, dim>::postprocess()
         {
           if (is_primitive[i])
           {
+            // Here we rely on the fact, that the constant basis fn is the first one.
             if (!u_i_extrema_set[component_ii[i]])
             {
               double val = current_unlimited_solution(dof_indices_neighbor[i]);
@@ -541,7 +550,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
 
   for (unsigned int i = 0; i < dofs_per_cell; ++i)
   {
-    if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
+    if (fe_v.get_fe().has_support_on_face(i, face_no))
     {
       double val = 0.;
       for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
@@ -833,7 +842,6 @@ void Problem<equationsType, dim>::run()
   // Time loop.
   double newton_damping = this->parameters.initial_and_max_newton_damping;
   cfl_coefficient = this->parameters.initial_and_max_cfl_coefficient;
-  bool previous_bad_step = false;
 
 #ifdef OUTPUT_BASE
   output_base();
@@ -845,14 +853,13 @@ void Problem<equationsType, dim>::run()
     // Some output.
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
-      std::cout << "T: " << time << std::endl;
+      std::cout << "Step: " << time_step << ", T: " << time << std::endl;
       if (initial_step)
         std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
-      std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
+      if (this->parameters.use_iterative_improvement)
+        std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
-    double res_norm_prev[2] = { 0., 0. };
-    bool bad_step = false;
     for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
     {
       // Assemble
@@ -900,37 +907,8 @@ void Problem<equationsType, dim>::run()
         if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
           std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
 
-        if ((res_norm < parameters.newton_residual_norm_threshold) || ((linStep > 1) && ((std::abs(res_norm_prev[1] - res_norm) / res_norm) < parameters.stagnation_coefficient)))
-        {
-          bad_step = false;
+        if (res_norm < parameters.newton_residual_norm_threshold)
           break;
-        }
-        else if ((linStep == this->parameters.newton_max_iterations - 1) || ((linStep > 1) && (((res_norm - res_norm_prev[0]) / res_norm_prev[0]) > parameters.bad_step_coefficient)))
-        {
-          if (this->parameters.automatic_cfl)
-          {
-            this->cfl_coefficient *= this->parameters.decrease_factor;
-            time -= parameters.time_step;
-            parameters.time_step *= this->parameters.decrease_factor;
-            time += parameters.time_step;
-            if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-              std::cout << "\t\tWorse CFL coefficient: " << this->cfl_coefficient << std::endl;
-          }
-          if (this->parameters.automatic_damping)
-          {
-            newton_damping *= this->parameters.decrease_factor;
-            if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-              std::cout << "\t\tWorse Newton damping coefficient: " << newton_damping << std::endl;
-          }
-          this->lin_solution = this->prev_solution;
-          bad_step = true;
-          break;
-        }
-        else
-        {
-          res_norm_prev[1] = res_norm_prev[0];
-          res_norm_prev[0] = res_norm;
-        }
       }
       else
       {
@@ -939,28 +917,7 @@ void Problem<equationsType, dim>::run()
       }
     }
 
-    if (!parameters.use_iterative_improvement || (!bad_step && !previous_bad_step))
-    {
-      if (!initial_step && parameters.use_iterative_improvement)
-      {
-        if (this->parameters.automatic_cfl)
-        {
-          this->cfl_coefficient = std::min(this->parameters.initial_and_max_cfl_coefficient, this->cfl_coefficient * parameters.increase_factor);
-          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-            std::cout << "\t\tBetter CFL coefficient: " << this->cfl_coefficient << std::endl;
-        }
-        if (this->parameters.automatic_damping)
-        {
-          newton_damping = std::min(this->parameters.initial_and_max_newton_damping, newton_damping * parameters.increase_factor);
-          if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-            std::cout << "\t\tBetter Newton damping coefficient: " << newton_damping << std::endl;
-        }
-      }
-      move_time_step_handle_outputs();
-    }
-
-    if(parameters.use_iterative_improvement)
-      previous_bad_step = bad_step;
+    move_time_step_handle_outputs();
   }
 }
 
