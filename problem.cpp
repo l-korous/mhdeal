@@ -391,7 +391,11 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
                 cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(j, q) * fe_v_value[component_ii[j] - 5];
               }
               else if (!is_primitive[j])
-                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_cell->shape_value(j, q);
+              {
+                dealii::Tensor<1, dim> fe_v_value_i = (*fe_v_cell)[mag].value(i, q);
+                dealii::Tensor<1, dim> fe_v_value_j = (*fe_v_cell)[mag].value(j, q);
+                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_value_i * fe_v_value_j;
+              }
             }
           }
         }
