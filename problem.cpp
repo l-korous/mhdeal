@@ -119,8 +119,7 @@ void Problem<equationsType, dim>::postprocess()
         data->vertexPoint[i] = data->center + (1. - NEGLIGIBLE) * (cell->vertex(i) - data->center);
 
         unsigned short neighbor_i = 0;
-        // TODO: if on boundary which is periodic, get also the proper periodic neighbors
-        // TODO: is this enough?
+
         for (auto neighbor_element : GridTools::find_cells_adjacent_to_vertex(triangulation, data->vertexIndex[i]))
         {
           typename DoFHandler<dim>::active_cell_iterator neighbor(&triangulation, neighbor_element->level(), neighbor_element->index(), &dof_handler);
@@ -128,6 +127,27 @@ void Problem<equationsType, dim>::postprocess()
           {
             data->neighbor_dof_indices[i][neighbor_i].resize(dofs_per_cell);
             neighbor->get_dof_indices(data->neighbor_dof_indices[i][neighbor_i++]);
+          }
+        }
+
+        // If on boundary which is periodic, get also the proper periodic neighbors
+        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        {
+          if (cell->at_boundary(face_no) && is_periodic_boundary(cell->face(face_no)->boundary_id()))
+          {
+            TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
+            for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
+            {
+              // Only now we know this vertex is at a periodic boundary
+              if (face->vertex_index(face_i) == data->vertexIndex[i])
+              {
+                const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+                data->neighbor_dof_indices[i][neighbor_i].resize(dofs_per_cell);
+                typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+                neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+                neighbor->get_dof_indices(data->neighbor_dof_indices[i][neighbor_i++]);
+              }
+            }
           }
         }
       }
@@ -480,7 +500,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
-      if (fe_v.get_fe().has_support_on_face(i, face_no) == true)
+      if (fe_v.get_fe().has_support_on_face(i, face_no))
       {
         if (!is_primitive[i])
         {
