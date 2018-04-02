@@ -1,5 +1,5 @@
 #include "util.h"
-#include "fe_is_constant_interface.h"
+#include "feIsConstInterface.h"
 
 template <int dim, int spacedim = dim>
 class FE_DG_DivFree : public FiniteElement<dim, spacedim>, public FiniteElementIsConstantInterface<dim>

@@ -26,23 +26,25 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.gas_gamma = 5. / 3.;
+  parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
   parameters.corner_b = Point<DIMENSION>(1., 1., 0.001);
-  parameters.refinements = { 50, 50, 1 };
+  parameters.refinements = { 30, 30, 1 };
   parameters.limit = true;
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::lax_friedrich;
   parameters.lax_friedrich_stabilization_value = 0.0;
-  parameters.initial_and_max_cfl_coefficient = .03;
+  parameters.cfl_coefficient = .03;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.use_iterative_improvement = false;
 
   parameters.patches = 0;
+  parameters.debug = false;
   parameters.output_step = -1.e-3;
   
-  parameters.final_time = 3.;
+  parameters.final_time = .5;
 }
 
 int main(int argc, char *argv[])
@@ -78,7 +80,7 @@ int main(int argc, char *argv[])
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
-    Equations<EQUATIONS, DIMENSION> equations(parameters);
+    Equations<EQUATIONS, DIMENSION> equations;
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Run the problem - entire transient problem.

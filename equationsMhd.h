@@ -1,8 +1,6 @@
 #ifndef _EQUATIONS_MHD_H
 #define _EQUATIONS_MHD_H
 
-#define PI 3.14159265359
-
 #include "equations.h"
 #include "parameters.h"
 
@@ -10,9 +8,6 @@ template <int dim>
 class Equations<EquationsTypeMhd, dim>
 {
 public:
-  // Equations constructor takes parameters as an attribute - to set up e.g. gas Gamma value
-  Equations(Parameters<dim>& parameters);
-
   static const unsigned int n_components = 2 * dim + 2;
 
   typedef std::array<double, n_components> InputVector;
@@ -22,37 +17,24 @@ public:
   static double compute_magnetic_energy(const InputVector &W);
 
   // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
-  double compute_pressure(const InputVector &W) const;
+  static double compute_pressure(const InputVector &W, const Parameters<dim>& parameters);
 
   // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
-  double compute_total_pressure(const InputVector &W) const;
+  static double compute_total_pressure(const InputVector &W, const Parameters<dim>& parameters);
 
   // Compute pressure, and use the passed values of kinetic energy and magnetic energy.
-  double compute_pressure(const InputVector &W, const double& Uk, const double& Um) const;
+  static double compute_pressure(const InputVector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters);
 
-  double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W) const;
-
-  void Q(std_cxx11::array<double, n_components> &result, const InputVector &W, const Tensor<1, 3> &normal) const;
-  void Q_inv(std_cxx11::array<double, n_components> &result, std_cxx11::array<double, n_components> &F, const Tensor<1, dim> &normal) const;
+  static double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W);
 
   // Compute the matrix of MHD fluxes.
-  void compute_flux_matrix(const InputVector &W, std::array <std::array <double, dim>, n_components > &flux) const;
-
-  // Compute the values for the numerical flux
-  void numerical_normal_flux(const Tensor<1, dim> &normal, const InputVector &Wplus, const InputVector &Wminus, std::array<double, n_components> &normal_flux);
-
-  void store_max_signal_speed(double val);
-
-  void store_max_signal_speed(typename dealii::internal::TableBaseAccessors::Accessor<2, Sacado::Fad::DFad<double>, false, 1>::value_type val);
-
-  // Passed as a constructor parameter
-  Parameters<dim>& parameters;
+  static void compute_flux_matrix(const InputVector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters);
 
   // The rest is for the output.  
   class Postprocessor : public DataPostprocessor<dim>
   {
   public:
-    Postprocessor(Equations<EquationsTypeMhd, dim>& equations);
+    Postprocessor(Parameters<dim>& parameters);
 
 #if DEAL_II_VERSION_MAJOR > 8 || (DEAL_II_VERSION_MAJOR == 8 && DEAL_II_VERSION_MINOR > 5) || (DEAL_II_VERSION_MAJOR == 8 && DEAL_II_VERSION_MINOR == 5 && DEAL_II_VERSION_SUBMINOR > 0)
     virtual void evaluate_vector_field(const ::DataPostprocessorInputs::Vector<dim> &inputs,
@@ -73,13 +55,10 @@ public:
 
     virtual UpdateFlags get_needed_update_flags() const;
   private:
-    Equations<EquationsTypeMhd, dim>& equations;
+    Parameters<dim>& parameters;
   };
 
   static std::vector<std::string> component_names();
-
-  // For CFL.
-  double max_signal_speed;
 
   static std::vector<DataComponentInterpretation::DataComponentInterpretation> component_interpretation();
 };

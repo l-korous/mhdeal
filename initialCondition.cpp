@@ -1,4 +1,4 @@
-#include "complete_elliptic_integrals.h"
+#include "completeEllipticIntegrals.h"
 #include "initialCondition.h"
 #include "equationsMhd.h"
 

@@ -13,7 +13,7 @@
 //
 // ---------------------------------------------------------------------
 
-#include "fe_taylor.h"
+#include "feTaylor.h"
 
 template <int dim, int spacedim>
 FE_DG_Taylor<dim, spacedim>::FE_DG_Taylor(const unsigned int degree)

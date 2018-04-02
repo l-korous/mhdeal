@@ -30,7 +30,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.initial_and_max_cfl_coefficient = .1;
+  parameters.cfl_coefficient = .1;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.limit_in_nonlin_loop = false;
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
-    Equations<EQUATIONS, DIMENSION> equations(parameters);
+    Equations<EQUATIONS, DIMENSION> equations;
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Run the problem - entire transient problem.

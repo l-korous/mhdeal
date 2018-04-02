@@ -4,13 +4,13 @@ SET(TARGET_SRC
   util.h
   equations.h
   equationsMhd.cpp
-  DealiiExtensions.cpp
-  DealiiExtensions.h
-  fe_div_free.h
-  fe_div_free.cpp
-  fe_taylor.h
-  fe_taylor.cpp
-  fe_is_constant_interface.h
+  feIsConstInterface.h
+  dealiiExtensions.cpp
+  dealiiExtensions.h
+  feDivFree.h
+  feDivFree.cpp
+  feTaylor.h
+  feTaylor.cpp
   equationsMhd.h
   parameters.h
   boundaryConditions.cpp
@@ -19,8 +19,12 @@ SET(TARGET_SRC
   initialCondition.h
   problem.cpp
   problem.h
-  complete_elliptic_integrals.cc
-  complete_elliptic_integrals.h
+  completeEllipticIntegrals.cpp
+  completeEllipticIntegrals.h
+  numericalFlux.cpp
+  numericalFlux.h
+  slopeLimiter.cpp
+  slopeLimiter.h
 )
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)

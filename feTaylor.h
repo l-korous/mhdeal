@@ -1,5 +1,5 @@
 #include "util.h"
-#include "fe_is_constant_interface.h"
+#include "feIsConstInterface.h"
 
 /*!@addtogroup fe */
 /*@{*/

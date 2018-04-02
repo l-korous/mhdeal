@@ -1,4 +1,4 @@
-#include "fe_div_free.h"
+#include "feDivFree.h"
 
 #define DEGREE 1
 

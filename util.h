@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 #include <deal.II/base/quadrature_lib.h>
+#include <deal.II/base/numbers.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/parameter_handler.h>
 #include <deal.II/base/function_parser.h>
@@ -74,6 +75,12 @@ std::string to_string_with_precision(const T a_value, const int n = 6)
 #ifndef OUTPUT_BASE
 //#define OUTPUT_BASE
 #endif
+
+// Safe limit on max number of basis functions (for all components !!)
+// - e.g. for linear Taylor functions in 3d, it is 4 x component count = 32 in case of MHD (8 components)
+#define BASIS_FN_COUNT 32
+
+static const double  M_PI = 3.14159265358979323846;
 
 using namespace dealii;
 #endif

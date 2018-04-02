@@ -11,6 +11,7 @@ public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
   Parameters() {
     this->limit = true;
+    this->slope_limiter = vertexBased;
     this->output_file_prefix = "";
     this->lax_friedrich_stabilization_value = .5;
     this->snapshot_step = 1.;
@@ -33,6 +34,10 @@ public:
 
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
+
+  // Limiter
+  enum Limiter { vertexBased, barthJespersen};
+  Limiter slope_limiter;
 
   // Perform iterative improvements.
   bool use_iterative_improvement;
@@ -100,7 +105,7 @@ public:
   double ilut_drop;
 
   // Global - obvious
-  double time_step, final_time, initial_and_max_cfl_coefficient;
+  double time_step, final_time, cfl_coefficient;
   // Polynomial order for the flow part.
   int polynomial_order_dg;
   // Quadrature order.

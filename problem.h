@@ -4,8 +4,10 @@
 #include "initialCondition.h"
 #include "boundaryConditions.h"
 #include "DealiiExtensions.h"
-#include "fe_div_free.h"
-#include "fe_taylor.h"
+#include "feDivFree.h"
+#include "feTaylor.h"
+#include "numericalFlux.h"
+#include "slopeLimiter.h"
 
 // Class that accepts all input from the user, provides interface for output, etc.
 // Should not be changed.
@@ -22,7 +24,6 @@ public:
     InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
   void run();
 
-private:
   // Technical matters done only once after creation.
   void setup_system();
 
@@ -32,18 +33,6 @@ private:
   // Performs a single global assembly.
   void assemble_system(bool assemble_matrix = true);
 
-  // Performs a single global assembly.
-  struct PostprocessData
-  {
-    Point<dim> center;
-    unsigned int vertexIndex[GeometryInfo<dim>::vertices_per_cell];
-    Point<dim> vertexPoint[GeometryInfo<dim>::vertices_per_cell];
-    std::vector<unsigned int> lambda_indices_to_multiply[Equations<equationsType, dim>::n_components];
-    std::vector<unsigned int> lambda_indices_to_multiply_all_B_components;
-    // TODO This may not work for adaptivity (max. number of cells sharing a vertes might be higher than 8)
-    std::vector<types::global_dof_index> neighbor_dof_indices[GeometryInfo<dim>::vertices_per_cell][GeometryInfo<dim>::vertices_per_cell];
-  };
-  std::map<unsigned int, PostprocessData> postprocessData;
   void postprocess();
 
   // Performs a single global assembly.
@@ -94,6 +83,7 @@ private:
   // Dofs calculated by this MPI process + all Dofs on all neighboring cells.
   IndexSet locally_relevant_dofs;
 
+  const MappingQ1<dim> mapping;
   const FESystem<dim> fe;
   DoFHandler<dim> dof_handler;
   const QGauss<dim> quadrature;
@@ -114,8 +104,6 @@ private:
 
   ConstraintMatrix constraints;
 
-  const MappingQ1<dim> mapping;
-
   MPI_Comm mpi_communicator;
 
   bool initial_step;
@@ -124,6 +112,9 @@ private:
   double last_output_time, last_snapshot_time, time;
   int time_step;
   double cfl_time_step;
+  // For CFL.
+  double max_signal_speed;
+
   AztecOO solver;
 
   DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
@@ -131,6 +122,12 @@ private:
   void precalculate_global();
   unsigned int dofs_per_cell;
   unsigned short n_quadrature_points_cell, n_quadrature_points_face;
+
+  // NumFlux
+  NumFlux<equationsType, dim>* numFlux;
+
+  // Slope limiter
+  SlopeLimiter<equationsType, dim>* slopeLimiter;
 
   // TODO Revise this for adaptivity (subface_flags, ...)
   const UpdateFlags update_flags;
@@ -148,15 +145,12 @@ private:
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev;
   std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > fluxes_old;
 
-  // May be increased, but for linear functions, it is exactly this.
-#define BASIS_FN_COUNT 100
   std::array <unsigned short, BASIS_FN_COUNT> component_ii;
   std::array <bool, BASIS_FN_COUNT> is_primitive;
   std::array <bool, BASIS_FN_COUNT> basis_fn_is_constant;
 
   // This is here and not in the loop because of tests - we test by looking at the last res_norm.
+  double res_norm;
   // Utility
-  bool is_periodic_boundary(int boundary_id) const;
-  public:
-  double res_norm, cfl_coefficient;
+  static bool is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters) ;
 };
