@@ -178,12 +178,16 @@ void Problem<equationsType, dim>::postprocess()
       alpha_e[i] = 1.;
     for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
     {
-      std::set<unsigned int> visited_faces;
-
       // (!!!) Find out u_i
       Vector<double> u_i(Equations<equationsType, dim>::n_components);
-      VectorTools::point_value(dof_handler, current_unlimited_solution, data->vertexPoint[i], u_i);
-
+      const Point<dim> p_cell = mapping.transform_real_to_unit_cell(cell, data->vertexPoint[i]);
+      const Quadrature<dim> one_point_quadrature(GeometryInfo<dim>::project_to_unit_cell(p_cell));
+      FEValues<dim> fe_values(mapping, fe, one_point_quadrature, update_values);
+      fe_values.reinit(cell);
+      std::vector<Vector<double> > u_value(1, Vector<double>(fe.n_components()));
+      fe_values.get_function_values(current_unlimited_solution, u_value);
+      u_i = u_value[0];
+      
       if (parameters.debug)
       {
         std::cout << "\tv_i: " << cell->vertex(i) << ", values: ";
