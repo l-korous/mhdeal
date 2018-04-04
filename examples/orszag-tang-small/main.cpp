@@ -26,15 +26,15 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.gas_gamma = 5. / 3.;
-  parameters.slope_limiter = parameters.vertexBased;
+  parameters.slope_limiter = parameters.barthJespersen;
   parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
   parameters.corner_b = Point<DIMENSION>(1., 1., 0.001);
-  parameters.refinements = { 30, 30, 1 };
-  parameters.limit = true;
+  parameters.refinements = { 40, 40, 1 };
+  parameters.limit = false;
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
-  parameters.num_flux_type = Parameters<DIMENSION>::lax_friedrich;
-  parameters.lax_friedrich_stabilization_value = 0.0;
+  parameters.num_flux_type = Parameters<DIMENSION>::hlld;
+  parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .03;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;

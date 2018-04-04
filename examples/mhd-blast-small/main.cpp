@@ -25,53 +25,24 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(0.0, 0.0, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.4, 0.4, 0.001);
-  parameters.refinements = { 40, 40, 1 };
+  parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
+  parameters.refinements = { 30, 30, 1 };
   parameters.limit = false;
+  parameters.slope_limiter = parameters.barthJespersen;
   parameters.use_div_free_space_for_B = true;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.cfl_coefficient = .05;
+  parameters.lax_friedrich_stabilization_value = 0.5;
+  parameters.cfl_coefficient = .01;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
 
   parameters.use_iterative_improvement = false;
-  parameters.limit_in_nonlin_loop = false;
-  parameters.automatic_damping = false;
-  parameters.automatic_cfl = false;
-  parameters.initial_and_max_newton_damping = 1.;
-  parameters.decrease_factor = .9;
-  parameters.increase_factor = 1. / parameters.decrease_factor;
-  parameters.stagnation_coefficient = 1.e-2;
-  parameters.bad_step_coefficient = 2.;
-
   parameters.patches = 2;
   parameters.output_step = -1.e-3;
 
   parameters.debug = false;
-
-  parameters.output_matrix = false;
-  parameters.output = Parameters<DIMENSION>::quiet_solver;
-  parameters.output_rhs = false;
-  parameters.output_solution = false;
-
-  parameters.snapshot_step = 1.;
-
-  parameters.time_step = 1.e-5;
-  parameters.final_time = 1.;
-
-  parameters.solver = Parameters<DIMENSION>::gmres;
-  parameters.linear_residual = 1e-10;
-  parameters.max_iterations = 10000;
-  parameters.ilut_fill = 1.5;
-  parameters.ilut_drop = 1e-6;
-  parameters.ilut_atol = 1e-6;
-  parameters.ilut_rtol = 1.0;
-
   parameters.gas_gamma = 1.4;
-
-  parameters.newton_max_iterations = 30;
-  parameters.newton_residual_norm_threshold = 1e-8;
 }
 
 int main(int argc, char *argv[])
