@@ -144,7 +144,8 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     cell->get_dof_indices(dof_indices);
 
     if (parameters.debug)
-      std::cout << "NEW CELL: " << ith_cell++ << std::endl;
+      std::cout << "NEW CELL: " << ith_cell << std::endl;
+    ith_cell++;
 
     // Assemble the volumetric integrals.
     assemble_cell_term(cell_matrix, cell_rhs, assemble_matrix);
@@ -184,7 +185,6 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 
           fe_v_face.reinit(cell, face_no);
           fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
-
           assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
         }
       }
@@ -195,7 +195,6 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     else
       constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
   }
-
   if (assemble_matrix)
     system_matrix.compress(VectorOperation::add);
   system_rhs.compress(VectorOperation::add);
@@ -416,7 +415,6 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
         if (!is_primitive[i])
         {
           dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
-
           val += this->parameters.time_step * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2]) * fe_v.JxW(q);
         }
         else
