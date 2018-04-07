@@ -73,7 +73,9 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
                 const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
                 data->neighbor_dof_indices[vertex_i][neighbor_i].resize(dofs_per_cell);
                 typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-                neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+                auto this_cell_index = cell->active_cell_index();
+                auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+                neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
                 neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
               }
             }
@@ -258,7 +260,9 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
                 const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
                 data->neighbor_dof_indices[vertex_i][neighbor_i].resize(dofs_per_cell);
                 typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-                neighbor = ((*(face_pair.cell[0])).active_cell_index() == (*cell).active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+                auto this_cell_index = cell->active_cell_index();
+                auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+                neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
                 neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
               }
             }
