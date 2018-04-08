@@ -4,6 +4,14 @@ template <int dim>
 Parameters<dim>::Parameters() {
   this->gas_gamma = 5. / 3.;
   this->use_iterative_improvement = false;
+  this->limit_in_nonlin_loop = false;
+  this->automatic_damping = false;
+  this->automatic_cfl = false;
+  this->initial_and_max_newton_damping = 1.;
+  this->decrease_factor = .9;
+  this->increase_factor = 1. / this->decrease_factor;
+  this->stagnation_coefficient = 1.e-2;
+  this->bad_step_coefficient = 2.;
   this->limit = true;
   this->slope_limiter = vertexBased;
   this->output_file_prefix = "";
