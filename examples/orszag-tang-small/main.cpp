@@ -40,6 +40,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.patches = 1;
   parameters.output_step = -1.e-3;
   parameters.final_time = .5;
+  parameters.debug = true;
 }
 
 int main(int argc, char *argv[])
