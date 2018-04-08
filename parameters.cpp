@@ -36,23 +36,23 @@ void Parameters<dim>::delete_old_outputs() const
 #ifdef _MSC_VER
     std::stringstream ss;
     ss << "del";
-    ss << " " << this->output_file_prefix << ".vtk";
-    ss << " " << this->output_file_prefix << ".newton_update";
-    ss << " " << this->output_file_prefix << ".current_solution";
-    ss << " " << this->output_file_prefix << ".matrix";
-    ss << " " << this->output_file_prefix << ".rhs";
+    ss << " " << this->output_file_prefix << "*.vtk";
+    ss << " " << this->output_file_prefix << "*.newton_update";
+    ss << " " << this->output_file_prefix << "*.current_solution";
+    ss << " " << this->output_file_prefix << "*.matrix";
+    ss << " " << this->output_file_prefix << "*.rhs";
     system(ss.str().c_str());
 #else
     std::stringstream ss;
     ss << "rm";
-    ss << " " << this->output_file_prefix << ".visit";
-    ss << " " << this->output_file_prefix << ".vtu";
-    ss << " " << this->output_file_prefix << ".pvtu";
-    ss << " " << this->output_file_prefix << ".vtk";
-    ss << " " << this->output_file_prefix << ".newton_update";
-    ss << " " << this->output_file_prefix << ".current_solution";
-    ss << " " << this->output_file_prefix << ".matrix";
-    ss << " " << this->output_file_prefix << ".rhs";
+    ss << " " << this->output_file_prefix << "*.visit";
+    ss << " " << this->output_file_prefix << "*.vtu";
+    ss << " " << this->output_file_prefix << "*.pvtu";
+    ss << " " << this->output_file_prefix << "*.vtk";
+    ss << " " << this->output_file_prefix << "*.newton_update";
+    ss << " " << this->output_file_prefix << "*.current_solution";
+    ss << " " << this->output_file_prefix << "*.matrix";
+    ss << " " << this->output_file_prefix << "*.rhs";
     system(ss.str().c_str());
 #endif
   }
