@@ -3,7 +3,7 @@
 #include "parameters.h"
 #include "initialCondition.h"
 #include "boundaryConditions.h"
-#include "DealiiExtensions.h"
+#include "dealiiExtensions.h"
 #include "feDivFree.h"
 #include "feTaylor.h"
 #include "numericalFlux.h"

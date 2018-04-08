@@ -5,7 +5,7 @@
  *      Author: kraemer
  */
 
-#include "DealiiExtensions.h"
+#include "dealiiExtensions.h"
 
 #include <deal.II/base/thread_management.h>
 #include <deal.II/base/quadrature_lib.h>

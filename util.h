@@ -85,7 +85,7 @@ std::string to_string_with_precision(const T a_value, const int n = 6)
 // - e.g. for linear Taylor functions in 3d, it is 4 x component count = 32 in case of MHD (8 components)
 #define BASIS_FN_COUNT 32
 
-static const double  M_PI = 3.14159265358979323846;
+static const double My_PI = 3.14159265358979323846;
 
 using namespace dealii;
 #endif

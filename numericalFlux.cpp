@@ -1,10 +1,10 @@
 #include "numericalFlux.h"
 
 template <EquationsType equationsType, int dim>
-void NumFlux<equationsType, dim>::Q(component_vector &result, const component_vector &W, const Tensor<1, dim> &normal)
+void NumFlux<equationsType, dim>::Q(n_comp_array &result, const n_comp_array &W, const Tensor<1, dim> &normal)
 {
-  double forResult[n_components];
-  for (unsigned int d = 0; d < n_components; d++)
+  double forResult[n_comp];
+  for (unsigned int d = 0; d < n_comp; d++)
     forResult[d] = W[d];
   if (normal[0] > 0.5) { // nothing
   }
@@ -39,15 +39,15 @@ void NumFlux<equationsType, dim>::Q(component_vector &result, const component_ve
     forResult[7] = W[5];
   }
 
-  for (unsigned int d = 0; d < n_components; d++)
+  for (unsigned int d = 0; d < n_comp; d++)
     result[d] = forResult[d];
 }
 
 template <EquationsType equationsType, int dim>
-void NumFlux<equationsType, dim>::Q_inv(component_vector &result, component_vector &W, const Tensor<1, dim> &normal)
+void NumFlux<equationsType, dim>::Q_inv(n_comp_array &result, n_comp_array &W, const Tensor<1, dim> &normal)
 {
-  double forResult[n_components];
-  for (unsigned int d = 0; d < n_components; d++)
+  double forResult[n_comp];
+  for (unsigned int d = 0; d < n_comp; d++)
     forResult[d] = W[d];
   if (normal[0] > 0.5) { // nothing
   }
@@ -81,34 +81,34 @@ void NumFlux<equationsType, dim>::Q_inv(component_vector &result, component_vect
     forResult[5] = W[7];
     forResult[7] = -W[5];
   }
-  for (unsigned int d = 0; d < n_components; d++)
+  for (unsigned int d = 0; d < n_comp; d++)
     result[d] = forResult[d];
 }
 
 template <EquationsType equationsType, int dim>
-void NumFluxLaxFriedrich<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const component_vector &Wplus_,
-  const component_vector &Wminus_, component_vector &normal_flux, double& max_speed) const
+void NumFluxLaxFriedrich<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const n_comp_array &Wplus_,
+  const n_comp_array &Wminus_, n_comp_array &normal_flux, double& max_speed) const
 {
   double hl[2], hr[2], spd[5];
 
-  component_vector ul, ur;
-  Q(ul, Wplus_, normal);
-  Q(ur, Wminus_, normal);
+  n_comp_array ul, ur;
+  this->Q(ul, Wplus_, normal);
+  this->Q(ur, Wminus_, normal);
 
   // Densities, energies.
   hl[0] = 1.0 / ul[0];
   double Ukl = 0.5 * hl[0] * (ul[1] * ul[1] + ul[2] * ul[2] + ul[3] * ul[3]);
   double Uml = 0.5 * (ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);
-  hl[1] = (parameters.gas_gamma - 1) * (ul[4] - Ukl - Uml);
+  hl[1] = (this->parameters.gas_gamma - 1.) * (ul[4] - Ukl - Uml);
 
   hr[0] = 1.0 / ur[0];
   double Ukr = 0.5 * hr[0] * (ur[1] * ur[1] + ur[2] * ur[2] + ur[3] * ur[3]);
   double Umr = 0.5 * (ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);
-  hr[1] = (parameters.gas_gamma - 1) * (ur[4] - Ukr - Umr);
+  hr[1] = (this->parameters.gas_gamma - 1.) * (ur[4] - Ukr - Umr);
 
   // sound speed
-  double al2 = parameters.gas_gamma * hl[1] * hl[0];
-  double ar2 = parameters.gas_gamma * hr[1] * hr[0];
+  double al2 = this->parameters.gas_gamma * hl[1] * hl[0];
+  double ar2 = this->parameters.gas_gamma * hr[1] * hr[0];
 
   // fast magnetoacoustic speed
   double cl = (al2 + (2. * Uml * hl[0]));
@@ -130,12 +130,12 @@ void NumFluxLaxFriedrich<equationsType, dim>::numerical_normal_flux(const Tensor
 
   max_speed = std::max(max_speed, (std::max(std::abs(spd[0]), std::abs(spd[4]))));
 
-  std::array<std::array <component_vector::value_type, 3>, n_components > iflux, oflux;
+  std::array<std::array <double, dim>, n_comp > iflux, oflux;
 
   Equations<equationsType, dim>::compute_flux_matrix(Wplus_, iflux, this->parameters);
   Equations<equationsType, dim>::compute_flux_matrix(Wminus_, oflux, this->parameters);
 
-  for (unsigned int di = 0; di < n_components; ++di)
+  for (unsigned int di = 0; di < n_comp; ++di)
   {
     normal_flux[di] = 0.;
     for (unsigned int d = 0; d < dim; ++d)
@@ -146,23 +146,23 @@ void NumFluxLaxFriedrich<equationsType, dim>::numerical_normal_flux(const Tensor
 }
 
 template <EquationsType equationsType, int dim>
-void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const component_vector &Wplus_,
-  const component_vector &Wminus_, component_vector &normal_flux, double& max_speed) const
+void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim> &normal, const n_comp_array &Wplus_,
+  const n_comp_array &Wminus_, n_comp_array &normal_flux, double& max_speed) const
 {
-  component_vector flux_lf;
-  if (parameters.debug)
+  n_comp_array flux_lf;
+  if (this->parameters.debug)
   {
     NumFluxLaxFriedrich<equationsType, dim> lf(this->parameters);
     lf.numerical_normal_flux(normal, Wplus_, Wminus_, flux_lf, max_speed);
   }
 
-  double Fl[n_components], Fr[n_components], hl[2], hr[2];
-  double Uldst[n_components], Urdst[n_components], Ulst[n_components], Urst[n_components];
+  double Fl[n_comp], Fr[n_comp], hl[2], hr[2];
+  double Uldst[n_comp], Urdst[n_comp], Ulst[n_comp], Urst[n_comp];
   double spd[5], vbstl, vbstr, Bsgn, invsumd;
 
-  component_vector ul, ur;
-  Q(ul, Wplus_, normal);
-  Q(ur, Wminus_, normal);
+  n_comp_array ul, ur;
+  this->Q(ul, Wplus_, normal);
+  this->Q(ur, Wminus_, normal);
 
   double Bx = 0.5*(ul[5] + ur[5]);
   double Bx2 = Bx * Bx;
@@ -171,16 +171,16 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   hl[0] = 1.0 / ul[0];
   double Ukl = 0.5 * hl[0] * (ul[1] * ul[1] + ul[2] * ul[2] + ul[3] * ul[3]);
   double Uml = 0.5 * (Bx2 + ul[6] * ul[6] + ul[7] * ul[7]);
-  hl[1] = (parameters.gas_gamma - 1.) * (ul[4] - Ukl - Uml);
+  hl[1] = (this->parameters.gas_gamma - 1.) * (ul[4] - Ukl - Uml);
 
   hr[0] = 1.0 / ur[0];
   double Ukr = 0.5 * hr[0] * (ur[1] * ur[1] + ur[2] * ur[2] + ur[3] * ur[3]);
   double Umr = 0.5 * (Bx2 + ur[6] * ur[6] + ur[7] * ur[7]);
-  hr[1] = (parameters.gas_gamma - 1.) * (ur[4] - Ukr - Umr);
+  hr[1] = (this->parameters.gas_gamma - 1.) * (ur[4] - Ukr - Umr);
 
   // sound speed
-  double al2 = parameters.gas_gamma * hl[1] * hl[0];
-  double ar2 = parameters.gas_gamma * hr[1] * hr[0];
+  double al2 = this->parameters.gas_gamma * hl[1] * hl[0];
+  double ar2 = this->parameters.gas_gamma * hr[1] * hr[0];
 
   // fast magnetoacoustic speed
   double cl = al2 + (2. * Uml * hl[0]);
@@ -234,11 +234,11 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
 
   // Upwind flux in the case of supersonic flow
   if (spd[0] >= 0.0) {
-    for (int j = 0; j < n_components; j++)
+    for (int j = 0; j < n_comp; j++)
       normal_flux[j] = Fl[j];
-    Q_inv(normal_flux, normal_flux, normal);
-    if (parameters.debug)
-      for (int j = 0; j < n_components; j++)
+    this->Q_inv(normal_flux, normal_flux, normal);
+    if (this->parameters.debug)
+      for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
@@ -249,11 +249,11 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
     return;
   }
   if (spd[4] <= 0.0) {
-    for (int j = 0; j < n_components; j++)
+    for (int j = 0; j < n_comp; j++)
       normal_flux[j] = Fr[j];
-    Q_inv(normal_flux, normal_flux, normal);
-    if (parameters.debug)
-      for (int j = 0; j < n_components; j++)
+    this->Q_inv(normal_flux, normal_flux, normal);
+    if (this->parameters.debug)
+      for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
@@ -333,11 +333,11 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
     ((ur[1] * Bx + ur[2] * ur[6] + ur[3] * ur[7]) * hr[0] - vbstr)) / sdmr;
 
   if (spd[1] >= 0.0) {
-    for (int j = 0; j < n_components; j++)
+    for (int j = 0; j < n_comp; j++)
       normal_flux[j] = Fl[j] + spd[0] * (Ulst[j] - ul[j]);
-    Q_inv(normal_flux, normal_flux, normal);
-    if (parameters.debug)
-      for (int j = 0; j < n_components; j++)
+    this->Q_inv(normal_flux, normal_flux, normal);
+    if (this->parameters.debug)
+      for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
@@ -348,11 +348,11 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
     return;
   }
   if (spd[3] <= 0.0 && spd[2] < 0.0) {
-    for (int j = 0; j < n_components; j++)
+    for (int j = 0; j < n_comp; j++)
       normal_flux[j] = Fr[j] + spd[4] * (Urst[j] - ur[j]);
-    Q_inv(normal_flux, normal_flux, normal);
-    if (parameters.debug)
-      for (int j = 0; j < n_components; j++)
+    this->Q_inv(normal_flux, normal_flux, normal);
+    if (this->parameters.debug)
+      for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
@@ -365,7 +365,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
 
   // F**_L and F**_R
   if (Bx2 < SMALL * ptst) {
-    for (int j = 0; j < n_components; j++) {
+    for (int j = 0; j < n_comp; j++) {
       Uldst[j] = Ulst[j];
       Urdst[j] = Urst[j];
     }
@@ -409,11 +409,11 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
 
   if (spd[2] >= 0.0) {
     cm = spd[1] - spd[0];
-    for (int j = 0; j < n_components; j++)
+    for (int j = 0; j < n_comp; j++)
       normal_flux[j] = Fl[j] + spd[1] * Uldst[j] - spd[0] * ul[j] - cm*Ulst[j];
-    Q_inv(normal_flux, normal_flux, normal);
-    if (parameters.debug)
-      for (int j = 0; j < n_components; j++)
+    this->Q_inv(normal_flux, normal_flux, normal);
+    if (this->parameters.debug)
+      for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
@@ -426,11 +426,11 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   else
   {
     cm = spd[3] - spd[4];
-    for (int j = 0; j < n_components; j++)
+    for (int j = 0; j < n_comp; j++)
       normal_flux[j] = Fr[j] + spd[3] * Urdst[j] - spd[4] * ur[j] - cm*Urst[j];
-    Q_inv(normal_flux, normal_flux, normal);
-    if (parameters.debug)
-      for (int j = 0; j < n_components; j++)
+    this->Q_inv(normal_flux, normal_flux, normal);
+    if (this->parameters.debug)
+      for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)

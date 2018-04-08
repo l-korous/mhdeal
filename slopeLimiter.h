@@ -3,7 +3,7 @@
 
 #include "equationsMhd.h"
 #include "parameters.h"
-#include "DealiiExtensions.h"
+#include "dealiiExtensions.h"
 
 template <EquationsType equationsType, int dim>
 class SlopeLimiter
