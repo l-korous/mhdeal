@@ -97,7 +97,7 @@ public:
   std::vector<unsigned int> refinements;
   std::vector<std::array<int, 3> > periodic_boundaries;
 
-  void delete_old_outputs() const;
+  void delete_old_outputs(MPI_Comm& mpi_communicator) const;
 };
 
 #endif

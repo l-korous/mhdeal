@@ -27,9 +27,8 @@ Parameters<dim>::Parameters() {
 }
 
 template <int dim>
-void Parameters<dim>::delete_old_outputs() const
+void Parameters<dim>::delete_old_outputs(MPI_Comm& mpi_communicator) const
 {
-  MPI_Comm mpi_communicator(MPI_COMM_WORLD);
   // The main process will optionally delete outputs.
   if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
   {

@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     // Initialization of parameters. See parameters.h for description of the individual parameters
     Parameters<DIMENSION> parameters;
     set_parameters(parameters);
-    parameters.delete_old_outputs();
+    parameters.delete_old_outputs(mpi_communicator);
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
