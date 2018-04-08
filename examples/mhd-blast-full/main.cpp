@@ -26,7 +26,9 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
   parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.01);
-  parameters.refinements = { 300, 450, 1 };
+  parameters.refinements = { 100, 150, 1 };
+  parameters.limit = true;
+  parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
@@ -34,43 +36,10 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
 
-  parameters.use_iterative_improvement = false;
-  parameters.limit_in_nonlin_loop = false;
-  parameters.automatic_damping = false;
-  parameters.automatic_cfl = false;
-  parameters.initial_and_max_newton_damping = 1.;
-  parameters.decrease_factor = .9;
-  parameters.increase_factor = 1. / parameters.decrease_factor;
-  parameters.stagnation_coefficient = 1.e-2;
-  parameters.bad_step_coefficient = 2.;
-
   parameters.patches = 1;
   parameters.output_step = 1.e-2;
 
-  parameters.debug = false;
-
-  parameters.output_matrix = false;
-  parameters.output = Parameters<DIMENSION>::quiet_solver;
-  parameters.output_rhs = false;
-  parameters.output_solution = false;
-
-  parameters.snapshot_step = 1.;
-
-  parameters.time_step = 1.e-5;
   parameters.final_time = 1.;
-
-  parameters.solver = Parameters<DIMENSION>::gmres;
-  parameters.linear_residual = 1e-10;
-  parameters.max_iterations = 10000;
-  parameters.ilut_fill = 1.5;
-  parameters.ilut_drop = 1e-6;
-  parameters.ilut_atol = 1e-6;
-  parameters.ilut_rtol = 1.0;
-
-  parameters.gas_gamma = 1.4;
-
-  parameters.newton_max_iterations = 30;
-  parameters.newton_residual_norm_threshold = 1e-8;
 }
 
 int main(int argc, char *argv[])
@@ -80,19 +49,10 @@ int main(int argc, char *argv[])
 
   try
   {
-    // The main process will optionally delete outputs.
-    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-    {
-#ifdef _MSC_VER
-      system("del *.visit *.vtk *.vtu *.pvtu *.newton_update *.current_solution *.matrix *.rhs");
-#else
-      system("rm *.visit *.vtk *vtu *.newton_update *.current_solution *.matrix *.rhs");
-#endif
-    }
-
     // Initialization of parameters. See parameters.h for description of the individual parameters
     Parameters<DIMENSION> parameters;
     set_parameters(parameters);
+    parameters.delete_old_outputs();
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI

@@ -9,28 +9,7 @@ class Parameters
 {
 public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
-  Parameters() {
-    this->limit = true;
-    this->slope_limiter = vertexBased;
-    this->output_file_prefix = "";
-    this->lax_friedrich_stabilization_value = .5;
-    this->snapshot_step = 1.;
-    this->time_step = 1.e-5;
-
-    this->debug = false;
-    this->output_matrix = false;
-    this->output = quiet_solver;
-    this->output_rhs = false;
-    this->output_solution = false;
-
-    this->solver = gmres;
-    this->linear_residual = 1e-10;
-    this->max_iterations = 10000;
-    this->ilut_fill = 1.5;
-    this->ilut_drop = 1e-6;
-    this->ilut_atol = 1e-6;
-    this->ilut_rtol = 1.0;
-  };
+  Parameters();
 
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
@@ -117,6 +96,8 @@ public:
   Point<dim> corner_b;
   std::vector<unsigned int> refinements;
   std::vector<std::array<int, 3> > periodic_boundaries;
+
+  void delete_old_outputs() const;
 };
 
 #endif

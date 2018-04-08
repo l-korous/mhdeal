@@ -12,6 +12,7 @@ SET(TARGET_SRC
   feTaylor.h
   feTaylor.cpp
   equationsMhd.h
+  parameters.cpp
   parameters.h
   boundaryConditions.cpp
   boundaryConditions.h

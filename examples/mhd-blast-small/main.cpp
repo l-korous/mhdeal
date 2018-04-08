@@ -27,22 +27,17 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.corner_a = Point<DIMENSION>(0.0, 0.0, 0.);
   parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
   parameters.refinements = { 30, 30, 1 };
-  parameters.limit = false;
+  parameters.limit = true;
   parameters.slope_limiter = parameters.barthJespersen;
   parameters.use_div_free_space_for_B = true;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .01;
+  parameters.cfl_coefficient = .05;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
-
-  parameters.use_iterative_improvement = false;
-  parameters.patches = 2;
+  parameters.patches = 1;
   parameters.output_step = -1.e-3;
-
-  parameters.debug = false;
-  parameters.gas_gamma = 1.4;
 }
 
 int main(int argc, char *argv[])
@@ -52,19 +47,10 @@ int main(int argc, char *argv[])
 
   try
   {
-    // The main process will optionally delete outputs.
-    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-    {
-#ifdef _MSC_VER
-      system("del *.visit *.vtk *.vtu *.pvtu *.newton_update *.current_solution *.matrix *.rhs");
-#else
-      system("rm *.visit *.vtk *vtu *.newton_update *.current_solution *.matrix *.rhs");
-#endif
-    }
-
     // Initialization of parameters. See parameters.h for description of the individual parameters
     Parameters<DIMENSION> parameters;
     set_parameters(parameters);
+    parameters.delete_old_outputs();
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI

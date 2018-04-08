@@ -158,24 +158,24 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
 
   double Fl[n_components], Fr[n_components], hl[2], hr[2];
   double Uldst[n_components], Urdst[n_components], Ulst[n_components], Urst[n_components];
-  double spd[5], vbstl, vbstr, Bsgnl, Bsgnr, invsumd;
+  double spd[5], vbstl, vbstr, Bsgn, invsumd;
 
   component_vector ul, ur;
   Q(ul, Wplus_, normal);
   Q(ur, Wminus_, normal);
 
-  double B = 0.5*(ul[5] + ur[5]);
-  double B2 = B*B;
+  double Bx = 0.5*(ul[5] + ur[5]);
+  double Bx2 = Bx * Bx;
 
   // Densities, energies.
   hl[0] = 1.0 / ul[0];
   double Ukl = 0.5 * hl[0] * (ul[1] * ul[1] + ul[2] * ul[2] + ul[3] * ul[3]);
-  double Uml = 0.5 * (ul[5] * ul[5] + ul[6] * ul[6] + ul[7] * ul[7]);
+  double Uml = 0.5 * (Bx2 + ul[6] * ul[6] + ul[7] * ul[7]);
   hl[1] = (parameters.gas_gamma - 1.) * (ul[4] - Ukl - Uml);
 
   hr[0] = 1.0 / ur[0];
   double Ukr = 0.5 * hr[0] * (ur[1] * ur[1] + ur[2] * ur[2] + ur[3] * ur[3]);
-  double Umr = 0.5 * (ur[5] * ur[5] + ur[6] * ur[6] + ur[7] * ur[7]);
+  double Umr = 0.5 * (Bx2 + ur[6] * ur[6] + ur[7] * ur[7]);
   hr[1] = (parameters.gas_gamma - 1.) * (ur[4] - Ukr - Umr);
 
   // sound speed
@@ -184,10 +184,10 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
 
   // fast magnetoacoustic speed
   double cl = al2 + (2. * Uml * hl[0]);
-  cl = sqrt(0.5 * (cl + sqrt((cl * cl) - (4.0 * al2 * ul[5] * ul[5] * hl[0]))));
+  cl = sqrt(0.5 * (cl + sqrt((cl * cl) - (4.0 * al2 * Bx2 * hl[0]))));
 
   double cr = ar2 + (2. * Umr * hr[0]);
-  cr = sqrt(0.5 * (cr + sqrt((cr * cr) - (4.0 * ar2 * ur[5] * ur[5] * hr[0]))));
+  cr = sqrt(0.5 * (cr + sqrt((cr * cr) - (4.0 * ar2 * Bx2 * hr[0]))));
 
   // total pressure
   double ptl = hl[1] + Uml;
@@ -207,30 +207,30 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   max_speed = std::max(max_speed, (std::max(std::abs(spd[0]), std::abs(spd[4]))));
 
   // Calculate left flux
-  double E2 = hl[0] * (ul[1] * ul[7] - ul[3] * ul[5]);
-  double E3 = hl[0] * (ul[2] * ul[5] - ul[1] * ul[6]);
+  double E2 = hl[0] * (ul[1] * ul[7] - ul[3] * Bx);
+  double E3 = hl[0] * (ul[2] * Bx - ul[1] * ul[6]);
 
   Fl[0] = ul[1];
-  Fl[1] = hl[0] * ul[1] * ul[1] - ul[5] * ul[5] + ptl;
-  Fl[2] = hl[0] * ul[1] * ul[2] - ul[5] * ul[6];
-  Fl[3] = hl[0] * ul[1] * ul[3] - ul[5] * ul[7];
+  Fl[1] = hl[0] * ul[1] * ul[1] - Bx2 + ptl;
+  Fl[2] = hl[0] * ul[1] * ul[2] - Bx * ul[6];
+  Fl[3] = hl[0] * ul[1] * ul[3] - Bx * ul[7];
   Fl[5] = 0.0;
   Fl[6] = -E3;
   Fl[7] = E2;
-  Fl[4] = (ul[4] + ptl) * (ul[1] / ul[0]) - (ul[5] * (ul[1] * ul[5] + ul[2] * ul[6] + ul[3] * ul[7]));
+  Fl[4] = (ul[4] + ptl) * (ul[1] / ul[0]) - (Bx * (ul[1] * Bx + ul[2] * ul[6] + ul[3] * ul[7]));
 
   // Calculate right flux
-  E2 = hr[0] * (ur[1] * ur[7] - ur[3] * ur[5]);
-  E3 = hr[0] * (ur[2] * ur[5] - ur[1] * ur[6]);
+  E2 = hr[0] * (ur[1] * ur[7] - ur[3] * Bx);
+  E3 = hr[0] * (ur[2] * Bx - ur[1] * ur[6]);
 
   Fr[0] = ur[1];
-  Fr[1] = hr[0] * ur[1] * ur[1] - ur[5] * ur[5] + ptr;
-  Fr[2] = hr[0] * ur[1] * ur[2] - ur[5] * ur[6];
-  Fr[3] = hr[0] * ur[1] * ur[3] - ur[5] * ur[7];
+  Fr[1] = hr[0] * ur[1] * ur[1] - Bx2 + ptr;
+  Fr[2] = hr[0] * ur[1] * ur[2] - Bx * ur[6];
+  Fr[3] = hr[0] * ur[1] * ur[3] - Bx * ur[7];
   Fr[5] = 0.0;
   Fr[6] = -E3;
   Fr[7] = E2;
-  Fr[4] = (ur[4] + ptr) * (ur[1] / ur[0]) - (ur[5] * (ur[1] * ur[5] + ur[2] * ur[6] + ur[3] * ur[7]));
+  Fr[4] = (ur[4] + ptr) * (ur[1] / ur[0]) - (Bx * (ur[1] * Bx + ur[2] * ur[6] + ur[3] * ur[7]));
 
   // Upwind flux in the case of supersonic flow
   if (spd[0] >= 0.0) {
@@ -241,7 +241,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       for (int j = 0; j < n_components; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
-          if (std::abs(flux_lf[j] - normal_flux[j]) > std::min(std::abs(flux_lf[j]), std::abs(normal_flux[j])))
+          if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
             std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
           }
@@ -256,7 +256,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       for (int j = 0; j < n_components; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
-          if (std::abs(flux_lf[j] - normal_flux[j]) > std::min(std::abs(flux_lf[j]), std::abs(normal_flux[j])))
+          if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
             std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
           }
@@ -274,23 +274,21 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   Ulst[0] = ul[0] * sdl / sdml;
   Urst[0] = ur[0] * sdr / sdmr;
 
-  Ulst[5] = Uldst[5] = ul[5];
-  Urst[5] = Urdst[5] = ur[5];
-
   double sqrtdl = sqrt(Ulst[0]);
   double sqrtdr = sqrt(Urst[0]);
 
   // Sl*, Sr*
-  spd[1] = spd[2] - fabs(Ulst[5]) / sqrtdl;
-  spd[3] = spd[2] + fabs(Urst[5]) / sqrtdr;
+  spd[1] = spd[2] - fabs(Bx) / sqrtdl;
+  spd[3] = spd[2] + fabs(Bx) / sqrtdr;
 
   double ptst = ptl + ul[0] * sdl*(sdl - sdml);
-  double ptstr = ptr + ur[0] * sdr*(sdr - sdmr);
+  //double ptstr = ptr + ur[0] * sdr*(sdr - sdmr);
 
   // F*_L
   Ulst[1] = Ulst[0] * spd[2];
-  cl = ul[0] * sdl * sdml - Ulst[5] * Ulst[5];
-  if (fabs(cl) < NEGLIGIBLE * ptst) {
+  Ulst[5] = Bx;
+  cl = ul[0] * sdl * sdml - Bx2;
+  if (fabs(cl) < SMALL * ptst) {
     Ulst[2] = Ulst[0] * ul[2] * hl[0];
     Ulst[3] = Ulst[0] * ul[3] * hl[0];
 
@@ -299,21 +297,22 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   }
   else {
     cl = 1.0 / cl;
-    cm = Ulst[5] * (sdl - sdml) * cl;
+    cm = Bx * (sdl - sdml) * cl;
     Ulst[2] = Ulst[0] * (ul[2] * hl[0] - ul[6] * cm);
     Ulst[3] = Ulst[0] * (ul[3] * hl[0] - ul[7] * cm);
-    cm = (ul[0] * sdl * sdl - Ulst[5] * Ulst[5]) * cl;
+    cm = (ul[0] * sdl * sdl - Bx2) * cl;
     Ulst[6] = ul[6] * cm;
     Ulst[7] = ul[7] * cm;
   }
-  vbstl = (Ulst[1] * Ulst[5] + Ulst[2] * Ulst[6] + Ulst[3] * Ulst[7]) / Ulst[0];
-  Ulst[4] = (sdl * ul[4] - ptl * ul[1] * hl[0] + ptst * spd[2] + Ulst[5] *
-    ((ul[1] * ul[5] + ul[2] * ul[6] + ul[3] * ul[7]) * hl[0] - vbstl)) / sdml;
+  vbstl = (Ulst[1] * Bx + Ulst[2] * Ulst[6] + Ulst[3] * Ulst[7]) / Ulst[0];
+  Ulst[4] = (sdl * ul[4] - ptl * ul[1] * hl[0] + ptst * spd[2] + Bx *
+    ((ul[1] * Bx + ul[2] * ul[6] + ul[3] * ul[7]) * hl[0] - vbstl)) / sdml;
 
   // F*_R
   Urst[1] = Urst[0] * spd[2];
-  cl = ur[0] * sdr * sdmr - Urst[5] * Urst[5];
-  if (fabs(cl) < NEGLIGIBLE * ptstr) {
+  Urst[5] = Bx;
+  cl = ur[0] * sdr * sdmr - Bx2;
+  if (fabs(cl) < SMALL * ptst) {
     Urst[2] = Urst[0] * ur[2] * hr[0];
     Urst[3] = Urst[0] * ur[3] * hr[0];
 
@@ -322,16 +321,16 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   }
   else {
     cl = 1.0 / cl;
-    cm = Urst[5] * (sdr - sdmr) * cl;
+    cm = Bx * (sdr - sdmr) * cl;
     Urst[2] = Urst[0] * (ur[2] * hr[0] - ur[6] * cm);
     Urst[3] = Urst[0] * (ur[3] * hr[0] - ur[7] * cm);
-    cm = (ur[0] * sdr * sdr - Urst[5] * Urst[5])*cl;
+    cm = (ur[0] * sdr * sdr - Bx2)*cl;
     Urst[6] = ur[6] * cm;
     Urst[7] = ur[7] * cm;
   }
-  vbstr = (Urst[1] * Urst[5] + Urst[2] * Urst[6] + Urst[3] * Urst[7]) / Urst[0];
-  Urst[4] = (sdr * ur[4] - ptr * ur[1] * hr[0] + ptstr * spd[2] + Urst[5] *
-    ((ur[1] * Urst[5] + ur[2] * ur[6] + ur[3] * ur[7]) * hr[0] - vbstr)) / sdmr;
+  vbstr = (Urst[1] * Bx + Urst[2] * Urst[6] + Urst[3] * Urst[7]) / Urst[0];
+  Urst[4] = (sdr * ur[4] - ptr * ur[1] * hr[0] + ptst * spd[2] + Bx *
+    ((ur[1] * Bx + ur[2] * ur[6] + ur[3] * ur[7]) * hr[0] - vbstr)) / sdmr;
 
   if (spd[1] >= 0.0) {
     for (int j = 0; j < n_components; j++)
@@ -341,7 +340,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       for (int j = 0; j < n_components; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
-          if (std::abs(flux_lf[j] - normal_flux[j]) > std::min(std::abs(flux_lf[j]), std::abs(normal_flux[j])))
+          if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
             std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
           }
@@ -356,7 +355,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       for (int j = 0; j < n_components; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
-          if (std::abs(flux_lf[j] - normal_flux[j]) > std::min(std::abs(flux_lf[j]), std::abs(normal_flux[j])))
+          if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
             std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
           }
@@ -365,7 +364,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   }
 
   // F**_L and F**_R
-  if (B2 < NEGLIGIBLE * (ptst + ptstr)) {
+  if (Bx2 < SMALL * ptst) {
     for (int j = 0; j < n_components; j++) {
       Uldst[j] = Ulst[j];
       Urdst[j] = Urst[j];
@@ -373,8 +372,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   }
   else {
     invsumd = 1.0 / (sqrtdl + sqrtdr);
-    Bsgnl = (Ulst[5] > 0.0) ? 1.0 : -1.0;
-    Bsgnr = (Urst[5] > 0.0) ? 1.0 : -1.0;
+    Bsgn = (Bx > 0.0) ? 1.0 : -1.0;
 
     Uldst[0] = Ulst[0];
     Urdst[0] = Urst[0];
@@ -382,28 +380,31 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
     Uldst[1] = Ulst[1];
     Urdst[1] = Urst[1];
 
+    Uldst[5] = Ulst[5];
+    Urdst[5] = Urst[5];
+
     cm = invsumd * (sqrtdl * Ulst[2] / Ulst[0] + sqrtdr * Urst[2] / Urst[0]);
     cl = invsumd * (Urst[6] - Ulst[6]);
-    Uldst[2] = Ulst[0] * (cm + Bsgnl*cl);
-    Urdst[2] = Urst[0] * (cm + Bsgnr*cl);
+    Uldst[2] = Ulst[0] * (cm + Bsgn*cl);
+    Urdst[2] = Urst[0] * (cm + Bsgn*cl);
 
     cm = invsumd * (sqrtdl * Ulst[3] / Ulst[0] + sqrtdr * Urst[3] / Urst[0]);
     cl = invsumd * (Urst[7] - Ulst[7]);
-    Uldst[3] = Ulst[0] * (cm + Bsgnl*cl);
-    Urdst[3] = Urst[0] * (cm + Bsgnr*cl);
+    Uldst[3] = Ulst[0] * (cm + Bsgn*cl);
+    Urdst[3] = Urst[0] * (cm + Bsgn*cl);
 
     cm = invsumd * (sqrtdl *Urst[6] + sqrtdr * Ulst[6]);
     cl = invsumd * sqrtdl * sqrtdr * (Urst[2] / Urst[0] - Ulst[2] / Ulst[0]);
-    Uldst[6] = cm + Bsgnl * cl;
-    Urdst[6] = cm + Bsgnr * cl;
+    Uldst[6] = cm + Bsgn * cl;
+    Urdst[6] = cm + Bsgn * cl;
 
     cm = invsumd * (sqrtdl * Urst[7] + sqrtdr * Ulst[7]);
     cl = invsumd * sqrtdl * sqrtdr * (Urst[3] / Urst[0] - Ulst[3] / Ulst[0]);
-    Uldst[7] = cm + Bsgnl * cl;
-    Urdst[7] = cm + Bsgnr * cl;
+    Uldst[7] = cm + Bsgn * cl;
+    Urdst[7] = cm + Bsgn * cl;
 
-    Uldst[4] = Ulst[4] - sqrtdl * Bsgnl * (vbstl - spd[2] * Ulst[5] - (Uldst[2] * Uldst[6] + Uldst[3] * Uldst[7]) / Uldst[0]);
-    Urdst[4] = Urst[4] + sqrtdr * Bsgnr * (vbstr - spd[2] * Urst[5] - (Urdst[2] * Urdst[6] + Urdst[3] * Urdst[7]) / Urdst[0]);
+    Uldst[4] = Ulst[4] - sqrtdl * Bsgn * (vbstl - spd[2] * Bx - (Uldst[2] * Uldst[6] + Uldst[3] * Uldst[7]) / Uldst[0]);
+    Urdst[4] = Urst[4] + sqrtdr * Bsgn * (vbstr - spd[2] * Bx - (Urdst[2] * Urdst[6] + Urdst[3] * Urdst[7]) / Urdst[0]);
   }
 
   if (spd[2] >= 0.0) {
@@ -415,7 +416,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       for (int j = 0; j < n_components; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
-          if (std::abs(flux_lf[j] - normal_flux[j]) > std::min(std::abs(flux_lf[j]), std::abs(normal_flux[j])))
+          if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
             std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
           }
@@ -432,7 +433,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       for (int j = 0; j < n_components; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
-          if (std::abs(flux_lf[j] - normal_flux[j]) > std::min(std::abs(flux_lf[j]), std::abs(normal_flux[j])))
+          if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
             std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
           }
