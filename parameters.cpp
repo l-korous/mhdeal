@@ -44,7 +44,7 @@ void Parameters<dim>::delete_old_outputs() const
     system(ss.str().c_str());
 #else
     std::stringstream ss;
-    ss << "del";
+    ss << "rm";
     ss << " " << this->output_file_prefix << ".visit";
     ss << " " << this->output_file_prefix << ".vtu";
     ss << " " << this->output_file_prefix << ".pvtu";
