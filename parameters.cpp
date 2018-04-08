@@ -32,6 +32,8 @@ Parameters<dim>::Parameters() {
   this->ilut_drop = 1e-6;
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
+  this->newton_max_iterations = 30;
+  this->newton_residual_norm_threshold = 1e-8;
 }
 
 template <int dim>

@@ -717,7 +717,7 @@ void Problem<equationsType, dim>::run()
         std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
-    for (int linStep = 0; linStep < this->parameters.newton_max_iterations; linStep++)
+    for (int linStep = 0; linStep < (this->parameters.use_iterative_improvement ? this->parameters.newton_max_iterations : 1); linStep++)
     {
       // Assemble
       system_rhs = 0;
