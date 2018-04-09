@@ -431,6 +431,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
           std::cout << "normal: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2] << std::endl;
           for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
             std::cout << "W+ [" << j << "]: " << (double)Wplus_old[j] << ", W- [" << j << "]: " << (double)Wminus_old[j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
+          exit(1);
         }
       }
 
