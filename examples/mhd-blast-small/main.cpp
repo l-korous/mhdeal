@@ -26,7 +26,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(-0.2, -0.2, 0.);
   parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
-  parameters.refinements = { 30, 30, 1 };
+  parameters.refinements = { 60, 60, 1 };
   parameters.limit = true;
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = true;
