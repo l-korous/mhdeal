@@ -38,6 +38,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.polynomial_order_dg = 1;
   parameters.patches = 1;
   parameters.output_step = -1.e-3;
+  parameters.final_time = 1.;
 }
 
 int main(int argc, char *argv[])
