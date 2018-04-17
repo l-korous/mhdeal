@@ -14,7 +14,7 @@ void NumFlux<equationsType, dim>::Q(n_comp_array &result, const n_comp_array &W,
     forResult[2] = -W[2];
     forResult[6] = -W[6];
   }
-  else if (normal[1] > 0.5) {
+  else if (normal[1] > 0.5) { 
     forResult[1] = W[2];
     forResult[2] = -W[1];
     forResult[5] = W[6];
@@ -214,10 +214,10 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   Fl[1] = hl[0] * ul[1] * ul[1] - Bx2 + ptl;
   Fl[2] = hl[0] * ul[1] * ul[2] - Bx * ul[6];
   Fl[3] = hl[0] * ul[1] * ul[3] - Bx * ul[7];
+  Fl[4] = (ul[4] + ptl) * (ul[1] / ul[0]) - (Bx * (ul[1] * Bx + ul[2] * ul[6] + ul[3] * ul[7]));
   Fl[5] = 0.0;
   Fl[6] = -E3;
   Fl[7] = E2;
-  Fl[4] = (ul[4] + ptl) * (ul[1] / ul[0]) - (Bx * (ul[1] * Bx + ul[2] * ul[6] + ul[3] * ul[7]));
 
   // Calculate right flux
   E2 = hr[0] * (ur[1] * ur[7] - ur[3] * Bx);
@@ -227,10 +227,10 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   Fr[1] = hr[0] * ur[1] * ur[1] - Bx2 + ptr;
   Fr[2] = hr[0] * ur[1] * ur[2] - Bx * ur[6];
   Fr[3] = hr[0] * ur[1] * ur[3] - Bx * ur[7];
+  Fr[4] = (ur[4] + ptr) * (ur[1] / ur[0]) - (Bx * (ur[1] * Bx + ur[2] * ur[6] + ur[3] * ur[7]));
   Fr[5] = 0.0;
   Fr[6] = -E3;
   Fr[7] = E2;
-  Fr[4] = (ur[4] + ptr) * (ur[1] / ur[0]) - (Bx * (ur[1] * Bx + ur[2] * ur[6] + ur[3] * ur[7]));
 
   // Upwind flux in the case of supersonic flow
   if (spd[0] >= 0.0) {

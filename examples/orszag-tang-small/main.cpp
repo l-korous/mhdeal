@@ -23,18 +23,19 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   triangulation.add_periodicity(matched_pairs);
 }
 
-void set_parameters(Parameters<DIMENSION>& parameters)
+void set_parameters(Parameters<DIMENSION>& parameters)  
 {
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
   parameters.corner_b = Point<DIMENSION>(1., 1., 0.001);
-  parameters.refinements = { 100, 100, 1 };
-  parameters.limit = false;
+  parameters.refinements = { 200, 200, 1 };
+  parameters.limit = true;
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .02;
+  parameters.cfl_coefficient = .1;
+  parameters.start_limiting_at = 0.05;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.patches = 1;

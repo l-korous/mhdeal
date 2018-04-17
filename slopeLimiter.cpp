@@ -149,6 +149,9 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
         {
           if (this->is_primitive[i])
           {
+            if (std::abs(u_c[this->component_ii[i]]) < SMALL)
+            continue;
+          
             // Here we rely on the fact, that the constant basis fn is the first one.
             if (!u_i_extrema_set[this->component_ii[i]])
             {
@@ -170,12 +173,16 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
 
       // Based on u_i_min, u_i_max, u_i, get alpha_e
       for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
+      {
+        if (std::abs(u_c[k]) < SMALL)
+          continue;
         if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
         {
           alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
           if (this->parameters.debug)
             std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
         }
+      }
     }
 
     for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)

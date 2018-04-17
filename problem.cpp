@@ -84,7 +84,7 @@ void Problem<equationsType, dim>::postprocess()
   current_limited_solution = current_unlimited_solution;
   constraints.distribute(current_limited_solution);
 
-  this->slopeLimiter->postprocess(current_unlimited_solution, current_limited_solution);
+  this->slopeLimiter->postprocess(current_limited_solution, current_unlimited_solution);
 }
 
 template <EquationsType equationsType, int dim>
@@ -740,7 +740,7 @@ void Problem<equationsType, dim>::run()
         output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
 
       // Postprocess if required
-      if (!initial_step && (parameters.limit && parameters.polynomial_order_dg > 0 && ((!parameters.use_iterative_improvement) || (parameters.limit_in_nonlin_loop))))
+      if (this->time > this->parameters.start_limiting_at && !initial_step && parameters.limit && parameters.polynomial_order_dg > 0 && ((!parameters.use_iterative_improvement) || (parameters.limit_in_nonlin_loop)))
         postprocess();
       else
         current_limited_solution = current_unlimited_solution;
@@ -782,7 +782,7 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
-  if (!this->initial_step && (parameters.limit && parameters.polynomial_order_dg > 0 && ((!parameters.use_iterative_improvement) || (!parameters.limit_in_nonlin_loop))))
+  if (this->time > this->parameters.start_limiting_at && !this->initial_step && parameters.limit && parameters.polynomial_order_dg > 0 && parameters.use_iterative_improvement && !parameters.limit_in_nonlin_loop)
   {
     postprocess();
     lin_solution = current_limited_solution;
