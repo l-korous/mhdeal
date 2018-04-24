@@ -71,7 +71,7 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W,
   const double pressure = compute_pressure(W, parameters);
   const double E = W[4];
   const double total_pressure = pressure + mag_energy;
-  const double UB = W[1] * W[5] + W[2] * W[6] + W[3] * W[7];
+  const double UB = (W[1] * W[5] + W[2] * W[6] + W[3] * W[7]) / W[0];
 
   flux[0][0] = W[1];
   flux[1][0] = (W[1] * W[1] / W[0]) - W[5] * W[5] + total_pressure;
