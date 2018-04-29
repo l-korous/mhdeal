@@ -136,7 +136,9 @@ public:
   // DOF indices both on the currently assembled element and the neighbor.
   FEValues<dim>* fe_v_cell;
   FEFaceValues<dim> fe_v_face;
+  FESubfaceValues<dim> fe_v_subface;
   FEFaceValues<dim> fe_v_face_neighbor;
+  FESubfaceValues<dim> fe_v_subface_neighbor;
   std::vector<types::global_dof_index> dof_indices;
   std::vector<types::global_dof_index> dof_indices_neighbor;
   std::array<double, Equations<equationsType, dim>::n_components> Wplus_old, Wminus_old;

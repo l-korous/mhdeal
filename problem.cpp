@@ -27,7 +27,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   face_update_flags(update_values | update_JxW_values | update_normal_vectors | update_q_points),
   neighbor_face_update_flags(update_values | update_q_points),
   fe_v_face(mapping, fe, face_quadrature, face_update_flags),
-  fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags)
+  fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
+  fe_v_subface(mapping, fe, face_quadrature, face_update_flags),
+  fe_v_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags)
 {
   fe_v_cell = new FEValues<dim>(mapping, fe, quadrature, update_flags);
   n_quadrature_points_cell = quadrature.get_points().size();
@@ -134,8 +136,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     if (!cell->is_locally_owned())
       continue;
 
-    if (this->initial_step)
-      fe_v_cell->reinit(cell);
+    fe_v_cell->reinit(cell);
 
     if (assemble_matrix)
       cell_matrix = 0;
@@ -182,12 +183,55 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
         }
         else
         {
-          const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-          neighbor->get_dof_indices(dof_indices_neighbor);
+          // Here the neighbor face is more split than the current one (has children with respect to the current face of the current element), we need to assemble sub-face by sub-face
+          // Not performed if there is no adaptivity involved.
+          if (cell->neighbor(face_no)->has_children())
+          {
+            const unsigned int neighbor2 = cell->neighbor_of_neighbor(face_no);
 
-          fe_v_face.reinit(cell, face_no);
-          fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
+            for (unsigned int subface_no = 0; subface_no < cell->face(face_no)->n_children(); ++subface_no)
+            {
+              const typename DoFHandler<dim>::active_cell_iterator neighbor_child = cell->neighbor_child_on_subface(face_no, subface_no);
+
+              Assert(neighbor_child->face(neighbor2) == cell->face(face_no)->child(subface_no), ExcInternalError());
+              Assert(neighbor_child->has_children() == false, ExcInternalError());
+
+              fe_v_subface.reinit(cell, face_no, subface_no);
+              fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
+              neighbor_child->get_dof_indices(dof_indices_neighbor);
+
+              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
+            }
+          }
+          // Here the neighbor face is less split than the current one, there is some transformation needed.
+          // Not performed if there is no adaptivity involved.
+          else if (cell->neighbor(face_no)->level() != cell->level())
+          {
+            const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+            Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
+            neighbor->get_dof_indices(dof_indices_neighbor);
+
+            const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
+            const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
+
+            Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == cell, ExcInternalError());
+
+            fe_v_face.reinit(cell, face_no);
+            fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
+
+            assemble_face_term(face_no, fe_v_face, fe_v_subface_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
+          }
+          // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
+          // This is the only face assembly case performed without adaptivity.
+          else
+          {
+            const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+            neighbor->get_dof_indices(dof_indices_neighbor);
+
+            fe_v_face.reinit(cell, face_no);
+            fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
+            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
+          }
         }
       }
     }
