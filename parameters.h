@@ -18,9 +18,6 @@ public:
   enum Limiter { vertexBased, barthJespersen};
   Limiter slope_limiter;
 
-  // Perform iterative improvements.
-  bool use_iterative_improvement;
-
   // Flux enumeration - for potentially adding more fluxes, decision which one to use is then made in Equations<>::numerical_normal_flux.
   enum NumFluxType { hlld, lax_friedrich };
   NumFluxType num_flux_type;

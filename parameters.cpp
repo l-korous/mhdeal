@@ -4,7 +4,6 @@ template <int dim>
 Parameters<dim>::Parameters() {
   this->start_limiting_at = 0.;
   this->gas_gamma = 5. / 3.;
-  this->use_iterative_improvement = false;
   this->limit_in_nonlin_loop = false;
   this->automatic_damping = false;
   this->automatic_cfl = false;

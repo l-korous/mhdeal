@@ -24,18 +24,18 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.2, -0.2, 0.);
+  parameters.corner_a = Point<DIMENSION>(-0.0, -0.0, 0.);
   parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
-  parameters.refinements = { 60, 60, 1 };
-  parameters.limit = true;
+  parameters.refinements = { 20, 20, 1 };
+  parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = true;
-  parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
+  //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .05;
   parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 1;
   parameters.output_step = -1.e-3;
   parameters.final_time = 1.;
@@ -60,6 +60,16 @@ int main(int argc, char *argv[])
     Triangulation<DIMENSION> triangulation;
 #endif    
     set_triangulation(triangulation, parameters);
+
+    int i = 0;
+    Triangulation<3>::active_cell_iterator cell = triangulation.begin_active();
+    Triangulation<3>::active_cell_iterator endc = triangulation.end();
+    for (; cell != endc; ++cell)
+    {
+      if ((i++ % 11 < 4) || (i++ % 13 > 9))
+        cell->set_refine_flag();
+    }
+    triangulation.execute_coarsening_and_refinement();
 
     MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp

@@ -39,12 +39,13 @@ public:
   void calculate_cfl_condition();
 
   // Performs a local assembly for all volumetric contributions on the local cell.
-  void assemble_cell_term(FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix);
-  
+  void assemble_cell_term(FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix, const FullMatrix<double> prolongation_matrix);
+
   // Performs a local assembly for all surface contributions on the local cell.
   // i.e. face terms calculated on all faces - internal and boundary
-  void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs);
-  
+  void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const bool external_face,
+    const unsigned int boundary_id, Vector<double>& cell_rhs, const FullMatrix<double> prolongation_matrix);
+
   void output_base();
   void output_results() const;
   void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step, int newton_step = -1) const;
@@ -58,8 +59,10 @@ public:
   // Triangulation - passed as a constructor parameter
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation;
+  parallel::distributed::Triangulation<dim>& prev_triangulation;
 #else
   Triangulation<dim>& triangulation;
+  Triangulation<dim>& prev_triangulation;
 #endif
 
   void save();
@@ -85,7 +88,7 @@ public:
 
   const MappingQ1<dim> mapping;
   const FESystem<dim> fe;
-  DoFHandler<dim> dof_handler;
+  DoFHandler<dim> dof_handler, prev_dof_handler;
   const QGauss<dim> quadrature;
   const QGauss<dim - 1> face_quadrature;
 
@@ -93,8 +96,7 @@ public:
   TrilinosWrappers::MPI::Vector     current_limited_solution;
   TrilinosWrappers::MPI::Vector     current_unlimited_solution;
   TrilinosWrappers::MPI::Vector     prev_solution;
-  TrilinosWrappers::MPI::Vector     lin_solution;
-  
+
   // The system being assembled.
   TrilinosWrappers::MPI::Vector system_rhs;
   TrilinosWrappers::SparseMatrix system_matrix;
@@ -134,7 +136,8 @@ public:
   const UpdateFlags face_update_flags;
   const UpdateFlags neighbor_face_update_flags;
   // DOF indices both on the currently assembled element and the neighbor.
-  FEValues<dim>* fe_v_cell;
+  typename DoFHandler<dim>::cell_iterator cell, prev_cell;
+  FEValues<dim> fe_v_cell, fe_v_prev_cell;
   FEFaceValues<dim> fe_v_face;
   FESubfaceValues<dim> fe_v_subface;
   FEFaceValues<dim> fe_v_face_neighbor;
@@ -143,7 +146,6 @@ public:
   std::vector<types::global_dof_index> dof_indices_neighbor;
   std::array<double, Equations<equationsType, dim>::n_components> Wplus_old, Wminus_old;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > normal_fluxes_old;
-  std::array<double, Equations<equationsType, dim>::n_components> W_lin;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev;
   std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > fluxes_old;
 
@@ -154,5 +156,5 @@ public:
   // This is here and not in the loop because of tests - we test by looking at the last res_norm.
   double res_norm;
   // Utility
-  static bool is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters) ;
+  static bool is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters);
 };

@@ -12,10 +12,13 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   parameters(parameters),
   equations(equations),
   triangulation(triangulation),
+  prev_triangulation(triangulation),
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
   mapping(),
-  fe(parameters.use_div_free_space_for_B ? FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 5, FE_DG_DivFree<dim>(), 1) : FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 8)), dof_handler(triangulation),
+  fe(parameters.use_div_free_space_for_B ? FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 5, FE_DG_DivFree<dim>(), 1) : FESystem<dim>(FE_DG_Taylor<dim>(parameters.polynomial_order_dg), 8)),
+  dof_handler(triangulation),
+  prev_dof_handler(prev_triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
   verbose_cout(std::cout, false),
@@ -26,12 +29,13 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   update_flags(update_values | update_JxW_values | update_gradients),
   face_update_flags(update_values | update_JxW_values | update_normal_vectors | update_q_points),
   neighbor_face_update_flags(update_values | update_q_points),
+  fe_v_cell(mapping, fe, quadrature, update_flags),
+  fe_v_prev_cell(mapping, fe, quadrature, update_flags),
   fe_v_face(mapping, fe, face_quadrature, face_update_flags),
   fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
   fe_v_subface(mapping, fe, face_quadrature, face_update_flags),
   fe_v_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags)
 {
-  fe_v_cell = new FEValues<dim>(mapping, fe, quadrature, update_flags);
   n_quadrature_points_cell = quadrature.get_points().size();
   fluxes_old.resize(n_quadrature_points_cell);
   W_prev.resize(n_quadrature_points_cell);
@@ -40,7 +44,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 
   if (parameters.num_flux_type == parameters.hlld)
     this->numFlux = new NumFluxHLLD<equationsType, dim>(this->parameters);
-  else if (parameters.num_flux_type == parameters.lax_friedrich )
+  else if (parameters.num_flux_type == parameters.lax_friedrich)
     this->numFlux = new NumFluxLaxFriedrich<equationsType, dim>(this->parameters);
 
   if (parameters.slope_limiter == parameters.vertexBased)
@@ -130,116 +134,167 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 
   // Loop through all cells.
   int ith_cell = 0;
-  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+
+  const std::list<std::pair<typename DoFHandler<dim>::cell_iterator, typename DoFHandler<dim>::cell_iterator> > cell_list =
+    GridTools::get_finest_common_cells(dof_handler, prev_dof_handler);
+
+  typename std::list<std::pair<typename DoFHandler<dim>::cell_iterator, typename DoFHandler<dim>::cell_iterator> >::const_iterator cell_iter;
+  typename std::list<std::tuple<typename DoFHandler<dim>::cell_iterator, typename DoFHandler<dim>::cell_iterator, FullMatrix<double> > >::const_iterator subcell_iter;
+
+  // Used for assembling on different meshes, as starting point for prolongation matrices.
+  FullMatrix<double> unit_matrix(fe.dofs_per_cell);
+  for (unsigned int i = 0; i < unit_matrix.m(); ++i)
+    unit_matrix(i, i) = 1;
+
+  for (cell_iter = cell_list.begin(); cell_iter != cell_list.end(); ++cell_iter)
   {
-    // Only assemble what belongs to this process.
-    if (!cell->is_locally_owned())
-      continue;
+    cell = cell_iter->first;
+    prev_cell = cell_iter->second;
 
-    fe_v_cell->reinit(cell);
+    std::list<std::tuple<typename DoFHandler<dim>::cell_iterator, typename DoFHandler<dim>::cell_iterator, FullMatrix<double> > > subcells;
 
-    if (assemble_matrix)
-      cell_matrix = 0;
-    cell_rhs = 0;
-
-    cell->get_dof_indices(dof_indices);
-
-    if (parameters.debug)
-      std::cout << "NEW CELL: " << ith_cell << std::endl;
-    ith_cell++;
-
-    // Assemble the volumetric integrals.
-    assemble_cell_term(cell_matrix, cell_rhs, assemble_matrix);
-
-    // Assemble the face integrals - ONLY if this is not the initial step (where we do the projection of the initial condition).
-    if (!initial_step)
+    if (cell->active())
     {
-      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+      // Here we can take a shortcut, since the cell is active, we can make this call.
+      if (!cell->is_locally_owned())
+        continue;
+      else if (prev_cell->active())
+        subcells.push_back(std::make_tuple(cell, prev_cell, unit_matrix));
+      else
       {
-        // Boundary face - here we pass the boundary id
-        if (cell->at_boundary(face_no))
+        for (unsigned int child = 0; child < GeometryInfo<dim>::max_children_per_cell; ++child)
         {
-          if (is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
-          {
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-            auto this_cell_index = cell->active_cell_index();
-            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-            const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
-
-            neighbor->get_dof_indices(dof_indices_neighbor);
-
-            fe_v_face.reinit(cell, face_no);
-            fe_v_face_neighbor.reinit(neighbor, neighbor_face);
-
-            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs);
-          }
-          else
-          {
-            fe_v_face.reinit(cell, face_no);
-            assemble_face_term(face_no, fe_v_face, fe_v_face, true, cell->face(face_no)->boundary_id(), cell_rhs);
-          }
-        }
-        else
-        {
-          // Here the neighbor face is more split than the current one (has children with respect to the current face of the current element), we need to assemble sub-face by sub-face
-          // Not performed if there is no adaptivity involved.
-          if (cell->neighbor(face_no)->has_children())
-          {
-            const unsigned int neighbor2 = cell->neighbor_of_neighbor(face_no);
-
-            for (unsigned int subface_no = 0; subface_no < cell->face(face_no)->n_children(); ++subface_no)
-            {
-              const typename DoFHandler<dim>::active_cell_iterator neighbor_child = cell->neighbor_child_on_subface(face_no, subface_no);
-
-              Assert(neighbor_child->face(neighbor2) == cell->face(face_no)->child(subface_no), ExcInternalError());
-              Assert(neighbor_child->has_children() == false, ExcInternalError());
-
-              fe_v_subface.reinit(cell, face_no, subface_no);
-              fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
-              neighbor_child->get_dof_indices(dof_indices_neighbor);
-
-              assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
-            }
-          }
-          // Here the neighbor face is less split than the current one, there is some transformation needed.
-          // Not performed if there is no adaptivity involved.
-          else if (cell->neighbor(face_no)->level() != cell->level())
-          {
-            const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-            Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
-            neighbor->get_dof_indices(dof_indices_neighbor);
-
-            const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
-            const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
-
-            Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == cell, ExcInternalError());
-
-            fe_v_face.reinit(cell, face_no);
-            fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
-
-            assemble_face_term(face_no, fe_v_face, fe_v_subface_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
-          }
-          // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
-          // This is the only face assembly case performed without adaptivity.
-          else
-          {
-            const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-            neighbor->get_dof_indices(dof_indices_neighbor);
-
-            fe_v_face.reinit(cell, face_no);
-            fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
-            assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs);
-          }
+          FullMatrix<double> new_matrix(fe.dofs_per_cell, fe.dofs_per_cell);
+          fe.get_prolongation_matrix(child).mmult(new_matrix, unit_matrix);
+          subcells.push_back(std::make_tuple(cell, prev_cell->child(child), new_matrix));
         }
       }
     }
-
-    if (assemble_matrix)
-      constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
     else
-      constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
+    {
+      for (unsigned int child = 0; child < GeometryInfo<dim>::max_children_per_cell; ++child)
+      {
+        FullMatrix<double> new_matrix(fe.dofs_per_cell, fe.dofs_per_cell);
+        fe.get_prolongation_matrix(child).mmult(new_matrix, unit_matrix);
+        subcells.push_back(std::make_tuple(cell->child(child), prev_cell, new_matrix));
+      }
+    }
+
+    for (subcell_iter = subcells.begin(); subcell_iter != subcells.end(); ++subcell_iter)
+    {
+      cell = std::get<0>(*subcell_iter);
+      // Now we know this one is active for sure.
+      if (!cell->is_locally_owned())
+        continue;
+
+      prev_cell = std::get<1>(*subcell_iter);
+
+      fe_v_cell.reinit(cell);
+      fe_v_prev_cell.reinit(prev_cell);
+
+      if (assemble_matrix)
+        cell_matrix = 0;
+      cell_rhs = 0;
+
+      cell_iter->first->get_dof_indices(dof_indices);
+
+      if (parameters.debug)
+        std::cout << "NEW CELL: " << ith_cell << std::endl;
+      ith_cell++;
+
+      // Assemble the volumetric integrals.
+      assemble_cell_term(cell_matrix, cell_rhs, assemble_matrix, std::get<2>(*subcell_iter));
+
+      // Assemble the face integrals - ONLY if this is not the initial step (where we do the projection of the initial condition).
+      if (!initial_step)
+      {
+        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        {
+          // Boundary face - here we pass the boundary id
+          if (cell->at_boundary(face_no))
+          {
+            if (is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
+            {
+              const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+              typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+              auto this_cell_index = cell->active_cell_index();
+              auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+              neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+              const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
+
+              neighbor->get_dof_indices(dof_indices_neighbor);
+
+              fe_v_face.reinit(cell, face_no);
+              fe_v_face_neighbor.reinit(neighbor, neighbor_face);
+
+              assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs, std::get<2>(*subcell_iter));
+            }
+            else
+            {
+              fe_v_face.reinit(cell, face_no);
+              assemble_face_term(face_no, fe_v_face, fe_v_face, true, cell->face(face_no)->boundary_id(), cell_rhs, std::get<2>(*subcell_iter));
+            }
+          }
+          else
+          {
+            // Here the neighbor face is more split than the current one (has children with respect to the current face of the current element), we need to assemble sub-face by sub-face
+            // Not performed if there is no adaptivity involved.
+            if (cell->neighbor(face_no)->has_children())
+            {
+              const unsigned int neighbor2 = cell->neighbor_of_neighbor(face_no);
+
+              for (unsigned int subface_no = 0; subface_no < cell->face(face_no)->n_children(); ++subface_no)
+              {
+                const typename DoFHandler<dim>::active_cell_iterator neighbor_child = cell->neighbor_child_on_subface(face_no, subface_no);
+
+                Assert(neighbor_child->face(neighbor2) == cell->face(face_no)->child(subface_no), ExcInternalError());
+                Assert(neighbor_child->has_children() == false, ExcInternalError());
+
+                fe_v_subface.reinit(cell, face_no, subface_no);
+                fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
+                neighbor_child->get_dof_indices(dof_indices_neighbor);
+
+                assemble_face_term(face_no, fe_v_subface, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, std::get<2>(*subcell_iter));
+              }
+            }
+            // Here the neighbor face is less split than the current one, there is some transformation needed.
+            // Not performed if there is no adaptivity involved.
+            else if (cell->neighbor(face_no)->level() != cell->level())
+            {
+              const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+              Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
+              neighbor->get_dof_indices(dof_indices_neighbor);
+
+              const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
+              const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
+
+              Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == cell, ExcInternalError());
+
+              fe_v_face.reinit(cell, face_no);
+              fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);
+
+              assemble_face_term(face_no, fe_v_face, fe_v_subface_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, std::get<2>(*subcell_iter));
+            }
+            // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
+            // This is the only face assembly case performed without adaptivity.
+            else
+            {
+              const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
+              neighbor->get_dof_indices(dof_indices_neighbor);
+
+              fe_v_face.reinit(cell, face_no);
+              fe_v_face_neighbor.reinit(neighbor, cell->neighbor_of_neighbor(face_no));
+              assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, std::get<2>(*subcell_iter));
+            }
+          }
+        }
+      }
+
+      if (assemble_matrix)
+        constraints.distribute_local_to_global(cell_matrix, cell_rhs, dof_indices, system_matrix, system_rhs);
+      else
+        constraints.distribute_local_to_global(cell_rhs, dof_indices, system_rhs);
+    }
   }
   if (assemble_matrix)
     system_matrix.compress(VectorOperation::add);
@@ -248,91 +303,87 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix)
+Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix, Vector<double>& cell_rhs, bool assemble_matrix, const FullMatrix<double> prolongation_matrix)
 {
+  // In initial step we assume that the 'previous' mesh is the same as the current one.
   if (initial_step)
   {
-    initial_condition.vector_value(fe_v_cell->get_quadrature_points(), W_prev);
+    initial_condition.vector_value(fe_v_cell.get_quadrature_points(), W_prev);
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
     {
-      double val = 0.;
+      double rhs_val = 0.;
       for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
       {
         if (is_primitive[i])
-          val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
+          rhs_val += fe_v_cell.JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
         else
         {
-          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
           for (unsigned int d = 0; d < dim; d++)
-            val += fe_v_cell->JxW(q) * W_prev[q][5 + d] * fe_v_value[d];
+            rhs_val += fe_v_cell.JxW(q) * W_prev[q][5 + d] * fe_v_value[d];
         }
+      }
+      cell_rhs(i) += rhs_val;
 
-        if (assemble_matrix)
+      if (assemble_matrix)
+      {
+        for (unsigned int j = 0; j < dofs_per_cell; ++j)
         {
-          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+          double matrix_val = 0.;
+          for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
           {
             if (is_primitive[i])
             {
               if (is_primitive[j] && (component_ii[i] == component_ii[j]))
-                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_cell->shape_value(j, q);
+                matrix_val += fe_v_cell.JxW(q) * fe_v_cell.shape_value(i, q) * fe_v_cell.shape_value(j, q);
               else if (!is_primitive[j] && (component_ii[i] >= 5))
               {
-                dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(j, q);
-                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(i, q) * fe_v_value[component_ii[i] - 5];
+                dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(j, q);
+                matrix_val += fe_v_cell.JxW(q) * fe_v_cell.shape_value(i, q) * fe_v_value[component_ii[i] - 5];
               }
             }
             else
             {
               if (is_primitive[j] && (component_ii[j] >= 5))
               {
-                dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
-                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_cell->shape_value(j, q) * fe_v_value[component_ii[j] - 5];
+                dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
+                matrix_val += fe_v_cell.JxW(q) * fe_v_cell.shape_value(j, q) * fe_v_value[component_ii[j] - 5];
               }
               else if (!is_primitive[j])
               {
-                dealii::Tensor<1, dim> fe_v_value_i = (*fe_v_cell)[mag].value(i, q);
-                dealii::Tensor<1, dim> fe_v_value_j = (*fe_v_cell)[mag].value(j, q);
-                cell_matrix(i, j) += fe_v_cell->JxW(q) * fe_v_value_i * fe_v_value_j;
+                dealii::Tensor<1, dim> fe_v_value_i = fe_v_cell[mag].value(i, q);
+                dealii::Tensor<1, dim> fe_v_value_j = fe_v_cell[mag].value(j, q);
+                matrix_val += fe_v_cell.JxW(q) * fe_v_value_i * fe_v_value_j;
               }
             }
           }
+          cell_matrix(i, j) += matrix_val;
         }
       }
-      cell_rhs(i) += val;
     }
   }
   else
   {
+    // Now we calculate the previous values. For this we need to employ the previous FEValues
     for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
     {
       for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
-        W_prev[q][c] = W_lin[c] = 0.;
+        W_prev[q][c] = 0.;
 
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
         if (!is_primitive[i])
         {
-          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
           for (unsigned int d = 0; d < dim; d++)
-          {
             W_prev[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
-            if (this->parameters.use_iterative_improvement)
-              W_lin[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
-          }
         }
         else
-        {
-          W_prev[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
-          if (this->parameters.use_iterative_improvement)
-            W_lin[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v_cell->shape_value(i, q);
-        }
+          W_prev[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v_cell.shape_value(i, q);
       }
-      if (!this->parameters.use_iterative_improvement)
-        for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
-          W_lin[c] = W_prev[q][c];
 
-      equations.compute_flux_matrix(W_lin, fluxes_old[q], this->parameters);
+      equations.compute_flux_matrix(W_prev[q], fluxes_old[q], this->parameters);
     }
 
     for (unsigned int i = 0; i < dofs_per_cell; ++i)
@@ -342,20 +393,20 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
       {
         if (is_primitive[i])
         {
-          val += fe_v_cell->JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell->shape_value(i, q);
+          val += fe_v_cell.JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
           if (!basis_fn_is_constant[i])
             for (int d = 0; d < dim; d++)
-              val += fe_v_cell->JxW(q) * parameters.time_step * fluxes_old[q][component_ii[i]][d] * fe_v_cell->shape_grad(i, q)[d];
+              val += fe_v_cell.JxW(q) * parameters.time_step * fluxes_old[q][component_ii[i]][d] * fe_v_cell.shape_grad(i, q)[d];
         }
         else
         {
-          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
-          dealii::Tensor<2, dim> fe_v_grad = (*fe_v_cell)[mag].gradient(i, q);
+          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
+          dealii::Tensor<2, dim> fe_v_grad = fe_v_cell[mag].gradient(i, q);
           for (unsigned int d = 0; d < dim; d++)
           {
-            val += fe_v_cell->JxW(q) * W_prev[q][5 + d] * fe_v_value[d];
+            val += fe_v_cell.JxW(q) * W_prev[q][5 + d] * fe_v_value[d];
             for (int e = 0; e < dim; e++)
-              val += fe_v_cell->JxW(q) * parameters.time_step * fluxes_old[q][5 + d][e] * fe_v_grad[d][e];
+              val += fe_v_cell.JxW(q) * parameters.time_step * fluxes_old[q][5 + d][e] * fe_v_grad[d][e];
           }
         }
       }
@@ -366,7 +417,8 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs)
+Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor,
+  const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs, const FullMatrix<double> prolongation_matrix)
 {
   if (parameters.debug)
     std::cout << "\tEdqe: " << face_no << std::endl;
@@ -383,42 +435,22 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
       {
         if (!is_primitive[i])
         {
-          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
           for (int d = 0; d < dim; d++)
-          {
-            if (this->parameters.use_iterative_improvement)
-              Wplus_old[5 + d] += lin_solution(dof_indices[i]) * fe_v_value[d];
-            else
-              Wplus_old[5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
-          }
+            Wplus_old[5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
         }
         else
-        {
-          if (this->parameters.use_iterative_improvement)
-            Wplus_old[component_ii[i]] += lin_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-          else
-            Wplus_old[component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-        }
+          Wplus_old[component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
         if (!external_face)
         {
           if (!is_primitive[i])
           {
             dealii::Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
             for (int d = 0; d < dim; d++)
-            {
-              if (this->parameters.use_iterative_improvement)
-                Wminus_old[5 + d] += lin_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
-              else
-                Wminus_old[5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
-            }
+              Wminus_old[5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
           }
           else
-          {
-            if (this->parameters.use_iterative_improvement)
-              Wminus_old[component_ii[i]] += lin_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
-            else
-              Wminus_old[component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
-          }
+            Wminus_old[component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
         }
       }
     }
@@ -460,7 +492,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
       {
         if (!is_primitive[i])
         {
-          dealii::Tensor<1, dim> fe_v_value = (*fe_v_cell)[mag].value(i, q);
+          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
           val += this->parameters.time_step * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2]) * fe_v.JxW(q);
         }
         else
@@ -603,7 +635,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -617,7 +649,6 @@ template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::setup_initial_solution()
 {
   prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  lin_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
@@ -669,12 +700,11 @@ void Problem<equationsType, dim>::setup_initial_solution()
     remove("triangulation");
     remove("triangulation.info");
     remove("history");
-}
+  }
 #else
   prev_solution = 0;
 #endif
 
-  lin_solution = prev_solution;
   current_unlimited_solution = prev_solution;
   current_limited_solution = prev_solution;
 }
@@ -758,82 +788,43 @@ void Problem<equationsType, dim>::run()
       std::cout << "Step: " << time_step << ", T: " << time << std::endl;
       if (initial_step)
         std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
-      if (this->parameters.use_iterative_improvement)
-        std::cout << "   NonLin Res" << std::endl << "   _____________________________________" << std::endl;
     }
 
-    for (int linStep = 0; linStep < (this->parameters.use_iterative_improvement ? this->parameters.newton_max_iterations : 1); linStep++)
-    {
-      // Assemble
-      system_rhs = 0;
-      if (linStep == 0 && initial_step)
-        system_matrix = 0;
-      assemble_system((linStep == 0 && initial_step));
+    // Assemble
+    system_rhs = 0;
+    if (initial_step)
+      system_matrix = 0;
 
-      // Output matrix & rhs if required.
-      if (parameters.output_matrix)
-        output_matrix(system_matrix, "matrix", time_step, linStep);
-      if (parameters.output_rhs)
-        output_vector(system_rhs, "rhs", time_step, linStep);
+    assemble_system(initial_step);
 
-      // Solve
-      solve(current_unlimited_solution, (linStep == 0 && initial_step));
+    // Output matrix & rhs if required.
+    if (parameters.output_matrix)
+      output_matrix(system_matrix, "matrix", time_step);
+    if (parameters.output_rhs)
+      output_vector(system_rhs, "rhs", time_step);
 
-      // Output solution if required
-      if (parameters.output_solution)
-        output_vector(current_unlimited_solution, "current_unlimited_solution", time_step, linStep);
+    // Solve
+    solve(current_unlimited_solution, initial_step);
 
-      // Postprocess if required
-      if (this->time > this->parameters.start_limiting_at && !initial_step && parameters.limit && parameters.polynomial_order_dg > 0 && ((!parameters.use_iterative_improvement) || (parameters.limit_in_nonlin_loop)))
-        postprocess();
-      else
-        current_limited_solution = current_unlimited_solution;
+    // Output solution if required
+    if (parameters.output_solution)
+      output_vector(current_unlimited_solution, "current_unlimited_solution", time_step);
 
-      if (this->parameters.use_iterative_improvement)
-      {
-        if (initial_step || newton_damping > (1. - 1.e-8))
-        {
-          newton_update = current_limited_solution;
-          newton_update -= lin_solution;
-          lin_solution = current_limited_solution;
-        }
-        else
-        {
-          newton_update = current_limited_solution;
-          newton_update -= lin_solution;
-          newton_update *= newton_damping;
-          lin_solution += newton_update;
-        }
-        // Get the residual norm.
-        res_norm = newton_update.linfty_norm();
-        if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-          std::cout << "\tLin step #" << linStep << ", error: " << res_norm << std::endl;
+    // Postprocess if required
+    if ((this->time > this->parameters.start_limiting_at) && !initial_step && parameters.limit && parameters.polynomial_order_dg > 0)
+      postprocess();
+    else
+      current_limited_solution = current_unlimited_solution;
 
-        if (res_norm < parameters.newton_residual_norm_threshold)
-          break;
-      }
-      else
-      {
-        lin_solution = current_limited_solution;
-        break;
-      }
-    }
+    prev_solution = current_limited_solution;
 
     move_time_step_handle_outputs();
-  }
+}
 }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
-  if (this->time > this->parameters.start_limiting_at && !this->initial_step && parameters.limit && parameters.polynomial_order_dg > 0 && parameters.use_iterative_improvement && !parameters.limit_in_nonlin_loop)
-  {
-    postprocess();
-    lin_solution = current_limited_solution;
-  }
-
-  this->prev_solution = this->lin_solution;
-
   if (parameters.output_solution)
     output_vector(prev_solution, "prev_solution", time_step);
 
