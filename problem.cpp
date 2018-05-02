@@ -131,8 +131,73 @@ void Problem<equationsType, dim>::precalculate_global()
   }
 }
 
+/*
+
+* @verbatim
+*       *-------*        *-------*
+*      /|       |       /       /|
+*     / |   3   |      /   5   / |
+*    /  |       |     /       /  |
+*   *   |       |    *-------*   |
+*   | 0 *-------*    |       | 1 *
+*   |  /       /     |       |  /
+*   | /   4   /      |   2   | /
+*   |/       /       |       |/
+*   *-------*        *-------*
+* @endverbatim
+
+* @verbatim
+*            RefinementCase<3>::cut_xy
+*
+*       *----*----*        *----*----*
+*      /|    |    |       / 2  /  3 /|
+*     * |    |    |      *----*----* |
+*    /| | 2  |  3 |     / 0  /  1 /| |
+*   * |2|    |    |    *----*----* |3|
+*   | | |    |    |    |    |    | | |
+*   |0| *----*----*    |    |    |1| *
+*   | |/ 2  /  3 /     | 0  |  1 | |/
+*   | *----*----*      |    |    | *
+*   |/ 0  /  1 /       |    |    |/
+*   *----*----*        *----*----*
+* @endverbatim
+*
+* @verbatim
+*       *----*----*        *----*----*
+*      /| 6  |  7 |       / 6  /  7 /|
+*     *6|    |    |      *----*----*7|
+*    /| *----*----*     / 4  /  5 /| *
+*   * |/|    |    |    *----*----* |/|
+*   |4* | 2  |  3 |    | 4  |  5 |5*3|
+*   |/|2*----*----*    |    |    |/| *
+*   * |/ 2  /  3 /     *----*----* |/
+*   |0*----*----*      |    |    |1*
+*   |/0   /  1 /       | 0  |  1 |/
+*   *----*----*        *----*----*
+* @endverbatim
+*
+* *---*---*
+* | 2 | 3 |
+* *---*---*    case_xy      (one isotropic refinement step)
+* | 0 | 1 |
+* *---*---*
+*
+* *---*---*
+* |   |   |
+* | 0 | 1 |    case_x
+* |   |   |
+* *---*---* 
+*
+* *-------*
+* |   1   |
+* *-------*    case_y
+* |   0   |
+* *-------*
+*
+*/
+
 template <int dim>
-static bool isRefinementCompatibleWithNeighborSubface(RefinementCase<dim> ref_case, int child, int subface_no)
+static bool isRefinementCompatibleWithSubface(int face_no, RefinementCase<dim> ref_case, int child, int subface_no, RefinementCase<dim - 1> face_ref_case)
 {
   std::cout << ref_case << std::endl;
   std::cout << child << std::endl;
@@ -234,7 +299,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
         for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
         {
           // Boundary face - here we pass the boundary id
-          if (prev_cell->at_boundary(face_no))
+          if (cell->at_boundary(face_no))
           {
             if (is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
             {
@@ -298,7 +363,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                 }
                 else if (std::get<2>(*subcell_iter) == currentMoreRefined)
                 {
-                  if (isRefinementCompatibleWithNeighborSubface(std::get<3>(*subcell_iter), std::get<4>(*subcell_iter), subface_no))
+                  if (isRefinementCompatibleWithSubface(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter), subface_no, prev_cell->face(face_no)->refinement_case()))
                   {
                     fe_v_face.reinit(cell, face_no);
                     fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
@@ -307,6 +372,12 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                     normals = fe_v_face.get_all_normal_vectors();
                     assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
                   }
+                    else // if(isRefinementVsThisFaceInternalInCurrentCell)
+                    {
+                      // fe_v_face ma spravny int. body na face_no
+                      // prev na prev_cellu je to stejny jako prev na "neighborovi", tam neni skok, takze nemusim hledat souseda, ani sousedni stranu
+                      // POZOR, musim to udelat jen jednou, toto je v cyklu pres subfaces, cili tady nic, ale udelat to mimo cyklus
+                    }
                 }
                 else if (std::get<2>(*subcell_iter) == prevMoreRefined)
                 {
@@ -936,6 +1007,9 @@ void Problem<equationsType, dim>::run()
 
     move_time_step_handle_outputs();
 
+    prev_triangulation.clear();
+    prev_triangulation.copy_triangulation(triangulation);
+
     if(!initial_step && (time_step % 10 == 0))
     {
       refine_mesh();
@@ -944,7 +1018,8 @@ void Problem<equationsType, dim>::run()
       current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
       current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
     }
-    else
+    this->setup_system();
+    if (!(!initial_step && (time_step % 10 == 0)))
       this->prev_solution = this->current_limited_solution;
   }
 }
@@ -952,9 +1027,6 @@ void Problem<equationsType, dim>::run()
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::refine_mesh()
 {
-  prev_triangulation.clear();
-  prev_triangulation.copy_triangulation(triangulation);
-
   Triangulation<dim>::active_cell_iterator cell = triangulation.begin_active();
   Triangulation<dim>::active_cell_iterator endc = triangulation.end();
   for (; cell != endc; ++cell)
@@ -964,7 +1036,6 @@ void Problem<equationsType, dim>::refine_mesh()
         cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
   }
   triangulation.execute_coarsening_and_refinement();
-  this->setup_system();
 }
 
 template <EquationsType equationsType, int dim>
