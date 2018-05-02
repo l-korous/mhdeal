@@ -46,10 +46,11 @@ void Parameters<dim>::delete_old_outputs(MPI_Comm& mpi_communicator) const
     std::stringstream ss;
     ss << "del";
     ss << " " << this->output_file_prefix << "*.vtk";
-    ss << " " << this->output_file_prefix << "*.newton_update";
     ss << " " << this->output_file_prefix << "*.current_solution";
+    ss << " " << this->output_file_prefix << "*.prev_solution";
     ss << " " << this->output_file_prefix << "*.matrix";
     ss << " " << this->output_file_prefix << "*.rhs";
+    ss << " " << this->output_file_prefix << "*.solution";
     system(ss.str().c_str());
 #else
     std::stringstream ss;
@@ -58,8 +59,9 @@ void Parameters<dim>::delete_old_outputs(MPI_Comm& mpi_communicator) const
     ss << " " << this->output_file_prefix << "*.vtu";
     ss << " " << this->output_file_prefix << "*.pvtu";
     ss << " " << this->output_file_prefix << "*.vtk";
-    ss << " " << this->output_file_prefix << "*.newton_update";
     ss << " " << this->output_file_prefix << "*.current_solution";
+    ss << " " << this->output_file_prefix << "*.prev_solution";
+    ss << " " << this->output_file_prefix << "*.solution";
     ss << " " << this->output_file_prefix << "*.matrix";
     ss << " " << this->output_file_prefix << "*.rhs";
     system(ss.str().c_str());

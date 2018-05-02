@@ -29,8 +29,7 @@ FE_DG_Taylor<dim, spacedim>::FE_DG_Taylor(const unsigned int degree)
   polynomial_space(Polynomials::Monomial<double>::generate_complete_basis(degree))
 {
   const unsigned int n_dofs = this->dofs_per_cell;
-  for (unsigned int ref_case = RefinementCase<dim>::cut_x;
-    ref_case < RefinementCase<dim>::isotropic_refinement + 1; ++ref_case)
+  for (unsigned int ref_case = RefinementCase<dim>::cut_x; ref_case < RefinementCase<dim>::isotropic_refinement + 1; ++ref_case)
   {
     // do nothing, as anisotropic refinement is not implemented so far
     if (dim != 2 && ref_case != RefinementCase<dim>::isotropic_refinement)
