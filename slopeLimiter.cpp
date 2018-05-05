@@ -19,10 +19,13 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
     cell->get_dof_indices(this->dof_indices);
 
     typename SlopeLimiter<equationsType, dim>::PostprocessData* data = 0;
+    // This could probably also help for adaptivity cases, but would have to be heavily conditioned.
+    /*
     auto it = this->postprocessData.find(cell->active_cell_index());
     if (it != this->postprocessData.end())
       data = &(it->second);
     else
+    */
     {
       data = &(((this->postprocessData.insert(std::make_pair(cell->active_cell_index(), typename SlopeLimiter<equationsType, dim>::PostprocessData()))).first)->second);
       for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
@@ -213,10 +216,13 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
     cell->get_dof_indices(this->dof_indices);
 
     typename SlopeLimiter<equationsType, dim>::PostprocessData* data = 0;
+    // This could probably also help for adaptivity cases, but would have to be heavily conditioned.
+    /*
     auto it = this->postprocessData.find(cell->active_cell_index());
     if (it != this->postprocessData.end())
       data = &(it->second);
     else
+    */
     {
       data = &(((this->postprocessData.insert(std::make_pair(cell->active_cell_index(), typename SlopeLimiter<equationsType, dim>::PostprocessData()))).first)->second);
       for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)

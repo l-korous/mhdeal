@@ -60,6 +60,7 @@
 #include <deal.II/distributed/tria.h>
 #include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/distributed/solution_transfer.h>
+#include <deal.II/numerics/error_estimator.h>
 
 #ifndef NEGLIGIBLE
 #define NEGLIGIBLE 1e-12

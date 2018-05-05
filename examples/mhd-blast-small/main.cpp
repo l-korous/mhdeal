@@ -1,6 +1,8 @@
 #include "util.h"
 #include "problem.h"
 #include "equationsMhd.h"
+#include "initialConditionMhdBlast.h"
+#include "adaptivityMhdBlast.h"
 #include "parameters.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
@@ -26,22 +28,23 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(-0.0, -0.0, 0.);
   parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
-  parameters.refinements = { 25, 25, 1 };
-  parameters.limit = false;
+  parameters.refinements = { 10, 10, 1 };
+  parameters.dof_threshold = 20000;
+  parameters.limit = true;
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = false;
+  parameters.use_div_free_space_for_B = true;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .005;
+  parameters.cfl_coefficient = .025;
   parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 0;
+  parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
   parameters.output_step = -1.e-3;
   parameters.final_time = 1.;
+  //parameters.debug = true;
 
   /*
-  parameters.debug = true;
   parameters.output_matrix = true;
   parameters.output_rhs = true;
   parameters.output_solution = true;
@@ -68,13 +71,15 @@ int main(int argc, char *argv[])
 #endif    
     set_triangulation(triangulation, parameters);
 
-    MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionMhdBlast<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
+    // Adaptivity
+    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, triangulation);
     // Put together the problem.
-    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions, &adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }

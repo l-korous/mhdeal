@@ -1,9 +1,6 @@
 get_filename_component(TARGET ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-SET(TARGET_SRC
-  main.cpp
-  initialConditionOT.cpp
-  initialConditionOT.h
-)
+FILE(GLOB SRC_FILES *.cpp *.h)
+SET(TARGET_SRC ${SRC_FILES})
 
 # Usually, you will not need to modify anything beyond this point...
 

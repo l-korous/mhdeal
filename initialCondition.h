@@ -22,39 +22,6 @@ private:
 };
 
 template <EquationsType equationsType, int dim>
-class SimpleICEuler : public InitialCondition<equationsType, dim>
-{
-public:
-  SimpleICEuler(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-template <EquationsType equationsType, int dim>
-class SimpleICMHD : public InitialCondition<equationsType, dim>
-{
-public:
-  SimpleICMHD(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-template <EquationsType equationsType, int dim>
-class EulerBlastIC : public InitialCondition<equationsType, dim>
-{
-public:
-  EulerBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-template <EquationsType equationsType, int dim>
-class MHDBlastIC : public InitialCondition<equationsType, dim>
-{
-public:
-  MHDBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-
-template <EquationsType equationsType, int dim>
 class TitovDemoulinIC : public InitialCondition<equationsType,dim>
 {
 public:

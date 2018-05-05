@@ -1,6 +1,7 @@
 #include "util.h"
 #include "problem.h"
 #include "equationsMhd.h"
+#include "initialConditionMhdBlast.h"
 #include "parameters.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
@@ -63,7 +64,7 @@ int main(int argc, char *argv[])
 #endif    
     set_triangulation(triangulation, parameters);
 
-    MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionMhdBlast<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h

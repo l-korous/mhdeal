@@ -2,6 +2,8 @@
 
 template <int dim>
 Parameters<dim>::Parameters() {
+  // Just a large enough number here.
+  this->dof_threshold = 100000000;
   this->start_limiting_at = 0.;
   this->gas_gamma = 5. / 3.;
   this->limit_in_nonlin_loop = false;

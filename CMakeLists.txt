@@ -1,6 +1,10 @@
 SET(TARGET "mhdeal")
 
 SET(TARGET_SRC
+  adaptivity.cpp
+  adaptivity.h
+  assemblingUtilities.cpp
+  assemblingUtilities.h
   util.h
   equations.h
   equationsMhd.cpp

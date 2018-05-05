@@ -1,13 +1,20 @@
+#ifndef _PROBLEM_H
+#define _PROBLEM_H
+
 #include "util.h"
 #include "equationsMhd.h"
 #include "parameters.h"
 #include "initialCondition.h"
 #include "boundaryConditions.h"
+#include "assemblingUtilities.h"
 #include "dealiiExtensions.h"
 #include "feDivFree.h"
 #include "feTaylor.h"
 #include "numericalFlux.h"
 #include "slopeLimiter.h"
+#include "adaptivity.h"
+
+template <EquationsType equationsType, int dim> class AssemblingUtilities;
 
 // Class that accepts all input from the user, provides interface for output, etc.
 // Should not be changed.
@@ -21,7 +28,7 @@ public:
 #else
     Triangulation<dim>& triangulation,
 #endif
-    InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
+    InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions, Adaptivity<dim>* adaptivity = 0);
   void run();
 
   // Technical matters done only once after creation.
@@ -48,14 +55,11 @@ public:
 
   void output_base();
   void output_results() const;
-  void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step) const;
-  void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step) const;
+  void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix) const;
+  void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix) const;
 
   // Solves the assembled system
   void solve();
-
-  // Adaptivity
-  void refine_mesh();
 
   // Process output, move to next time step.
   void move_time_step_handle_outputs();
@@ -85,7 +89,7 @@ public:
   BoundaryConditions<equationsType, dim>& boundary_conditions;
 
   // Dofs calculated by this MPI process.
-  IndexSet locally_owned_dofs;
+  IndexSet locally_owned_dofs, prev_locally_owned_dofs;
 
   // Dofs calculated by this MPI process + all Dofs on all neighboring cells.
   IndexSet locally_relevant_dofs, prev_locally_relevant_dofs;
@@ -112,7 +116,6 @@ public:
 
   MPI_Comm mpi_communicator;
 
-  bool initial_step;
   double last_output_time, last_snapshot_time, time;
   int time_step;
   // For CFL.
@@ -139,6 +142,12 @@ public:
     equallyRefined
   };
 
+  Adaptivity<dim>* adaptivity;
+
+  // Indication whether mesh has been refined in this step.
+  // - optimization.
+  bool refined_mesh;
+
   const UpdateFlags update_flags;
   const UpdateFlags face_update_flags;
   const UpdateFlags neighbor_face_update_flags;
@@ -151,9 +160,8 @@ public:
   std::vector<types::global_dof_index> dof_indices;
   std::vector<types::global_dof_index> prev_dof_indices;
   std::vector<types::global_dof_index> prev_dof_indices_neighbor;
-  std::array<double, Equations<equationsType, dim>::n_components> Wplus_old, Wminus_old;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > normal_fluxes_old;
-  std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev;
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev, Wplus_old, Wminus_old;
   std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > fluxes_old;
 
   std::array <unsigned short, BASIS_FN_COUNT> component_ii;
@@ -164,4 +172,6 @@ public:
   double res_norm;
   // Utility
   static bool is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters);
+  AssemblingUtilities<equationsType, dim> assembling_utils;
 };
+#endif

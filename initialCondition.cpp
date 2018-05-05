@@ -20,108 +20,6 @@ Parameters<dim>& InitialCondition<equationsType, dim>::getParams() const
 }
 
 template <EquationsType equationsType, int dim>
-SimpleICEuler<equationsType, dim>::SimpleICEuler(Parameters<dim>& parameters) :
-  InitialCondition<equationsType, dim>(parameters)
-{
-};
-
-
-template <EquationsType equationsType, int dim>
-void SimpleICEuler<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
-{
-  for (unsigned int i = 0; i < points.size(); ++i)
-  {
-    result[i][0] = 1.;
-    result[i][1] = 0.;
-    result[i][2] = 0.;
-    result[i][3] = 0.;
-    result[i][4] = 5.;
-    result[i][5] = 0.;
-    result[i][6] = 0.;
-    result[i][7] = 0.;
-  }
-}
-
-template <EquationsType equationsType, int dim>
-SimpleICMHD<equationsType, dim>::SimpleICMHD(Parameters<dim>& parameters) :
-  InitialCondition<equationsType, dim>(parameters)
-{
-};
-
-
-template <EquationsType equationsType, int dim>
-void SimpleICMHD<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
-{
-  for (unsigned int i = 0; i < points.size(); ++i)
-  {
-    result[i][0] = 1.;
-    result[i][1] = 0.;
-    result[i][2] = 0.;
-    result[i][3] = 0.;
-    result[i][4] = 5.;
-    result[i][5] = 0.1;
-    result[i][6] = 0.1;
-    result[i][7] = 0.1;
-  }
-}
-
-template <EquationsType equationsType, int dim>
-EulerBlastIC<equationsType, dim>::EulerBlastIC(Parameters<dim>& parameters) :
-  InitialCondition<equationsType, dim>(parameters)
-{
-};
-
-template <EquationsType equationsType, int dim>
-void EulerBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
-{
-  // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
-  for (unsigned int i = 0; i < points.size(); ++i)
-  {
-    result[i][0] = 1.;
-    result[i][1] = 0.;
-    result[i][2] = 0.;
-    result[i][3] = 0.;
-    result[i][5] = 0.;
-    result[i][6] = 0.;
-    result[i][7] = 0.;
-    if (points[i].norm() < 0.1)
-      result[i][4] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5 * (result[i][5] * result[i][5] + result[i][6] * result[i][6] + result[i][7] * result[i][7]);
-    else
-      result[i][4] = .1 / (this->getParams().gas_gamma - 1.0) + 0.5 * (result[i][5] * result[i][5] + result[i][6] * result[i][6] + result[i][7] * result[i][7]);
-  }
-}
-
-template <EquationsType equationsType, int dim>
-MHDBlastIC<equationsType, dim>::MHDBlastIC(Parameters<dim>& parameters) :
-  InitialCondition<equationsType, dim>(parameters)
-{
-};
-
-template <EquationsType equationsType, int dim>
-void MHDBlastIC<equationsType, dim>::vector_value(const std::vector<Point<dim> > &points,
-  std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&result) const
-{
-  // The result is a two-dimensional array, first dimension is for the integration point, second for the component (density, momentum-x, ...)
-  for (unsigned int i = 0; i < points.size(); ++i)
-  {
-    result[i][0] = 1.;
-    result[i][1] = 0.;
-    result[i][2] = 0.;
-    result[i][3] = 0.;
-    result[i][5] = 1.0 / std::sqrt(2.);
-    result[i][6] = 1.0 / std::sqrt(2.);
-    result[i][7] = 0.;
-    if (points[i].norm() < 0.1)
-      result[i][4] = 10. / (this->getParams().gas_gamma - 1.0) + 0.5 * (result[i][5] * result[i][5] + result[i][6] * result[i][6] + result[i][7] * result[i][7]);
-    else
-      result[i][4] = .1 / (this->getParams().gas_gamma - 1.0) + 0.5 * (result[i][5] * result[i][5] + result[i][6] * result[i][6] + result[i][7] * result[i][7]);
-  }
-}
-
-template <EquationsType equationsType, int dim>
 TitovDemoulinIC<equationsType, dim>::TitovDemoulinIC(Parameters<dim>& parameters) : 
                InitialCondition<equationsType,dim>(parameters)
 {
@@ -357,8 +255,4 @@ void TitovDemoulinIC<equationsType, dim>::vector_value(const std::vector<Point<d
 }
 
 template class InitialCondition<EquationsTypeMhd, 3>;
-template class EulerBlastIC<EquationsTypeMhd, 3>;
-template class MHDBlastIC<EquationsTypeMhd, 3>;
 template class TitovDemoulinIC<EquationsTypeMhd, 3>;
-template class SimpleICMHD<EquationsTypeMhd, 3>;
-template class SimpleICEuler<EquationsTypeMhd, 3>;

@@ -11,6 +11,9 @@ public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
   Parameters();
 
+  // For adaptivity.
+  int dof_threshold;
+
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
 

@@ -7,7 +7,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 #else
   Triangulation<dim>& triangulation,
 #endif
-  InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
+  InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions, Adaptivity<dim>* adaptivity) :
   mpi_communicator(MPI_COMM_WORLD),
   parameters(parameters),
   equations(equations),
@@ -21,7 +21,6 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
   verbose_cout(std::cout, false),
-  initial_step(true),
   last_output_time(0.), last_snapshot_time(0.), time(0.),
   time_step(0),
   mag(dim + 2),
@@ -35,13 +34,18 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe_v_prev_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
   fe_v_subface(mapping, fe, face_quadrature, face_update_flags),
   fe_v_prev_subface(mapping, fe, face_quadrature, face_update_flags),
-  fe_v_prev_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags)
+  fe_v_prev_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
+  adaptivity(adaptivity),
+  refined_mesh(false)
 {
+  assembling_utils.set_problem(this);
   prev_triangulation.copy_triangulation(triangulation);
   prev_dof_handler = new DoFHandler<dim>(prev_triangulation);
   n_quadrature_points_cell = quadrature.get_points().size();
   fluxes_old.resize(n_quadrature_points_cell);
   W_prev.resize(n_quadrature_points_cell);
+  Wplus_old.resize(n_quadrature_points_face);
+  Wminus_old.resize(n_quadrature_points_face);
   n_quadrature_points_face = face_quadrature.get_points().size();
   normal_fluxes_old.resize(n_quadrature_points_face);
 
@@ -66,6 +70,7 @@ void Problem<equationsType, dim>::setup_system()
   prev_dof_handler->distribute_dofs(fe);
   DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant_dofs);
   DoFTools::extract_locally_relevant_dofs(*prev_dof_handler, prev_locally_relevant_dofs);
+  prev_locally_owned_dofs = prev_dof_handler->locally_owned_dofs();
   locally_owned_dofs = dof_handler.locally_owned_dofs();
   constraints.clear();
   constraints.reinit(locally_relevant_dofs);
@@ -86,8 +91,8 @@ void Problem<equationsType, dim>::setup_system()
 
   system_rhs.reinit(locally_owned_dofs, mpi_communicator);
   system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
-  
-  if(initial_step)
+
+  if (time_step == 0)
     precalculate_global();
 }
 
@@ -129,80 +134,6 @@ void Problem<equationsType, dim>::precalculate_global()
       basis_fn_is_constant[i] = false;
     }
   }
-}
-
-/*
-
-* @verbatim
-*       *-------*        *-------*
-*      /|       |       /       /|
-*     / |   3   |      /   5   / |
-*    /  |       |     /       /  |
-*   *   |       |    *-------*   |
-*   | 0 *-------*    |       | 1 *
-*   |  /       /     |       |  /
-*   | /   4   /      |   2   | /
-*   |/       /       |       |/
-*   *-------*        *-------*
-* @endverbatim
-
-* @verbatim
-*            RefinementCase<3>::cut_xy
-*
-*       *----*----*        *----*----*
-*      /|    |    |       / 2  /  3 /|
-*     * |    |    |      *----*----* |
-*    /| | 2  |  3 |     / 0  /  1 /| |
-*   * |2|    |    |    *----*----* |3|
-*   | | |    |    |    |    |    | | |
-*   |0| *----*----*    |    |    |1| *
-*   | |/ 2  /  3 /     | 0  |  1 | |/
-*   | *----*----*      |    |    | *
-*   |/ 0  /  1 /       |    |    |/
-*   *----*----*        *----*----*
-* @endverbatim
-*
-* @verbatim
-*       *----*----*        *----*----*
-*      /| 6  |  7 |       / 6  /  7 /|
-*     *6|    |    |      *----*----*7|
-*    /| *----*----*     / 4  /  5 /| *
-*   * |/|    |    |    *----*----* |/|
-*   |4* | 2  |  3 |    | 4  |  5 |5*3|
-*   |/|2*----*----*    |    |    |/| *
-*   * |/ 2  /  3 /     *----*----* |/
-*   |0*----*----*      |    |    |1*
-*   |/0   /  1 /       | 0  |  1 |/
-*   *----*----*        *----*----*
-* @endverbatim
-*
-* *---*---*
-* | 2 | 3 |
-* *---*---*    case_xy      (one isotropic refinement step)
-* | 0 | 1 |
-* *---*---*
-*
-* *---*---*
-* |   |   |
-* | 0 | 1 |    case_x
-* |   |   |
-* *---*---* 
-*
-* *-------*
-* |   1   |
-* *-------*    case_y
-* |   0   |
-* *-------*
-*
-*/
-
-template <int dim>
-static bool isRefinementCompatibleWithSubface(int face_no, RefinementCase<dim> ref_case, int child, int subface_no, RefinementCase<dim - 1> face_ref_case)
-{
-  std::cout << ref_case << std::endl;
-  std::cout << child << std::endl;
-  std::cout << subface_no << std::endl;
-  return true;
 }
 
 template <EquationsType equationsType, int dim>
@@ -262,7 +193,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
         continue;
 
       prev_cell = std::get<1>(*subcell_iter);
-      
+
       std::vector<double> JxW;
       std::vector<Tensor<1, dim> > normals;
       // Cell is active, we want its quadrature points.j
@@ -287,63 +218,90 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
       prev_cell->get_dof_indices(prev_dof_indices);
 
       if (parameters.debug)
-        std::cout << "NEW CELL: " << ith_cell << std::endl;
+      {
+        std::cout << "Current cell: " << ith_cell << std::endl;
+        for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
+          std::cout << "\t vertex " << v_i << ": " << cell->vertex(v_i) << std::endl;
+        std::cout << "Previous cell: " << ith_cell << std::endl;
+        for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
+          std::cout << "\t vertex " << v_i << ": " << prev_cell->vertex(v_i) << std::endl;
+      }
       ith_cell++;
 
       // Assemble the volumetric integrals.
       assemble_cell_term(cell_matrix, cell_rhs, assemble_matrix, JxW);
 
-      // Assemble the face integrals - ONLY if this is not the initial step (where we do the projection of the initial condition).
-      if (!initial_step)
+      // Assemble the face integrals.
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        if (parameters.debug)
+          std::cout << "Face: " << face_no << std::endl;
+
+        // Face that is internal wrt. prev_cell
+        if (std::get<2>(*subcell_iter) == currentMoreRefined && assembling_utils.is_refinement_within_current_cell(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter)))
         {
-          // Boundary face - here we pass the boundary id
-          if (cell->at_boundary(face_no))
+          if (parameters.debug)
+            std::cout << "\t\tFace within cell" << std::endl;
+          fe_v_face.reinit(cell, face_no);
+          fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
+          JxW = fe_v_face.get_JxW_values();
+          normals = fe_v_face.get_all_normal_vectors();
+          prev_cell->get_dof_indices(prev_dof_indices_neighbor);
+          assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
+        }
+        // Boundary face - here we pass the boundary id
+        else if (prev_cell->at_boundary(face_no))
+        {
+          if (parameters.debug)
+            std::cout << "\tboundary" << std::endl;
+
+          if (is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
           {
-            if (is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
-            {
-              const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-              typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-              auto this_cell_index = cell->active_cell_index();
-              auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-              neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-              const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+            auto this_cell_index = cell->active_cell_index();
+            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+            const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
 
-              neighbor->get_dof_indices(prev_dof_indices_neighbor);
+            neighbor->get_dof_indices(prev_dof_indices_neighbor);
 
-              fe_v_face.reinit(cell, face_no);
-              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face);
+            fe_v_face.reinit(cell, face_no);
+            fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face);
 
-              assemble_face_term(face_no, fe_v_face, fe_v_face, fe_v_prev_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs, JxW, normals);
-            }
-            else
-            {
-              if (std::get<2>(*subcell_iter) == currentMoreRefined)
-              {
-                fe_v_face.reinit(cell, face_no);
-                fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
-                JxW = fe_v_face.get_JxW_values();
-                normals = fe_v_face.get_all_normal_vectors();
-              }
-              else
-              {
-                fe_v_prev_face.reinit(prev_cell, face_no);
-                fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
-                JxW = fe_v_prev_face.get_JxW_values();
-                normals = fe_v_prev_face.get_all_normal_vectors();
-              }
-              assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face, true, cell->face(face_no)->boundary_id(), cell_rhs, JxW, normals);
-            }
+            assemble_face_term(face_no, fe_v_face, fe_v_face, fe_v_prev_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs, JxW, normals);
           }
           else
           {
-            // Here the neighbor face is more split than the current one (has children with respect to the current face of the current element), we need to assemble sub-face by sub-face
-            // Not performed if there is no adaptivity involved.
-            if (prev_cell->neighbor(face_no)->has_children())
+            if (std::get<2>(*subcell_iter) == currentMoreRefined)
+            {
+              fe_v_face.reinit(cell, face_no);
+              fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
+              JxW = fe_v_face.get_JxW_values();
+              normals = fe_v_face.get_all_normal_vectors();
+            }
+            else
+            {
+              fe_v_prev_face.reinit(prev_cell, face_no);
+              fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
+              JxW = fe_v_prev_face.get_JxW_values();
+              normals = fe_v_prev_face.get_all_normal_vectors();
+            }
+            prev_cell->get_dof_indices(prev_dof_indices_neighbor);
+            assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face, true, cell->face(face_no)->boundary_id(), cell_rhs, JxW, normals);
+          }
+        }
+        // Internal face, which corresponds to a real face in prev_triangulation
+        else
+        {
+          if (prev_cell->neighbor(face_no)->has_children())
+          {
+            if (parameters.debug)
+              std::cout << "\tMore neighbors" << std::endl;
+
+            if (!(std::get<2>(*subcell_iter) == currentMoreRefined) || !(this->assembling_utils.is_refinement_within_current_cell(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter))))
             {
               const unsigned int neighbor2 = prev_cell->neighbor_of_neighbor(face_no);
-
               for (unsigned int subface_no = 0; subface_no < prev_cell->face(face_no)->n_children(); ++subface_no)
               {
                 const typename DoFHandler<dim>::active_cell_iterator neighbor_child = prev_cell->neighbor_child_on_subface(face_no, subface_no);
@@ -352,8 +310,17 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                 Assert(neighbor_child->has_children() == false, ExcInternalError());
                 neighbor_child->get_dof_indices(prev_dof_indices_neighbor);
 
+                if (parameters.debug)
+                {
+                  std::cout << "\t\tFace NOT within cell, neighbor: " << std::endl;
+                  for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
+                    std::cout << "\t\t vertex " << v_i << ": " << neighbor_child->vertex(v_i) << std::endl;
+                }
+
                 if (std::get<2>(*subcell_iter) == equallyRefined)
                 {
+                  if (parameters.debug)
+                    std::cout << "\t\t - Current equally refined" << std::endl;
                   fe_v_prev_subface.reinit(prev_cell, face_no, subface_no);
                   fe_v_face.reinit(cell, face_no, fe_v_prev_subface.get_quadrature_points());
                   fe_v_prev_face_neighbor.reinit(neighbor_child, neighbor2, fe_v_prev_subface.get_quadrature_points());
@@ -363,8 +330,12 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                 }
                 else if (std::get<2>(*subcell_iter) == currentMoreRefined)
                 {
-                  if (isRefinementCompatibleWithSubface(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter), subface_no, prev_cell->face(face_no)->refinement_case()))
+                  if (parameters.debug)
+                    std::cout << "\t\t - Current more refined" << std::endl;
+                  if (assembling_utils.is_refinement_compatible_with_subface(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter), subface_no, prev_cell->face(face_no)->refinement_case()))
                   {
+                    if (parameters.debug)
+                      std::cout << "\t\t - Neighbor compatible with subface" << std::endl;
                     fe_v_face.reinit(cell, face_no);
                     fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
                     fe_v_prev_face_neighbor.reinit(neighbor_child, neighbor2, fe_v_face.get_quadrature_points());
@@ -372,15 +343,14 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                     normals = fe_v_face.get_all_normal_vectors();
                     assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
                   }
-                    else // if(isRefinementVsThisFaceInternalInCurrentCell)
-                    {
-                      // fe_v_face ma spravny int. body na face_no
-                      // prev na prev_cellu je to stejny jako prev na "neighborovi", tam neni skok, takze nemusim hledat souseda, ani sousedni stranu
-                      // POZOR, musim to udelat jen jednou, toto je v cyklu pres subfaces, cili tady nic, ale udelat to mimo cyklus
-                    }
+                  else if (parameters.debug)
+                    std::cout << "\t\t - Neighbor NOT compatible with subface" << std::endl;
+
                 }
                 else if (std::get<2>(*subcell_iter) == prevMoreRefined)
                 {
+                  if (parameters.debug)
+                    std::cout << "\t\t - Current less refined" << std::endl;
                   fe_v_prev_subface.reinit(prev_cell, face_no, subface_no);
                   fe_v_face.reinit(cell, face_no, fe_v_prev_subface.get_quadrature_points());
                   fe_v_prev_face_neighbor.reinit(neighbor_child, neighbor2, fe_v_prev_subface.get_quadrature_points());
@@ -388,84 +358,96 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                   normals = fe_v_prev_subface.get_all_normal_vectors();
                   assemble_face_term(face_no, fe_v_face, fe_v_prev_subface, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
                 }
-                
               }
             }
-            // Here the neighbor face is less split than the current one, there is some transformation needed.
-            // Not performed if there is no adaptivity involved.
-            else if (prev_cell->neighbor(face_no)->level() != prev_cell->level())
+          }
+          // Here the neighbor face is less split than the current one, there is some transformation needed.
+          // Not performed if there is no adaptivity involved.
+          else if (prev_cell->neighbor(face_no)->level() != prev_cell->level())
+          {
+            if (parameters.debug)
             {
-              const typename DoFHandler<dim>::cell_iterator neighbor = prev_cell->neighbor(face_no);
-              Assert(neighbor->level() == prev_cell->level() - 1, ExcInternalError());
-              neighbor->get_dof_indices(prev_dof_indices_neighbor);
-
-              const std::pair<unsigned int, unsigned int> faceno_subfaceno = prev_cell->neighbor_of_coarser_neighbor(face_no);
-              const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
-
-              Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == prev_cell, ExcInternalError());
-
-              if (std::get<2>(*subcell_iter) == equallyRefined)
-              {
-                fe_v_prev_face.reinit(prev_cell, face_no);
-                fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
-                fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
-                JxW = fe_v_prev_face.get_JxW_values();
-                normals = fe_v_prev_face.get_all_normal_vectors();
-              }
-              else if (std::get<2>(*subcell_iter) == currentMoreRefined)
-              {
-                fe_v_face.reinit(cell, face_no);
-                fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
-                fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_face.get_quadrature_points());
-                JxW = fe_v_face.get_JxW_values();
-                normals = fe_v_face.get_all_normal_vectors();
-              }
-              else if (std::get<2>(*subcell_iter) == prevMoreRefined)
-              {
-                fe_v_prev_face.reinit(prev_cell, face_no);
-                fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
-                fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
-                JxW = fe_v_prev_face.get_JxW_values();
-                normals = fe_v_prev_face.get_all_normal_vectors();
-              }
-
-              assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
+              std::cout << "\tLess neighbors, neighbor: " << std::endl;
+              for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
+                std::cout << "\t vertex " << v_i << ": " << prev_cell->neighbor(face_no)->vertex(v_i) << std::endl;
             }
-            // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
-            // This is the only face assembly case performed without adaptivity.
-            else
+
+            const typename DoFHandler<dim>::cell_iterator neighbor = prev_cell->neighbor(face_no);
+            Assert(neighbor->level() == prev_cell->level() - 1, ExcInternalError());
+            neighbor->get_dof_indices(prev_dof_indices_neighbor);
+
+            const std::pair<unsigned int, unsigned int> faceno_subfaceno = prev_cell->neighbor_of_coarser_neighbor(face_no);
+            const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
+
+            Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == prev_cell, ExcInternalError());
+
+            if (std::get<2>(*subcell_iter) == equallyRefined)
             {
-              const typename DoFHandler<dim>::cell_iterator neighbor = prev_cell->neighbor(face_no);
-              neighbor->get_dof_indices(prev_dof_indices_neighbor);
-              const unsigned int neighbor_face_no = cell->neighbor_of_neighbor(face_no);
-
-              if (std::get<2>(*subcell_iter) == equallyRefined)
-              {
-                fe_v_prev_face.reinit(prev_cell, face_no);
-                fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
-                fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
-                JxW = fe_v_prev_face.get_JxW_values();
-                normals = fe_v_prev_face.get_all_normal_vectors();
-              }
-              else if (std::get<2>(*subcell_iter) == currentMoreRefined)
-              {
-                fe_v_face.reinit(cell, face_no);
-                fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
-                fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_face.get_quadrature_points());
-                JxW = fe_v_face.get_JxW_values();
-                normals = fe_v_face.get_all_normal_vectors();
-              }
-              else if (std::get<2>(*subcell_iter) == prevMoreRefined)
-              {
-                fe_v_prev_face.reinit(prev_cell, face_no);
-                fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
-                fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
-                JxW = fe_v_prev_face.get_JxW_values();
-                normals = fe_v_prev_face.get_all_normal_vectors();
-              }
-
-              assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
+              fe_v_prev_face.reinit(prev_cell, face_no);
+              fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
+              JxW = fe_v_prev_face.get_JxW_values();
+              normals = fe_v_prev_face.get_all_normal_vectors();
             }
+            else if (std::get<2>(*subcell_iter) == currentMoreRefined)
+            {
+              fe_v_face.reinit(cell, face_no);
+              fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_face.get_quadrature_points());
+              JxW = fe_v_face.get_JxW_values();
+              normals = fe_v_face.get_all_normal_vectors();
+            }
+            else if (std::get<2>(*subcell_iter) == prevMoreRefined)
+            {
+              fe_v_prev_face.reinit(prev_cell, face_no);
+              fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
+              JxW = fe_v_prev_face.get_JxW_values();
+              normals = fe_v_prev_face.get_all_normal_vectors();
+            }
+
+            assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
+          }
+          // Here the neighbor face fits exactly the current face of the current element, this is the 'easy' part.
+          // This is the only face assembly case performed without adaptivity.
+          else
+          {
+            const typename DoFHandler<dim>::cell_iterator neighbor = prev_cell->neighbor(face_no);
+            neighbor->get_dof_indices(prev_dof_indices_neighbor);
+            const unsigned int neighbor_face_no = cell->neighbor_of_neighbor(face_no);
+
+            if (parameters.debug)
+            {
+              std::cout << "\tSame neighbor, neighbor: " << std::endl;
+              for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
+                std::cout << "\t vertex " << v_i << ": " << neighbor->vertex(v_i) << std::endl;
+            }
+            if (std::get<2>(*subcell_iter) == equallyRefined)
+            {
+              fe_v_prev_face.reinit(prev_cell, face_no);
+              fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
+              JxW = fe_v_prev_face.get_JxW_values();
+              normals = fe_v_prev_face.get_all_normal_vectors();
+            }
+            else if (std::get<2>(*subcell_iter) == currentMoreRefined)
+            {
+              fe_v_face.reinit(cell, face_no);
+              fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_face.get_quadrature_points());
+              JxW = fe_v_face.get_JxW_values();
+              normals = fe_v_face.get_all_normal_vectors();
+            }
+            else if (std::get<2>(*subcell_iter) == prevMoreRefined)
+            {
+              fe_v_prev_face.reinit(prev_cell, face_no);
+              fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face_no, fe_v_prev_face.get_quadrature_points());
+              JxW = fe_v_prev_face.get_JxW_values();
+              normals = fe_v_prev_face.get_all_normal_vectors();
+            }
+
+            assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
           }
         }
       }
@@ -534,27 +516,8 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
     }
   }
 
-  if (initial_step)
-  {
+  if (time_step == 0)
     initial_condition.vector_value(fe_v_cell.get_quadrature_points(), W_prev);
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
-    {
-      double val = 0.;
-      for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
-      {
-        if (is_primitive[i])
-          val += JxW[q] * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
-        else
-        {
-          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
-          for (unsigned int d = 0; d < dim; d++)
-            val += JxW[q] * W_prev[q][5 + d] * fe_v_value[d];
-        }
-      }
-      cell_rhs(i) += val;
-    }
-  }
   else
   {
     // Now we calculate the previous values. For this we need to employ the previous FEValues
@@ -574,45 +537,46 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
         else
           W_prev[q][component_ii[i]] += prev_solution(prev_dof_indices[i]) * fe_v_prev_cell.shape_value(i, q);
       }
-
-      equations.compute_flux_matrix(W_prev[q], fluxes_old[q], this->parameters);
     }
+  }
 
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
+    equations.compute_flux_matrix(W_prev[q], fluxes_old[q], this->parameters);
+
+  for (unsigned int i = 0; i < dofs_per_cell; ++i)
+  {
+    double val = 0.;
+    for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
     {
-      double val = 0.;
-      for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
+      if (is_primitive[i])
       {
-        if (is_primitive[i])
+        val += JxW[q] * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
+        if (!basis_fn_is_constant[i])
+          for (int d = 0; d < dim; d++)
+            val += JxW[q] * parameters.time_step * fluxes_old[q][component_ii[i]][d] * fe_v_cell.shape_grad(i, q)[d];
+      }
+      else
+      {
+        dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
+        dealii::Tensor<2, dim> fe_v_grad = fe_v_cell[mag].gradient(i, q);
+        for (unsigned int d = 0; d < dim; d++)
         {
-          val += JxW[q] * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
-          if (!basis_fn_is_constant[i])
-            for (int d = 0; d < dim; d++)
-              val += JxW[q] * parameters.time_step * fluxes_old[q][component_ii[i]][d] * fe_v_cell.shape_grad(i, q)[d];
-        }
-        else
-        {
-          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
-          dealii::Tensor<2, dim> fe_v_grad = fe_v_cell[mag].gradient(i, q);
-          for (unsigned int d = 0; d < dim; d++)
-          {
-            val += JxW[q] * W_prev[q][5 + d] * fe_v_value[d];
-            for (int e = 0; e < dim; e++)
-              val += JxW[q] * parameters.time_step * fluxes_old[q][5 + d][e] * fe_v_grad[d][e];
-          }
+          val += JxW[q] * W_prev[q][5 + d] * fe_v_value[d];
+          for (int e = 0; e < dim; e++)
+            val += JxW[q] * parameters.time_step * fluxes_old[q][5 + d][e] * fe_v_grad[d][e];
         }
       }
-      if (std::isnan(val))
-      {
-        std::cout << "isnan: " << val << std::endl;
-        std::cout << "i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v_cell.get_fe().system_to_component_index(i).first) << std::endl;
-        std::cout << "point: " << fe_v_cell.quadrature_point(0)[0] << ", " << fe_v_cell.quadrature_point(0)[1] << ", " << fe_v_cell.quadrature_point(0)[2] << std::endl;
-        for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
-          std::cout << "W [" << j << "]: " << (double)W_prev[0][j] << std::endl;
-        exit(1);
-      }
-      cell_rhs(i) += val;
     }
+    if (std::isnan(val))
+    {
+      std::cout << "isnan: " << val << std::endl;
+      std::cout << "i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v_cell.get_fe().system_to_component_index(i).first) << std::endl;
+      std::cout << "point: " << fe_v_cell.quadrature_point(0)[0] << ", " << fe_v_cell.quadrature_point(0)[1] << ", " << fe_v_cell.quadrature_point(0)[2] << std::endl;
+      for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
+        std::cout << "W [" << j << "]: " << (double)W_prev[0][j] << std::endl;
+      exit(1);
+    }
+    cell_rhs(i) += val;
   }
 }
 
@@ -621,46 +585,57 @@ void
 Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_prev, const FEFaceValuesBase<dim> &fe_v_prev_neighbor,
   const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs, std::vector<double>& JxW, std::vector<Tensor<1, dim> >& normals)
 {
-  if (parameters.debug)
-    std::cout << "\tEdqe: " << face_no << std::endl;
-
   // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
-  for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
+  if (time_step == 0)
   {
-    for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
-      Wplus_old[c] = Wminus_old[c] = 0.;
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    initial_condition.vector_value(fe_v.get_quadrature_points(), Wplus_old);
+    if (!external_face)
+      for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
+        for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
+          Wminus_old[q][c] = Wplus_old[q][c];
+  }
+  else
+  {
+    for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
     {
-      if (fe_v.get_fe().has_support_on_face(i, face_no))
+      for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
+        Wplus_old[q][c] = Wminus_old[q][c] = 0.;
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        if (!is_primitive[i])
-        {
-          dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
-          for (int d = 0; d < dim; d++)
-            Wplus_old[5 + d] += prev_solution(prev_dof_indices[i]) * fe_v_value[d];
-        }
-        else
-          Wplus_old[component_ii[i]] += prev_solution(prev_dof_indices[i]) * fe_v.shape_value(i, q);
-        if (!external_face)
+        if (fe_v.get_fe().has_support_on_face(i, face_no))
         {
           if (!is_primitive[i])
           {
-            dealii::Tensor<1, dim> fe_v_value_neighbor = fe_v_prev_neighbor[mag].value(i, q);
+            dealii::Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
             for (int d = 0; d < dim; d++)
-              Wminus_old[5 + d] += prev_solution(prev_dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+              Wplus_old[q][5 + d] += prev_solution(prev_dof_indices[i]) * fe_v_value[d];
           }
           else
-            Wminus_old[component_ii[i]] += prev_solution(prev_dof_indices_neighbor[i]) * fe_v_prev_neighbor.shape_value(i, q);
+            Wplus_old[q][component_ii[i]] += prev_solution(prev_dof_indices[i]) * fe_v.shape_value(i, q);
+          if (!external_face)
+          {
+            if (!is_primitive[i])
+            {
+              dealii::Tensor<1, dim> fe_v_value_neighbor = fe_v_prev_neighbor[mag].value(i, q);
+              for (int d = 0; d < dim; d++)
+                Wminus_old[q][5 + d] += prev_solution(prev_dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+            }
+            else
+              Wminus_old[q][component_ii[i]] += prev_solution(prev_dof_indices_neighbor[i]) * fe_v_prev_neighbor.shape_value(i, q);
+          }
         }
       }
     }
+  }
 
+  for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
+  {
     if (external_face)
-      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old, Wplus_old);
+      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q]);
 
     // Once we have the states on both sides of the face, we need to calculate the numerical flux.
-    this->numFlux->numerical_normal_flux(normals[q], Wplus_old, Wminus_old, normal_fluxes_old[q], max_signal_speed);
+    this->numFlux->numerical_normal_flux(normals[q], Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
 
     // Some debugging outputs.
     if (parameters.debug)
@@ -669,12 +644,12 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
       std::cout << "\t\tq: " << fe_v.quadrature_point(q) << ", n: " << normals[q][0] << ", " << normals[q][1] << ", " << normals[q][2] << std::endl;
       std::cout << "\t\tWplus: ";
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << Wplus_old[i] << (i < 7 ? ", " : "");
+        std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
       std::cout << std::endl;
 
       std::cout << "\t\tWminus: ";
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << Wminus_old[i] << (i < 7 ? ", " : "");
+        std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
       std::cout << std::endl;
 
       std::cout << "\t\tNum F: ";
@@ -701,13 +676,13 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
 
         if (std::isnan(val))
         {
-          numFlux->numerical_normal_flux(normals[q], Wplus_old, Wminus_old, normal_fluxes_old[q], max_signal_speed);
+          numFlux->numerical_normal_flux(normals[q], Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
           std::cout << "isnan: " << val << std::endl;
           std::cout << "i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
           std::cout << "point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
           std::cout << "normal: " << normals[q][0] << ", " << normals[q][1] << ", " << normals[q][2] << std::endl;
           for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
-            std::cout << "W+ [" << j << "]: " << (double)Wplus_old[j] << ", W- [" << j << "]: " << (double)Wminus_old[j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
+            std::cout << "W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
           exit(1);
         }
       }
@@ -836,7 +811,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -897,14 +872,14 @@ void Problem<equationsType, dim>::setup_initial_solution()
     remove("triangulation");
     remove("triangulation.info");
     remove("history");
-}
+  }
 #else
   prev_solution = 0;
 #endif
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step) const
+void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix) const
 {
   std::ofstream m;
   std::stringstream ssm;
@@ -915,7 +890,7 @@ void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& 
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step) const
+void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix) const
 {
   std::ofstream n;
   std::stringstream ssn;
@@ -976,8 +951,7 @@ void Problem<equationsType, dim>::run()
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
       std::cout << "Step: " << time_step << ", T: " << time << std::endl;
-      if (initial_step)
-        std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
+      std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
     }
 
     // Assemble
@@ -988,61 +962,92 @@ void Problem<equationsType, dim>::run()
 
     // Output matrix & rhs if required.
     if (parameters.output_matrix)
-      output_matrix(system_matrix, "matrix", time_step);
+      output_matrix(system_matrix, "matrix");
     if (parameters.output_rhs)
-      output_vector(system_rhs, "rhs", time_step);
+      output_vector(system_rhs, "rhs");
 
     // Solve
     solve();
 
     // Output solution if required
     if (parameters.output_solution)
-      output_vector(current_unlimited_solution, "current_unlimited_solution", time_step);
+      output_vector(current_unlimited_solution, "current_unlimited_solution");
 
     // Postprocess if required
-    if ((this->time > this->parameters.start_limiting_at) && !initial_step && parameters.limit && parameters.polynomial_order_dg > 0)
+    if ((this->time > this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
       postprocess();
     else
       current_limited_solution = current_unlimited_solution;
 
     move_time_step_handle_outputs();
 
-    prev_triangulation.clear();
-    prev_triangulation.copy_triangulation(triangulation);
-
-    if(!initial_step && (time_step % 10 == 0))
+    this->refined_mesh = this->adaptivity->refine_mesh(this->time_step, this->current_limited_solution, this->dof_handler);
+    if (this->refined_mesh)
     {
-      refine_mesh();
+      // Use the old dof_handler to prepare for solution transfer.
+#ifdef HAVE_MPI
+      parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> soltrans(*prev_dof_handler);
+#else
+      SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> soltrans(*prev_dof_handler);
+#endif
+      // If this is the initial step (where we are looking for a good mesh to capture the initial condition, 
+      // then we do not need to transfer anything.
+      if (time_step > 0)
+        soltrans.prepare_for_coarsening_and_refinement(prev_solution);
+
+      // Replace the old triangulation by the current one before the current one gets refined.
+      prev_triangulation.clear();
+      prev_triangulation.copy_triangulation(triangulation);
+
+      // Refine the current triangulation.
+      triangulation.execute_coarsening_and_refinement();
+
+      // Process the refinement (DOFs, matrix, rhs, vectors)
+      this->setup_system();
+
+      // Reinit the current solution, this can't be done in setup_system, because if we do not refine, we still need those solution on the
+      // (unrefined) current triangulation.
+      prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
+      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+
+      // The rest is not meaningful for the initial step.
+      // And for the initial step, we need to make sure we stay in it.
+      if (time_step == 1)
+        time_step = 0;
+      if (time_step > 0)
+      {
+        // Now interpolate the solution
+        TrilinosWrappers::MPI::Vector interpolated_solution;
+        interpolated_solution.reinit(prev_locally_owned_dofs, mpi_communicator);
+#ifdef HAVE_MPI
+        soltrans.interpolate(interpolated_solution);
+#else
+        soltrans.interpolate(prev_solution, interpolated_solution);
+#endif
+
+        // Put the interpolated solution back to the previous one.
+        this->prev_solution = interpolated_solution;
+      }
+    }
+    else
+    {
+      prev_triangulation.clear();
+      prev_triangulation.copy_triangulation(triangulation);
+      this->setup_system();
       prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
       this->prev_solution = this->current_limited_solution;
-      current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
+      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
       current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
     }
-    this->setup_system();
-    if (!(!initial_step && (time_step % 10 == 0)))
-      this->prev_solution = this->current_limited_solution;
   }
-}
-
-template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::refine_mesh()
-{
-  Triangulation<dim>::active_cell_iterator cell = triangulation.begin_active();
-  Triangulation<dim>::active_cell_iterator endc = triangulation.end();
-  for (; cell != endc; ++cell)
-  {
-    for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
-      if (std::abs(cell->vertex(vertex_i).norm() - 0.1) < 0.03)
-        cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
-  }
-  triangulation.execute_coarsening_and_refinement();
 }
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::move_time_step_handle_outputs()
 {
   if (parameters.output_solution)
-    output_vector(current_limited_solution, "solution", time_step);
+    output_vector(current_limited_solution, "solution");
 
   if ((parameters.output_step < 0) || (time - last_output_time >= parameters.output_step))
   {
@@ -1056,16 +1061,12 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     last_snapshot_time = time;
   }
 
-  if (!initial_step)
-  {
-    calculate_cfl_condition();
-    double global_cfl_time_step = dealii::Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
-    parameters.time_step = global_cfl_time_step;
-  }
+  calculate_cfl_condition();
+  double global_cfl_time_step = dealii::Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
+  parameters.time_step = global_cfl_time_step;
 
   ++time_step;
   time += parameters.time_step;
-  initial_step = false;
 }
 
 template <EquationsType equationsType, int dim>
