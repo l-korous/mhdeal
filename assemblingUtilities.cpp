@@ -348,8 +348,173 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_compatible_with_subf
       break;
     }
   }
+  else if (ref_case == RefinementCase<dim>::cut_y)
+  {
+    switch (face_no) {
+    case 0:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        return true;
+      }
+      break;
+    case 1:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        return true;
+      }
+      break;
+    case 2:
+      return true;
+      break;
+    case 3:
+      return true;
+      break;
+    case 4:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      break;
+    case 5:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      break;
+    }
+  }
 
-  return false;
+  else if (ref_case == RefinementCase<dim>::cut_x)
+  {
+    switch (face_no) {
+    case 0:
+      return true;
+      break;
+    case 1:
+      return true;
+      break;
+    case 2:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      break;
+    case 3:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      break;
+    case 4:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        return true;
+      }
+      break;
+    case 5:
+      if (face_ref_case == RefinementCase<dim - 1>::cut_xy)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 0 && subface_no == 2) return true;
+        if (child == 1 && subface_no == 1) return true;
+        if (child == 1 && subface_no == 3) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_x)
+      {
+        if (child == 0 && subface_no == 0) return true;
+        if (child == 1 && subface_no == 1) return true;
+      }
+      else if (face_ref_case == RefinementCase<dim - 1>::cut_y)
+      {
+        return true;
+      }
+      break;
+    }
+  }
 }
 
 template <EquationsType equationsType, int dim>
@@ -361,8 +526,12 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(
       return ((child == 1) || (child == 3));
     else if (ref_case == RefinementCase<dim>::cut_xyz)
       return ((child == 1) || (child == 3) || (child == 5) || (child == 7));
+    else if (ref_case == RefinementCase<dim>::cut_y)
+      return false;
+    else if (ref_case == RefinementCase<dim>::cut_x)
+      return (child == 1);
     else {
-      std::cout << "Unknown refinement";
+      std::cout << "Unknown refinement" << ref_case;
       exit(1);
     }
     break;
@@ -371,6 +540,10 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(
       return (!((child == 1) || (child == 3)));
     else if (ref_case == RefinementCase<dim>::cut_xyz)
       return (!((child == 1) || (child == 3) || (child == 5) || (child == 7)));
+    else if (ref_case == RefinementCase<dim>::cut_y)
+      return false;
+    else if (ref_case == RefinementCase<dim>::cut_x)
+      return (child == 0);
     else {
       std::cout << "Unknown refinement";
       exit(1);
@@ -381,6 +554,10 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(
       return ((child == 2) || (child == 3));
     else if (ref_case == RefinementCase<dim>::cut_xyz)
       return ((child == 2) || (child == 3) || (child == 6) || (child == 7));
+    else if (ref_case == RefinementCase<dim>::cut_y)
+      return (child == 1);
+    else if (ref_case == RefinementCase<dim>::cut_x)
+      return false;
     else {
       std::cout << "Unknown refinement";
       exit(1);
@@ -391,6 +568,10 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(
       return (!((child == 2) || (child == 3)));
     else if (ref_case == RefinementCase<dim>::cut_xyz)
       return (!((child == 2) || (child == 3) || (child == 6) || (child == 7)));
+    else if (ref_case == RefinementCase<dim>::cut_y)
+      return (child == 0);
+    else if (ref_case == RefinementCase<dim>::cut_x)
+      return false;
     else {
       std::cout << "Unknown refinement";
       exit(1);
@@ -401,6 +582,10 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(
       return false;
     else if (ref_case == RefinementCase<dim>::cut_xyz)
       return (child > 3);
+    else if (ref_case == RefinementCase<dim>::cut_y)
+      return false;
+    else if (ref_case == RefinementCase<dim>::cut_x)
+      return false;
     else {
       std::cout << "Unknown refinement";
       exit(1);
@@ -411,6 +596,10 @@ bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(
       return false;
     else if (ref_case == RefinementCase<dim>::cut_xyz)
       return (child <= 3);
+    else if (ref_case == RefinementCase<dim>::cut_y)
+      return false;
+    else if (ref_case == RefinementCase<dim>::cut_x)
+      return false;
     else {
       std::cout << "Unknown refinement";
       exit(1);

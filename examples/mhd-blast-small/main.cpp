@@ -29,18 +29,17 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.corner_a = Point<DIMENSION>(-0.0, -0.0, 0.);
   parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
   parameters.refinements = { 10, 10, 1 };
-  parameters.dof_threshold = 20000;
-  parameters.limit = true;
+  parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .025;
-  parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.cfl_coefficient = .05;
+  parameters.quadrature_order = 1;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = -1.e-3;
+  parameters.output_step = 5.e-4;
   parameters.final_time = 1.;
   //parameters.debug = true;
 
@@ -65,11 +64,14 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::smoothing_on_refinement | Triangulation<DIMENSION>::smoothing_on_coarsening));
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::eliminate_unrefined_islands | Triangulation<DIMENSION>::allow_anisotropic_smoothing));
 #else
-    Triangulation<DIMENSION> triangulation;
-#endif    
+    Triangulation<DIMENSION> triangulation;// (typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::patch_level_1 | Triangulation<DIMENSION>::allow_anisotropic_smoothing));
+#endif
     set_triangulation(triangulation, parameters);
+    for (typename Triangulation<DIMENSION>::active_cell_iterator cell = triangulation.begin_active(); cell != triangulation.end(); ++cell)
+        cell->set_refine_flag(RefinementPossibilities<DIMENSION>::cut_xy);
+    triangulation.execute_coarsening_and_refinement();
 
     InitialConditionMhdBlast<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp

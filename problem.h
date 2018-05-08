@@ -62,7 +62,7 @@ public:
   void solve();
 
   // Process output, move to next time step.
-  void move_time_step_handle_outputs();
+  void handle_outputs();
 
   // Triangulation - passed as a constructor parameter
 #ifdef HAVE_MPI

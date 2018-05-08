@@ -61,6 +61,7 @@
 #include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/distributed/solution_transfer.h>
 #include <deal.II/numerics/error_estimator.h>
+#include <deal.II/numerics/derivative_approximation.h>
 
 #ifndef NEGLIGIBLE
 #define NEGLIGIBLE 1e-12
