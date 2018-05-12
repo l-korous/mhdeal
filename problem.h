@@ -171,7 +171,6 @@ public:
   // This is here and not in the loop because of tests - we test by looking at the last res_norm.
   double res_norm;
   // Utility
-  static bool is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters);
   AssemblingUtilities<equationsType, dim> assembling_utils;
 };
 #endif

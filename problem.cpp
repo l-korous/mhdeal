@@ -78,9 +78,9 @@ void Problem<equationsType, dim>::setup_system()
   DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
   if (this->parameters.periodic_boundaries.size() > 0)
   {
+    periodic_cell_map.clear();
     for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
-      DealIIExtensions::make_periodicity_map_dg(dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
-    DealIIExtensions::make_sparser_flux_sparsity_pattern(dof_handler, dsp, constraints, parameters.periodic_boundaries, periodic_cell_map);
+      DealIIExtensions::make_periodicity_map_dg(*prev_dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
   }
   constraints.close();
 
@@ -260,21 +260,35 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
           if (parameters.debug)
             std::cout << "\tboundary" << std::endl;
 
-          if (is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
+          if (parameters.is_periodic_boundary(prev_cell->face(face_no)->boundary_id()))
           {
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-            auto this_cell_index = cell->active_cell_index();
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(prev_cell, face_no))->second;
+            typename DoFHandler<dim>::active_cell_iterator neighbor(prev_cell);
+            auto this_cell_index = prev_cell->active_cell_index();
             auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
             neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
             const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
 
             neighbor->get_dof_indices(prev_dof_indices_neighbor);
 
-            fe_v_face.reinit(cell, face_no);
-            fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face);
+            if (std::get<2>(*subcell_iter) == currentMoreRefined)
+            {
+              fe_v_face.reinit(cell, face_no);
+              fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face, fe_v_face.get_quadrature_points());
+              JxW = fe_v_face.get_JxW_values();
+              normals = fe_v_face.get_all_normal_vectors();
+            }
+            else
+            {
+              fe_v_prev_face.reinit(prev_cell, face_no);
+              fe_v_face.reinit(cell, face_no, fe_v_prev_face.get_quadrature_points());
+              fe_v_prev_face_neighbor.reinit(neighbor, neighbor_face, fe_v_prev_face.get_quadrature_points());
+              JxW = fe_v_prev_face.get_JxW_values();
+              normals = fe_v_prev_face.get_all_normal_vectors();
+            }
 
-            assemble_face_term(face_no, fe_v_face, fe_v_face, fe_v_prev_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs, JxW, normals);
+            assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs, JxW, normals);
           }
           else
           {
@@ -969,7 +983,7 @@ void Problem<equationsType, dim>::run()
     // Output VTK, calculate CFL, etc.
     handle_outputs();
 
-    this->refined_mesh = this->adaptivity->refine_mesh(this->time_step, this->current_limited_solution, this->dof_handler, this->mapping);
+    this->refined_mesh = this->adaptivity->refine_mesh(this->time_step, this->time, this->current_limited_solution, this->dof_handler, this->mapping);
     if (this->refined_mesh)
     {
       // Use the old dof_handler to prepare for solution transfer.
@@ -1055,15 +1069,6 @@ void Problem<equationsType, dim>::handle_outputs()
   calculate_cfl_condition();
   double global_cfl_time_step = dealii::Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
   parameters.time_step = global_cfl_time_step;
-}
-
-template <EquationsType equationsType, int dim>
-bool Problem<equationsType, dim>::is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters)
-{
-  for (int pb = 0; pb < parameters.periodic_boundaries.size(); pb++)
-    if (parameters.periodic_boundaries[pb][0] == boundary_id || parameters.periodic_boundaries[pb][1] == boundary_id)
-      return true;
-  return false;
 }
 
 template class Problem<EquationsTypeMhd, 3>;

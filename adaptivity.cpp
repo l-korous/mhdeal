@@ -14,7 +14,7 @@ Adaptivity<dim>::Adaptivity(Parameters<dim>& parameters,
 }
 
 template <int dim>
-bool Adaptivity<dim>::refine_mesh(int time_step, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
+bool Adaptivity<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
 {
   bool toReturn = false;
   int ith_cell = 0;

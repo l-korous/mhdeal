@@ -11,6 +11,10 @@ public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
   Parameters();
 
+  void delete_old_outputs(MPI_Comm& mpi_communicator) const;
+
+  bool is_periodic_boundary(int boundary_id) const;
+
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
 
@@ -93,8 +97,6 @@ public:
   Point<dim> corner_b;
   std::vector<unsigned int> refinements;
   std::vector<std::array<int, 3> > periodic_boundaries;
-
-  void delete_old_outputs(MPI_Comm& mpi_communicator) const;
 
   double start_limiting_at;
 };

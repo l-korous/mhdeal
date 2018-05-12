@@ -65,7 +65,7 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
         // If on boundary which is periodic, get also the proper periodic neighbors
         for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
         {
-          if (cell->at_boundary(face_no) && Problem<equationsType, dim>::is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
+          if (cell->at_boundary(face_no) && parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
           {
             TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
             for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
@@ -262,7 +262,7 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
         // If on boundary which is periodic, get also the proper periodic neighbors
         for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
         {
-          if (cell->at_boundary(face_no) && Problem<equationsType, dim>::is_periodic_boundary(cell->face(face_no)->boundary_id(), this->parameters))
+          if (cell->at_boundary(face_no) && parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
           {
             TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
             for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)

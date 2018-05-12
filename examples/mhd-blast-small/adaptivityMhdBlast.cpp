@@ -1,4 +1,5 @@
 #include "adaptivityMhdBlast.h"
+#include "dealiiExtensions.h"
 
 template <int dim>
 AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters,
@@ -51,7 +52,7 @@ void AdaptivityMhdBlast<dim>::set_anisotropic_flags(TrilinosWrappers::MPI::Vecto
             const std::vector<double> &JxW = fe_v_subface.get_JxW_values();
             for (unsigned int x = 0; x < fe_v_subface.n_quadrature_points; ++x)
               area[face_no / 2] += JxW[x];
-            for(int scalar_i = 0; scalar_i < 2; scalar_i++)
+            for (int scalar_i = 0; scalar_i < 2; scalar_i++)
             {
               fe_v_subface[scalars[scalar_i]].get_function_values(solution, u);
               fe_v_face_neighbor[scalars[scalar_i]].get_function_values(solution, u_neighbor);
@@ -119,13 +120,14 @@ void AdaptivityMhdBlast<dim>::set_anisotropic_flags(TrilinosWrappers::MPI::Vecto
   }
 }
 
+
 template <int dim>
-bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
+bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
 {
   if (time_step % 4)
     return false;
 
-  if (adaptivity_step++ > (time_step == 0 ? 4 : 0))
+  if (adaptivity_step++ > (time_step == 0 ? 20 : 0))
   {
     adaptivity_step = 0;
     return false;
@@ -133,10 +135,51 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, TrilinosWrappers::MPI::
 
   Vector<double> gradient_indicator(triangulation.n_active_cells());
   set_anisotropic_flags(solution, dof_handler, mapping, gradient_indicator);
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, 0.55, 0.15, 2000);
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, 0.3, 0.05, 5000 + (int)std::floor((time / 0.5) * 10000.));
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
     if (cell->refine_flag_set())
       cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
+
+  // Fix for periodic boundaries.
+  if (this->parameters.periodic_boundaries.size() > 0)
+  {
+    DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
+    for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
+      DealIIExtensions::make_periodicity_map_dg(dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
+    for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    {
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+      {
+        if (parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+        {
+          if (cell->refine_flag_set())
+          {
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+            auto this_cell_index = cell->active_cell_index();
+            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+            if (cell->refine_flag_set() || neighbor->refine_flag_set())
+            {
+              cell->set_refine_flag(RefinementPossibilities<dim>::cut_xyz);
+              neighbor->set_refine_flag(RefinementPossibilities<dim>::cut_xyz);
+            }
+            else
+              neighbor->clear_coarsen_flag();
+          }
+          cell->clear_coarsen_flag();
+        }
+        if (cell->level() > 0)
+        {
+          if (parameters.is_periodic_boundary(cell->parent()->face(face_no)->boundary_id()))
+          {
+            for(int i = 0; i < cell->parent()->n_children(); i++)
+              cell->parent()->child(i)->clear_coarsen_flag();
+          }
+        }
+      }
+    }
+  }
 
   return true;
 }

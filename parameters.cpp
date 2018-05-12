@@ -69,4 +69,13 @@ void Parameters<dim>::delete_old_outputs(MPI_Comm& mpi_communicator) const
   }
 }
 
+template <int dim>
+bool Parameters<dim>::is_periodic_boundary(int boundary_id) const
+{
+  for (int pb = 0; pb < this->periodic_boundaries.size(); pb++)
+    if (this->periodic_boundaries[pb][0] == boundary_id || this->periodic_boundaries[pb][1] == boundary_id)
+      return true;
+  return false;
+}
+
 template class Parameters<3>;
