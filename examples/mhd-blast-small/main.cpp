@@ -70,9 +70,9 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator);
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
 #else
-    Triangulation<DIMENSION> triangulation;// (typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::patch_level_1 | Triangulation<DIMENSION>::allow_anisotropic_smoothing));
+    Triangulation<DIMENSION> triangulation;
 #endif
     set_triangulation(triangulation, parameters);
 

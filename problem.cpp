@@ -220,9 +220,6 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
       cell->get_dof_indices(dof_indices);
       prev_cell->get_dof_indices(prev_dof_indices);
 
-      //if (this->time_step == 5 && ith_cell == 28)
-      //  parameters.debug = true;
-
       if (parameters.debug)
       {
         std::cout << "Current cell: " << ith_cell << std::endl;
@@ -938,7 +935,7 @@ void Problem<equationsType, dim>::run()
   // Preparations.
   setup_system();
   prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
-  current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
+  current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   setup_initial_solution();
 
