@@ -12,6 +12,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   parameters(parameters),
   equations(equations),
   triangulation(triangulation),
+#ifdef HAVE_MPI
+  prev_triangulation(MPI_COMM_WORLD),
+#endif
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
   mapping(),

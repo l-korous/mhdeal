@@ -15,9 +15,8 @@ public:
 
   // To be overwritten.
   virtual void vector_value(const std::vector<Point<dim> >& , std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-  Parameters<dim>& getParams() const;
 
-private:
+protected:
   Parameters<dim>& parameters;
 };
 

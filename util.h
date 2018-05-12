@@ -42,8 +42,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/mapping_q1.h>
 #include <deal.II/fe/fe_q.h>
-#include <deal.II/fe/fe_dgt.h>
-// #include <deal.II/fe/fe_div_free.h> 
 #include <deal.II/fe/fe_raviart_thomas.h>
 
 #include <deal.II/numerics/data_out.h>

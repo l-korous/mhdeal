@@ -14,12 +14,6 @@ void InitialCondition<equationsType, dim>::vector_value(const std::vector<Point<
 }
 
 template <EquationsType equationsType, int dim>
-Parameters<dim>& InitialCondition<equationsType, dim>::getParams() const
-{
-  return parameters;
-}
-
-template <EquationsType equationsType, int dim>
 TitovDemoulinIC<equationsType, dim>::TitovDemoulinIC(Parameters<dim>& parameters) : 
                InitialCondition<equationsType,dim>(parameters)
 {
@@ -83,8 +77,8 @@ void TitovDemoulinIC<equationsType, dim>::vector_value(const std::vector<Point<d
 {
   //========== Calculate the vector potential for I_t-generated toroidal field 
   double xx, yy, zz;
-  Point<dim> &ca = this->getParams().corner_a;
-  Point<dim> &cb = this->getParams().corner_b;
+  Point<dim> &ca = this->parameters.corner_a;
+  Point<dim> &cb = this->parameters.corner_b;
 
   for (unsigned int pp = 0; pp < points.size(); ++pp)
   {
@@ -245,7 +239,7 @@ void TitovDemoulinIC<equationsType, dim>::vector_value(const std::vector<Point<d
     value_list[pp][3] = 0.0;
 
     // energy density
-    value_list[pp][4] = pressure / (this->getParams().gas_gamma - 1.0) +
+    value_list[pp][4] = pressure / (this->parameters.gas_gamma - 1.0) +
       B_loc[0] * B_loc[0] + B_loc[1] * B_loc[1] + B_loc[2] * B_loc[2];
 
     value_list[pp][5] = B_loc[0];

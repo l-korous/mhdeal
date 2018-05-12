@@ -67,7 +67,7 @@ public:
   // Triangulation - passed as a constructor parameter
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation;
-  parallel::distributed::Triangulation<dim>& prev_triangulation;
+  parallel::distributed::Triangulation<dim> prev_triangulation;
 #else
   Triangulation<dim>& triangulation;
   Triangulation<dim> prev_triangulation;

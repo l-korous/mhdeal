@@ -64,16 +64,11 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator));
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator);
 #else
     Triangulation<DIMENSION> triangulation;// (typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::patch_level_1 | Triangulation<DIMENSION>::allow_anisotropic_smoothing));
 #endif
     set_triangulation(triangulation, parameters);
-    /*
-    for (typename Triangulation<DIMENSION>::active_cell_iterator cell = triangulation.begin_active(); cell != triangulation.end(); ++cell)
-        cell->set_refine_flag(RefinementPossibilities<DIMENSION>::cut_xy);
-    triangulation.execute_coarsening_and_refinement();
-    */
 
     InitialConditionMhdBlast<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp

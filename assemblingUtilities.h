@@ -12,8 +12,8 @@ class AssemblingUtilities
 {
 public:
   void set_problem(Problem<equationsType, dim>* problem);
-  bool AssemblingUtilities<equationsType, dim>::is_refinement_compatible_with_subface(int face_no, RefinementCase<dim> ref_case, int child, int subface_no, RefinementCase<dim - 1> face_ref_case);
-  bool AssemblingUtilities<equationsType, dim>::is_refinement_within_current_cell(int face_no, RefinementCase<dim> ref_case, int child);
+  bool is_refinement_compatible_with_subface(int face_no, RefinementCase<dim> ref_case, int child, int subface_no, RefinementCase<dim - 1> face_ref_case);
+  bool is_refinement_within_current_cell(int face_no, RefinementCase<dim> ref_case, int child);
 
 private:
   Problem<equationsType, dim>* problem;

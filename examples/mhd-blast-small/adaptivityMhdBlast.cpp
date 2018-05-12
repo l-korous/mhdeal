@@ -16,7 +16,7 @@ AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters,
 }
 
 template <int dim>
-void AdaptivityMhdBlast<dim>::set_anisotropic_flags(TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping, Vector<double>& gradient_indicator)
+void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping, Vector<double>& gradient_indicator)
 {
   FEValuesExtractors::Scalar scalars[2];
   scalars[0].component = 0;
@@ -133,24 +133,21 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
     return false;
   }
 
-  Vector<double> gradient_indicator(triangulation.n_active_cells());
-  set_anisotropic_flags(solution, dof_handler, mapping, gradient_indicator);
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, 0.3, 0.05, 5000 + (int)std::floor((time / 0.5) * 10000.));
-  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
-    if (cell->refine_flag_set())
-      cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
+  Vector<double> gradient_indicator(this->triangulation.n_active_cells());
+  calculate_jumps(solution, dof_handler, mapping, gradient_indicator);
+  GridRefinement::refine_and_coarsen_fixed_fraction(this->triangulation, gradient_indicator, 0.3, 0.05, 5000 + (int)std::floor((time / 0.5) * 10000.));
 
   // Fix for periodic boundaries.
   if (this->parameters.periodic_boundaries.size() > 0)
   {
     DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
-    for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
+    for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != this->parameters.periodic_boundaries.end(); it++)
       DealIIExtensions::make_periodicity_map_dg(dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
     for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        if (parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+        if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
         {
           if (cell->refine_flag_set())
           {
@@ -171,7 +168,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
         }
         if (cell->level() > 0)
         {
-          if (parameters.is_periodic_boundary(cell->parent()->face(face_no)->boundary_id()))
+          if (this->parameters.is_periodic_boundary(cell->parent()->face(face_no)->boundary_id()))
           {
             for(int i = 0; i < cell->parent()->n_children(); i++)
               cell->parent()->child(i)->clear_coarsen_flag();
