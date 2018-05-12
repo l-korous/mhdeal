@@ -117,7 +117,8 @@ public:
   MPI_Comm mpi_communicator;
 
   double last_output_time, last_snapshot_time, time;
-  int time_step;
+  // Adaptivity step is increased always, but if mesh is refined, time step does not progress. Therefore, there can be more adaptivity steps in one time step.
+  int time_step, adaptivity_step;
   // For CFL.
   double cfl_time_step;
   double max_signal_speed;

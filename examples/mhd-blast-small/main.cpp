@@ -39,7 +39,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 5.e-4;
+  parameters.output_step = -5.e-4;
   parameters.final_time = 1.;
   //parameters.debug = true;
 

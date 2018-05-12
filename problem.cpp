@@ -25,6 +25,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   verbose_cout(std::cout, false),
   last_output_time(0.), last_snapshot_time(0.), time(0.),
   time_step(0),
+  adaptivity_step(0),
   mag(dim + 2),
   update_flags(update_values | update_JxW_values | update_gradients),
   face_update_flags(update_values | update_JxW_values | update_normal_vectors | update_q_points),
@@ -955,6 +956,7 @@ void Problem<equationsType, dim>::run()
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
       std::cout << "Step: " << time_step << ", T: " << time << std::endl;
+      std::cout << "- adaptivity step: " << adaptivity_step << std::endl;
       std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
     }
 
@@ -1001,8 +1003,7 @@ void Problem<equationsType, dim>::run()
         soltrans.prepare_for_coarsening_and_refinement(prev_solution);
 
       // Replace the old triangulation by the current one before the current one gets refined.
-      prev_triangulation.clear();
-      prev_triangulation.copy_triangulation(triangulation);
+      this->adaptivity->refine_prev_mesh(*prev_dof_handler, prev_triangulation);
 
       // Refine the current triangulation.
       triangulation.execute_coarsening_and_refinement();
@@ -1036,8 +1037,7 @@ void Problem<equationsType, dim>::run()
     }
     else
     {
-      prev_triangulation.clear();
-      prev_triangulation.copy_triangulation(triangulation);
+      this->adaptivity->refine_prev_mesh(*prev_dof_handler, prev_triangulation);
       this->setup_system();
       prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
       this->prev_solution = this->current_limited_solution;
@@ -1048,6 +1048,7 @@ void Problem<equationsType, dim>::run()
       ++time_step;
       time += parameters.time_step;
     }
+    adaptivity_step++;
   }
 }
 
