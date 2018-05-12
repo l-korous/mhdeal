@@ -26,13 +26,19 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.001);
-  parameters.refinements = { 20, 30, 1 };
+  parameters.corner_a = Point<DIMENSION>(-0.3, -0.3, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.3, 0.3, 0.06);
+  parameters.refinements = { 20, 20, 
+#ifdef HAVE_MPI
+    4
+#else
+    1
+#endif
+  };
   parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = false;
-  parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
+  //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .025;

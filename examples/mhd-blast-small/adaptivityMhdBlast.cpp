@@ -134,9 +134,11 @@ void AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
   if (prev_adapted[1])
   {
     GridRefinement::refine_and_coarsen_fixed_fraction(prev_triangulation, prev_gradient_indicator[1], 0.3, 0.05, prev_max_cells[1]);
+#ifndef HAVE_MPI
     for (typename DoFHandler<dim>::active_cell_iterator cell = prev_dof_handler.begin_active(); cell != prev_dof_handler.end(); ++cell)
       if (cell->refine_flag_set())
         cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
+#endif
     prev_triangulation.execute_coarsening_and_refinement();
   }
 
@@ -217,9 +219,11 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   prev_max_cells[0] = 2000 + (int)std::floor((time / 0.5) * 10000.);
   
   GridRefinement::refine_and_coarsen_fixed_fraction(this->triangulation, gradient_indicator, 0.3, 0.05, prev_max_cells[0]);
+#ifndef HAVE_MPI
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
     if (cell->refine_flag_set())
       cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
+#endif
 
   // Fix for periodic boundaries.
   if (this->parameters.periodic_boundaries.size() > 0)
