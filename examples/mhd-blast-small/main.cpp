@@ -33,9 +33,9 @@ double coarsen_threshold;
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.3, -0.3, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.3, 0.3, 0.06);
-  parameters.refinements = { 20, 20, 
+  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.1);
+  parameters.refinements = { 20, 30, 
 #ifdef HAVE_MPI
     4
 #else
@@ -45,14 +45,14 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = false;
-  //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
+  parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .025;
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = -5.e-4;
+  parameters.output_step = 5.e-4;
   parameters.final_time = 1.;
   //parameters.debug = true;
 
@@ -62,10 +62,10 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  max_cells = 3000;
-  refine_every_nth_time_step = 5;
-  perform_n_initial_refinements = 20;
-  refine_threshold = 0.05;
+  max_cells = 4000;
+  refine_every_nth_time_step = 10;
+  perform_n_initial_refinements = 30;
+  refine_threshold = 0.2;
   coarsen_threshold = 0.05;
 }
 

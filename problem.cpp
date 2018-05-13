@@ -79,12 +79,23 @@ void Problem<equationsType, dim>::setup_system()
   constraints.reinit(locally_relevant_dofs);
   DoFTools::make_hanging_node_constraints(dof_handler, constraints);
   DynamicSparsityPattern dsp(locally_relevant_dofs);
-  DoFTools::make_flux_sparsity_pattern(dof_handler, dsp, constraints, false);
+  DoFTools::make_sparsity_pattern(dof_handler, dsp, constraints, false);
   if (this->parameters.periodic_boundaries.size() > 0)
   {
     periodic_cell_map.clear();
     for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
       DealIIExtensions::make_periodicity_map_dg(*prev_dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
+    DynamicSparsityPattern prev_dsp(prev_locally_relevant_dofs);
+    ConstraintMatrix prev_constraints;
+    prev_constraints.clear();
+    prev_constraints.reinit(prev_locally_relevant_dofs);
+    DoFTools::make_hanging_node_constraints(*prev_dof_handler, prev_constraints);
+    DoFTools::make_flux_sparsity_pattern(*prev_dof_handler, prev_dsp, prev_constraints, false);
+    DealIIExtensions::make_sparser_flux_sparsity_pattern(*prev_dof_handler, prev_dsp, prev_constraints, parameters.periodic_boundaries, periodic_cell_map);
+    prev_constraints.close();
+#ifdef HAVE_MPI 
+    SparsityTools::distribute_sparsity_pattern(prev_dsp, prev_dof_handler->n_locally_owned_dofs_per_processor(), mpi_communicator, prev_locally_relevant_dofs);
+#endif
   }
   constraints.close();
 
