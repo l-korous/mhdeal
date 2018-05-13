@@ -24,6 +24,13 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   triangulation.add_periodicity(matched_pairs);
 }
 
+// Parameters that are specific for this example.
+int max_cells;
+int refine_every_nth_time_step;
+int perform_n_initial_refinements;
+double refine_threshold;
+double coarsen_threshold;
+
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(-0.3, -0.3, 0.);
@@ -54,6 +61,12 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_rhs = true;
   parameters.output_solution = true;
   */
+
+  max_cells = 3000;
+  refine_every_nth_time_step = 5;
+  perform_n_initial_refinements = 20;
+  refine_threshold = 0.05;
+  coarsen_threshold = 0.05;
 }
 
 int main(int argc, char *argv[])
@@ -82,7 +95,7 @@ int main(int argc, char *argv[])
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
-    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, triangulation);
+    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, triangulation, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions, &adaptivity);
     // Run the problem - entire transient problem.

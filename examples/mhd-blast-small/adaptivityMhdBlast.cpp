@@ -4,14 +4,16 @@
 template <int dim>
 AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters,
 #ifdef HAVE_MPI
-  parallel::distributed::Triangulation<dim>& triangulation
+  parallel::distributed::Triangulation<dim>& triangulation,
 #else
-  Triangulation<dim>& triangulation
+  Triangulation<dim>& triangulation,
 #endif
+  int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
 ) :
   Adaptivity<dim>(parameters, triangulation),
   last_time_step(0),
-  adaptivity_step(0)
+  adaptivity_step(0),
+  max_cells(max_cells), refine_every_nth_time_step(refine_every_nth_time_step), perform_n_initial_refinements(perform_n_initial_refinements), refine_threshold(refine_threshold), coarsen_threshold(coarsen_threshold)
 {
 }
 
@@ -118,6 +120,9 @@ void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& sol
     }
     gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps * cell->diameter() * cell->diameter() * cell->diameter();
   }
+  for (int i = 0; i < gradient_indicator.size(); i++)
+    if (gradient_indicator[i] < SMALL)
+      gradient_indicator[i] = 0.;
 }
 
 template <int dim>
@@ -134,13 +139,22 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
   if (!prev_adapted[1])
     return false;
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(prev_triangulation, prev_gradient_indicator[1], 0.5, 0.05, prev_max_cells[1]);
+  GridRefinement::refine_and_coarsen_fixed_fraction(prev_triangulation, prev_gradient_indicator[1], this->refine_threshold, this->coarsen_threshold, prev_max_cells[1]);
+
+  // If possible, use aniso (only for non-distributed triangulation).
 #ifndef HAVE_MPI
   for (typename DoFHandler<dim>::active_cell_iterator cell = prev_dof_handler.begin_active(); cell != prev_dof_handler.end(); ++cell)
     if (cell->is_locally_owned())
       if (cell->refine_flag_set())
         cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
 #endif
+
+  // Fix for small errors.
+  for (typename DoFHandler<dim>::active_cell_iterator cell = prev_dof_handler.begin_active(); cell != prev_dof_handler.end(); ++cell)
+    if (cell->is_locally_owned())
+      if (cell->refine_flag_set() && (prev_gradient_indicator[1](cell->active_cell_index()) < NEGLIGIBLE))
+        cell->clear_refine_flag();
+
   prev_triangulation.prepare_coarsening_and_refinement();
 
   // Fix for periodic boundaries.
@@ -193,7 +207,7 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
 template <int dim>
 bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
 {
-  if (time_step % 4)
+  if (time_step % this->refine_every_nth_time_step)
   {
     prev_adapted[1] = prev_adapted[0];
     prev_gradient_indicator[1] = prev_gradient_indicator[0];
@@ -202,7 +216,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
     return false;
   }
 
-  if (adaptivity_step++ > (time_step == 0 ? 20 : 0))
+  if (adaptivity_step++ > (time_step == 0 ? this->perform_n_initial_refinements : 0))
   {
     adaptivity_step = 0;
     prev_adapted[1] = prev_adapted[0];
@@ -219,15 +233,23 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   prev_adapted[1] = prev_adapted[0];
   prev_adapted[0] = true;
   prev_max_cells[1] = prev_max_cells[0];
-  prev_max_cells[0] = 5000 + (int)std::floor((time / 0.5) * 10000.);
+  prev_max_cells[0] = max_cells + (int)std::floor((time / 0.5) * 10000.);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(this->triangulation, gradient_indicator, 0.5, 0.05, prev_max_cells[0]);
+  GridRefinement::refine_and_coarsen_fixed_fraction(this->triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells[0]);
+  
+  // If possible, use aniso (only for non-distributed triangulation).
 #ifndef HAVE_MPI
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
     if (cell->is_locally_owned())
       if (cell->refine_flag_set())
         cell->set_refine_flag(RefinementPossibilities<dim>::cut_xy);
 #endif
+
+  // Fix for small errors.
+  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    if (cell->is_locally_owned())
+      if (cell->refine_flag_set() && (gradient_indicator(cell->active_cell_index()) < NEGLIGIBLE))
+        cell->clear_refine_flag();
 
   // Fix for periodic boundaries.
   if (this->parameters.periodic_boundaries.size() > 0)

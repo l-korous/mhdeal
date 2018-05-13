@@ -954,7 +954,7 @@ void Problem<equationsType, dim>::run()
     {
       std::cout << "Step: " << time_step << ", T: " << time << std::endl;
       std::cout << "- adaptivity step: " << adaptivity_step << std::endl;
-      std::cout << "   Number of active cells:       " << triangulation.n_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
+      std::cout << "   Number of active cells:       " << triangulation.n_global_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl << std::endl;
     }
 
     // Assemble
