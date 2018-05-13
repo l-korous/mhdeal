@@ -994,13 +994,19 @@ void Problem<equationsType, dim>::run()
 #else
       SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> soltrans(*prev_dof_handler);
 #endif
+      // Replace the old triangulation by the current one before the current one gets refined.
+      bool prev_mesh_refined = this->adaptivity->refine_prev_mesh(*prev_dof_handler, prev_triangulation);
+      
       // If this is the initial step (where we are looking for a good mesh to capture the initial condition, 
       // then we do not need to transfer anything.
-      if (time_step > 0)
-        soltrans.prepare_for_coarsening_and_refinement(prev_solution);
+      if (prev_mesh_refined)
+      {
+        if (time_step > 0)
+          soltrans.prepare_for_coarsening_and_refinement(prev_solution);
 
-      // Replace the old triangulation by the current one before the current one gets refined.
-      this->adaptivity->refine_prev_mesh(*prev_dof_handler, prev_triangulation);
+        // Only now update the prev mesh (after potential call to SolutionTransfer).
+        prev_triangulation.execute_coarsening_and_refinement();
+      }
 
       // Refine the current triangulation.
       triangulation.execute_coarsening_and_refinement();
@@ -1008,17 +1014,20 @@ void Problem<equationsType, dim>::run()
       // Process the refinement (DOFs, matrix, rhs, vectors)
       this->setup_system();
 
-      // Reinit the current solution, this can't be done in setup_system, because if we do not refine, we still need those solution on the
-      // (unrefined) current triangulation.
-#ifdef HAVE_MPI
-      prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
-#endif
       current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
       current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
       // The rest is not meaningful for the initial step.
-      if (time_step > 0)
+      // What we do is that we do not progress the solution, we instead keep the previous one, and interpolate it on the adapted mesh.
+      // If that mesh is not adapted, we do not do it of course.
+      if ((time_step > 0) && prev_mesh_refined)
       {
+        // Reinit the current solution, this can't be done in setup_system, because if we do not refine, we still need those solution on the
+        // (unrefined) current triangulation.
+#ifdef HAVE_MPI
+        prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
+#endif
+
         // Now interpolate the solution
         TrilinosWrappers::MPI::Vector interpolated_solution;
         interpolated_solution.reinit(prev_locally_owned_dofs, mpi_communicator);
@@ -1034,7 +1043,8 @@ void Problem<equationsType, dim>::run()
     }
     else
     {
-      this->adaptivity->refine_prev_mesh(*prev_dof_handler, prev_triangulation);
+      if(this->adaptivity->refine_prev_mesh(*prev_dof_handler, prev_triangulation))
+        prev_triangulation.execute_coarsening_and_refinement();
       this->setup_system();
       prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
       this->prev_solution = this->current_limited_solution;

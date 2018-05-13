@@ -16,7 +16,7 @@ public:
 #endif
   );
   virtual bool refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping);
-  virtual void refine_prev_mesh(const DoFHandler<dim>& prev_dof_handler,
+  virtual bool refine_prev_mesh(const DoFHandler<dim>& prev_dof_handler,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation
 #else

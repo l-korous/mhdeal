@@ -17,7 +17,7 @@ public:
   );
   bool refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping);
   bool process_element(const typename Triangulation<dim>::active_cell_iterator& cell, int ith_cell, int time_step) const;
-  void refine_prev_mesh(const DoFHandler<dim>& prev_dof_handler,
+  bool refine_prev_mesh(const DoFHandler<dim>& prev_dof_handler,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation
 #else
