@@ -216,7 +216,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
     return false;
   }
 
-  if (adaptivity_step++ > (time_step == 0 ? this->perform_n_initial_refinements : 0))
+  if (++adaptivity_step > (time_step == 0 ? this->perform_n_initial_refinements : 1))
   {
     adaptivity_step = 0;
     prev_adapted[1] = prev_adapted[0];
