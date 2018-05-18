@@ -142,7 +142,7 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
   GridRefinement::refine_and_coarsen_fixed_fraction(prev_triangulation, prev_gradient_indicator[1], this->refine_threshold, this->coarsen_threshold, prev_max_cells[1]);
 
   // If possible, use aniso (only for non-distributed triangulation).
-#ifdef HAVE_MPI
+#ifndef HAVE_MPI
   for (typename DoFHandler<dim>::active_cell_iterator cell = prev_dof_handler.begin_active(); cell != prev_dof_handler.end(); ++cell)
     if (cell->is_locally_owned())
       if (cell->refine_flag_set())
@@ -238,7 +238,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   GridRefinement::refine_and_coarsen_fixed_fraction(this->triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells[0]);
   
   // If possible, use aniso (only for non-distributed triangulation).
-#ifdef HAVE_MPI
+#ifndef HAVE_MPI
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
     if (cell->is_locally_owned())
       if (cell->refine_flag_set())

@@ -99,7 +99,7 @@ namespace DealIIExtensions
                 if (face_pair_it == cell_map.end())
                 {
                   std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
-                  continue;
+                  exit(1);
                 }
                 const FacePair<DH::dimension>& face_pair = face_pair_it->second;
                 neighbor = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
