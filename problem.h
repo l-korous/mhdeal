@@ -66,15 +66,12 @@ public:
 
   // Triangulation - passed as a constructor parameter
 #ifdef HAVE_MPI
-  parallel::distributed::Triangulation<dim>& triangulation;
-  parallel::distributed::Triangulation<dim> prev_triangulation;
+  parallel::distributed::Triangulation<dim> triangulation;
+  parallel::distributed::Triangulation<dim>& prev_triangulation;
 #else
-  Triangulation<dim>& triangulation;
-  Triangulation<dim> prev_triangulation;
+  Triangulation<dim> triangulation;
+  Triangulation<dim>& prev_triangulation;
 #endif
-
-  void save();
-  void load();
 
   // Equations - passed as a constructor parameter
   Equations<equationsType, dim>& equations;
@@ -96,7 +93,7 @@ public:
 
   const MappingQ1<dim> mapping;
   const FESystem<dim> fe;
-  DoFHandler<dim> dof_handler, *prev_dof_handler;
+  DoFHandler<dim> *dof_handler, prev_dof_handler;
   const QGauss<dim> quadrature;
   const QGauss<dim - 1> face_quadrature;
 
@@ -112,7 +109,7 @@ public:
   // Rest is technical.
   ConditionalOStream verbose_cout;
 
-  ConstraintMatrix constraints;
+  ConstraintMatrix constraints, prev_constraints;
 
   MPI_Comm mpi_communicator;
 

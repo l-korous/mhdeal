@@ -2,19 +2,14 @@
 #include "dealiiExtensions.h"
 
 template <int dim>
-AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters,
-#ifdef HAVE_MPI
-  parallel::distributed::Triangulation<dim>& triangulation,
-#else
-  Triangulation<dim>& triangulation,
-#endif
-  int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
+AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
 ) :
-  Adaptivity<dim>(parameters, triangulation),
+  Adaptivity<dim>(parameters),
   last_time_step(0),
   adaptivity_step(0),
   max_cells(max_cells), refine_every_nth_time_step(refine_every_nth_time_step), perform_n_initial_refinements(perform_n_initial_refinements), refine_threshold(refine_threshold), coarsen_threshold(coarsen_threshold)
 {
+  prev_adapted[1] = prev_adapted[0] = false;
 }
 
 template <int dim>
@@ -205,7 +200,13 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
 }
 
 template <int dim>
-bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
+bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler,
+#ifdef HAVE_MPI
+  parallel::distributed::Triangulation<dim>& triangulation
+#else
+  Triangulation<dim>& triangulation
+#endif
+  , const Mapping<dim>& mapping)
 {
   if (time_step % this->refine_every_nth_time_step)
   {
@@ -226,7 +227,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
     return false;
   }
 
-  Vector<double> gradient_indicator(this->triangulation.n_active_cells());
+  Vector<double> gradient_indicator(triangulation.n_active_cells());
   calculate_jumps(solution, dof_handler, mapping, gradient_indicator);
   prev_gradient_indicator[1] = prev_gradient_indicator[0];
   prev_gradient_indicator[0] = gradient_indicator;
@@ -235,7 +236,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   prev_max_cells[1] = prev_max_cells[0];
   prev_max_cells[0] = max_cells + (int)std::floor((time / 0.5) * 10000.);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(this->triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells[0]);
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells[0]);
   
   // If possible, use aniso (only for non-distributed triangulation).
 #ifndef HAVE_MPI

@@ -4,19 +4,10 @@ template <int dim>
 Parameters<dim>::Parameters() {
   this->start_limiting_at = 0.;
   this->gas_gamma = 5. / 3.;
-  this->limit_in_nonlin_loop = false;
-  this->automatic_damping = false;
-  this->automatic_cfl = false;
-  this->initial_and_max_newton_damping = 1.;
-  this->decrease_factor = .9;
-  this->increase_factor = 1. / this->decrease_factor;
-  this->stagnation_coefficient = 1.e-2;
-  this->bad_step_coefficient = 2.;
   this->limit = true;
   this->slope_limiter = vertexBased;
   this->output_file_prefix = "";
   this->lax_friedrich_stabilization_value = .5;
-  this->snapshot_step = 1.;
   this->time_step = 1.e-6;
 
   this->debug = false;
@@ -32,8 +23,6 @@ Parameters<dim>::Parameters() {
   this->ilut_drop = 1e-6;
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
-  this->newton_max_iterations = 30;
-  this->newton_residual_norm_threshold = 1e-8;
 }
 
 template <int dim>

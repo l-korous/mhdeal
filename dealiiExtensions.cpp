@@ -41,7 +41,7 @@ namespace DealIIExtensions
 {
 
   template<class DH, class SparsityPattern>
-  void make_sparser_flux_sparsity_pattern(const DH &dof, SparsityPattern &sparsity, const ConstraintMatrix &constraints, const std::vector<std::array<int, 3> >& boundaries,
+  void make_sparser_flux_sparsity_pattern(const DH &dof, SparsityPattern &sparsity, const ConstraintMatrix &constraints, const Parameters<DH::dimension>& parameters,
     const PeriodicCellMap<DH::dimension>& cell_map, FEFaceValues<DH::dimension>* fe_face, const bool keep_constrained_dofs)
   {
 #ifdef DEBUG
@@ -88,34 +88,36 @@ namespace DealIIExtensions
           typename DH::face_iterator this_face = cell->face(face);
           typename DH::face_iterator other_face;
           typename DH::cell_iterator neighbor(cell);
-          unsigned int neighbor_face = 1000;
+          unsigned int neighbor_face = 1000000;
+          int boundary_id = this_face->boundary_id();
           if (cell->at_boundary(face))
           {
-            for (int p = 0; p < boundaries.size(); p++)
+            if (parameters.is_periodic_boundary(boundary_id))
             {
-              if (boundaries[p][0] == this_face->boundary_id() || boundaries[p][1] == this_face->boundary_id())
+              typename PeriodicCellMap<DH::dimension>::const_iterator face_pair_it = cell_map.find(std::make_pair(cell, face));
+              if (face_pair_it == cell_map.end())
               {
-                typename PeriodicCellMap<DH::dimension>::const_iterator face_pair_it = cell_map.find(std::make_pair(cell, face));
-                if (face_pair_it == cell_map.end())
-                {
-                  std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
-                  exit(1);
-                }
-                const FacePair<DH::dimension>& face_pair = face_pair_it->second;
-                neighbor = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
-                neighbor_face = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
-                other_face = neighbor->face(neighbor_face);
-                break;
+                MPI_Comm mpi_communicator(MPI_COMM_WORLD);
+                std::cout << "Proc: " << Utilities::MPI::this_mpi_process(mpi_communicator) << std::endl;
+                std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
+                std::cout << "Current cell: " << std::endl;
+                std::cout << "- level: " << cell->level() << std::endl;
+                for (unsigned int v_i = 0; v_i < GeometryInfo<DH::dimension>::vertices_per_cell; ++v_i)
+                  std::cout << "\t vertex " << v_i << ": " << cell->vertex(v_i) << std::endl;
+                std::cout << "- face: " << face << ", boundary: " << boundary_id << std::endl;
+                exit(1);
               }
+              const FacePair<DH::dimension>& face_pair = face_pair_it->second;
+              neighbor = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.cell[1] : face_pair.cell[0];
+              neighbor_face = (face_pair.cell[0]->active_cell_index() == cell->active_cell_index()) ? face_pair.face_idx[1] : face_pair.face_idx[0];
+              other_face = neighbor->face(neighbor_face);
             }
-            if (neighbor_face == 1000)
-            {
+            else
               continue;
-            }
           }
           else {
             neighbor = cell->neighbor(face);
-            neighbor_face = 1000; // indicator that it has to be assembled, later
+            neighbor_face = 1000000; // indicator that it has to be assembled, later
           }
 
           // specify whether pairwise coupling is valid
@@ -176,16 +178,8 @@ namespace DealIIExtensions
             neighbor->get_dof_indices(dofs_on_other_cell);
 
             // identify which neighbor face belongs to this face
-            if (neighbor_face == 1000)
-            {
-              for (neighbor_face = 0; neighbor_face < GeometryInfo<DH::dimension>::faces_per_cell; ++neighbor_face)
-              {
-                other_face = neighbor->face(neighbor_face);
-                if (*other_face == *this_face)
-                  break;
-                Assert(neighbor_face + 1 < GeometryInfo<DH::dimension>::faces_per_cell, ExcMessage("Neighbor face was not found, but needed for constructing the sparsity pattern"));
-              }
-            }
+            if (neighbor_face == 1000000)
+              neighbor_face == cell->neighbor_face_no(face);
 
             if (!pairwise_coupling_valid)
             {
@@ -423,11 +417,6 @@ namespace DealIIExtensions
         return;
       if ((cell_1->is_artificial()) || (cell_2->is_artificial()))
         return;
-      /*Assert(not cell_1->is_artificial(),
-          ExcMessage ("Cell at periodic boundary must not be artificial."));
-      Assert(not cell_2->is_artificial(),
-          ExcMessage ("Cell at periodic boundary must not be artificial."));
-       */
 
        // insert periodic face pair for both cells
       dealii::GridTools::PeriodicFacePair<dealii::TriaIterator<dealii::CellAccessor<dim, spacedim> > > face_pair;
@@ -586,37 +575,21 @@ namespace DealIIExtensions
   }
 
   typedef TrilinosWrappers::SparsityPattern SP;
-  //for (SP : SPARSITY_PATTERNS; deal_II_dimension : DIMENSIONS)
-  //for (size_t deal_II_dimension = 1; deal_II_dimension < 4; deal_II_dimension++)
-  //{
-  template void
-    make_sparser_flux_sparsity_pattern<DoFHandler<2>, SP>(const DoFHandler<2> &dof,
-      SP &sparsity, const ConstraintMatrix &constraints,
-      const std::vector<std::array<int, 3> >& boundaries,
-      const PeriodicCellMap<2>& cell_map, FEFaceValues<2>* fe_face,
-      const bool);
 
   template void
     make_sparser_flux_sparsity_pattern<DoFHandler<3>, SP>(const DoFHandler<3> &dof,
       SP &sparsity, const ConstraintMatrix &constraints,
-      const std::vector<std::array<int, 3> >& boundaries,
+      const Parameters<3>& parameters,
       const PeriodicCellMap<3>& cell_map, FEFaceValues<3>* fe_face,
       const bool);
 
   template void
     make_sparser_flux_sparsity_pattern<DoFHandler<3>, dealii::DynamicSparsityPattern>(const DoFHandler<3> &dof,
       dealii::DynamicSparsityPattern &sparsity, const ConstraintMatrix &constraints,
-      const std::vector<std::array<int, 3> >& boundaries,
+      const Parameters<3>& parameters,
       const PeriodicCellMap<3>& cell_map, FEFaceValues<3>* fe_face,
       const bool);
 
-  template
-    void make_periodicity_map_dg<DoFHandler<2> >(
-      const typename DoFHandler<2>::cell_iterator &cell_1,
-      const identity<typename DoFHandler<2>::cell_iterator>::type &cell_2,
-      size_t face_nr_1, size_t face_nr_2, PeriodicCellMap<2>& cell_map,
-      const bool face_orientation, const bool face_flip,
-      const bool face_rotation);
   template
     void make_periodicity_map_dg<DoFHandler<3> >(
       const typename DoFHandler<3>::cell_iterator &cell_1,
@@ -626,13 +599,6 @@ namespace DealIIExtensions
       const bool face_rotation);
 
   template
-    void make_periodicity_map_dg<DoFHandler<2> >(
-      const std::vector<
-      GridTools::PeriodicFacePair<
-      typename DoFHandler<2>::cell_iterator> > &periodic_faces,
-      PeriodicCellMap<2>& cell_map);
-
-  template
     void make_periodicity_map_dg<DoFHandler<3> >(
       const std::vector<
       GridTools::PeriodicFacePair<
@@ -640,20 +606,9 @@ namespace DealIIExtensions
       PeriodicCellMap<3>& cell_map);
 
   template
-    void make_periodicity_map_dg<DoFHandler<2> >(const DoFHandler<2> &dof_handler,
-      size_t b_id1, size_t b_id2, const int direction,
-      PeriodicCellMap<2>& cell_map);
-  template
     void make_periodicity_map_dg<DoFHandler<3> >(const DoFHandler<3> &dof_handler,
       size_t b_id1, size_t b_id2, const int direction,
       PeriodicCellMap<3>& cell_map);
-  //}s
-
-  template
-    void extract_dofs_with_support_on_boundary(
-      const dealii::DoFHandler<2> &dof_handler,
-      const ComponentMask &component_mask, std::vector<bool> &selected_dofs,
-      const std::set<types::boundary_id> &boundary_ids);
 
   template
     void extract_dofs_with_support_on_boundary(

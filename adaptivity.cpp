@@ -1,20 +1,19 @@
 #include "adaptivity.h"
 
 template <int dim>
-Adaptivity<dim>::Adaptivity(Parameters<dim>& parameters,
+Adaptivity<dim>::Adaptivity(Parameters<dim>& parameters) :
+  parameters(parameters)
+{
+}
+
+template <int dim>
+bool Adaptivity<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation
 #else
   Triangulation<dim>& triangulation
 #endif
-  ) :
-  parameters(parameters),
-  triangulation(triangulation)
-{
-}
-
-template <int dim>
-bool Adaptivity<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping)
+  , const Mapping<dim>& mapping)
 {
   bool toReturn = false;
   int ith_cell = 0;
