@@ -23,7 +23,7 @@ void InitialConditionMhdBlast<equationsType, dim>::vector_value(const std::vecto
     result[i][5] = 1.0 / std::sqrt(2.);
     result[i][6] = 1.0 / std::sqrt(2.);
     result[i][7] = 0.;
-    if (points[i].norm() < 0.1)
+    if (std::sqrt(points[i][0] * points[i][0] + points[i][1] * points[i][1]) < 0.1)
       result[i][4] = 10. / (this->parameters.gas_gamma - 1.0) + 0.5 * (result[i][5] * result[i][5] + result[i][6] * result[i][6] + result[i][7] * result[i][7]);
     else
       result[i][4] = .1 / (this->parameters.gas_gamma - 1.0) + 0.5 * (result[i][5] * result[i][5] + result[i][6] * result[i][6] + result[i][7] * result[i][7]);
