@@ -68,6 +68,8 @@
 #define SMALL 1e-8
 #endif
 
+using namespace dealii;
+
 template <typename T>
 std::string to_string_with_precision(const T a_value, const int n = 6)
 {
@@ -75,6 +77,57 @@ std::string to_string_with_precision(const T a_value, const int n = 6)
   out << std::setprecision(n) << a_value;
   return out.str();
 }
+
+template <int Offset = 0>
+class Log
+{
+public:
+  template <typename T>
+  const Log& operator << (const T &t) const
+  {
+    for (int i = Offset; i > 0; i--)
+      std::cout << "  ";
+    std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+    std::cout << t;
+    return *this;
+  }
+
+  const Log& operator << (std::ostream& (*p) (std::ostream &)) const
+  {
+    for (int i = Offset; i > 0; i--)
+      std::cout << "  ";
+    std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+    std::cout << p;
+    return *this;
+  }
+};
+
+template <int Offset = 0>
+class Logline
+{
+public:
+  template <typename T>
+  const Logline& operator << (const T &t) const
+  {
+    for (int i = Offset; i > 0; i--)
+      std::cout << "  ";
+    std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+    std::cout << t;
+    std::cout << std::endl;
+    return *this;
+  }
+  const Logline& operator << (std::ostream& (*p) (std::ostream &)) const
+  {
+    for (int i = Offset; i > 0; i--)
+      std::cout << "  ";
+    std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+    std::cout << p;
+    std::cout << std::endl;
+    return *this;
+  }
+};
+#define LOG(x, ...) {std::stringstream ss; ss << __VA_ARGS__; Log<x> l; l << ss.str();}
+#define LOGL(x, ...) {std::stringstream ss; ss << __VA_ARGS__; Logline<x> l; l << ss.str();}
 
 // For debug purposes only.
 #ifndef OUTPUT_BASE
@@ -86,6 +139,4 @@ std::string to_string_with_precision(const T a_value, const int n = 6)
 #define BASIS_FN_COUNT 32
 
 static const double My_PI = 3.14159265358979323846;
-
-using namespace dealii;
 #endif

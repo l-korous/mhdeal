@@ -5,6 +5,7 @@ SET(TARGET_SRC
   adaptivity.h
   assemblingUtilities.cpp
   assemblingUtilities.h
+  util.cpp
   util.h
   equations.h
   equationsMhd.cpp

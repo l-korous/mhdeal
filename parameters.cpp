@@ -10,7 +10,7 @@ Parameters<dim>::Parameters() {
   this->lax_friedrich_stabilization_value = .5;
   this->time_step = 1.e-6;
 
-  this->debug = false;
+  this->debug = 0;
   this->output_matrix = false;
   this->output = quiet_solver;
   this->output_rhs = false;

@@ -73,13 +73,24 @@ public:
   int polynomial_order_dg;
   // Quadrature order.
   int quadrature_order;
-  // Debugging purposes
-  bool debug;
 
   Point<dim> corner_a;
   Point<dim> corner_b;
   std::vector<unsigned int> refinements;
   std::vector<std::array<int, 3> > periodic_boundaries;
+
+  // Debugging
+  enum DebuggingFlag
+  {
+    None = 0,
+    BasicSteps = 1,
+    PeriodicBoundaries = 2,
+    Assembling = 4,
+    SlopeLimiting = 8,
+    NumFlux = 16,
+    Adaptivity = 32
+  };
+  int debug;
 };
 
 #endif

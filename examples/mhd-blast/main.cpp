@@ -48,7 +48,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.patches = 0;
   parameters.output_step = -5.e-4;
   parameters.final_time = 1.;
-  //parameters.debug = true;
+  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
   /*
   parameters.output_matrix = true;

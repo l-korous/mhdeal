@@ -104,8 +104,8 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       }
     }
 
-    if (this->parameters.debug)
-      std::cout << "cell: " << ++cell_count << " - center: " << data->center << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
+    if (this->parameters.debug & this->parameters.SlopeLimiting)
+      LOGL(2, "cell: " << ++cell_count << " - center: " << data->center << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4]);
 
     double alpha_e[Equations<equationsType, dim>::n_components];
     for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
@@ -122,12 +122,11 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       fe_values.get_function_values(current_unlimited_solution, u_value);
       u_i = u_value[0];
 
-      if (this->parameters.debug)
+      if (this->parameters.debug & this->parameters.SlopeLimiting)
       {
-        std::cout << "\tv_i: " << cell->vertex(vertex_i) << ", values: ";
+        LOGL(3, "\tv_i: " << cell->vertex(vertex_i) << ", values: ");
         for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-          std::cout << u_i[i] << (i == Equations<equationsType, dim>::n_components - 1 ? "" : ", ");
-        std::cout << std::endl;
+          LOGL(4, u_i[i] << (i == Equations<equationsType, dim>::n_components - 1 ? "" : ", "));
       }
 
       // Init u_i_min, u_i_max
@@ -159,12 +158,12 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
             if (!u_i_extrema_set[this->component_ii[i]])
             {
               double val = current_unlimited_solution(dof_indices_neighbor[i]);
-              if (this->parameters.debug)
+              if (this->parameters.debug & this->parameters.SlopeLimiting)
               {
                 if (val < u_i_min[this->component_ii[i]])
-                  std::cout << "\tdecreasing u_i_min to: " << val << std::endl;
+                  LOGL(3, "\tdecreasing u_i_min to: " << val);
                 if (val > u_i_max[this->component_ii[i]])
-                  std::cout << "\tincreasing u_i_max to: " << val << std::endl;
+                  LOGL(3, "\tincreasing u_i_max to: " << val);
               }
               u_i_min[this->component_ii[i]] = std::min(u_i_min[this->component_ii[i]], val);
               u_i_max[this->component_ii[i]] = std::max(u_i_max[this->component_ii[i]], val);
@@ -182,8 +181,8 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
         if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
         {
           alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
-          if (this->parameters.debug)
-            std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
+          if (this->parameters.debug & this->parameters.SlopeLimiting)
+            LOGL(1, "\talpha_e[" << k << "]: " << alpha_e[k]);
         }
       }
     }
@@ -301,8 +300,8 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
       }
     }
 
-    if (this->parameters.debug)
-      std::cout << "cell: " << ++cell_count << " - center: " << data->center << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4] << std::endl;
+    if (this->parameters.debug & this->parameters.SlopeLimiting)
+      LOGL(2, "cell: " << ++cell_count << " - center: " << data->center << ", values: " << u_c[0] << ", " << u_c[1] << ", " << u_c[2] << ", " << u_c[3] << ", " << u_c[4]);
 
     double alpha_e[Equations<equationsType, dim>::n_components];
     for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
@@ -335,12 +334,12 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
             if (!u_i_extrema_set[this->component_ii[i]])
             {
               double val = current_unlimited_solution(dof_indices_neighbor[i]);
-              if (this->parameters.debug)
+              if (this->parameters.debug & this->parameters.SlopeLimiting)
               {
                 if (val < u_i_min[this->component_ii[i]])
-                  std::cout << "\tdecreasing u_i_min to: " << val << std::endl;
+                  LOGL(3, "\tdecreasing u_i_min to: " << val);
                 if (val > u_i_max[this->component_ii[i]])
-                  std::cout << "\tincreasing u_i_max to: " << val << std::endl;
+                  LOGL(3, "\tincreasing u_i_max to: " << val);
               }
               u_i_min[this->component_ii[i]] = std::min(u_i_min[this->component_ii[i]], val);
               u_i_max[this->component_ii[i]] = std::max(u_i_max[this->component_ii[i]], val);
@@ -364,20 +363,19 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
       fe_values.get_function_values(current_unlimited_solution, u_value);
       u_i = u_value[0];
 
-      if (this->parameters.debug)
+      if (this->parameters.debug & this->parameters.SlopeLimiting)
       {
-        std::cout << "\tv_i: " << cell->vertex(vertex_i) << ", values: ";
+        LOGL(3, "\tv_i: " << cell->vertex(vertex_i) << ", values: ");
         for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-          std::cout << u_i[i] << (i == Equations<equationsType, dim>::n_components - 1 ? "" : ", ");
-        std::cout << std::endl;
+          LOGL(4, u_i[i] << (i == Equations<equationsType, dim>::n_components - 1 ? "" : ", "));
       }
 
       for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
         if (std::abs((u_c[k] - u_i[k]) / u_c[k]) > NEGLIGIBLE)
         {
           alpha_e[k] = std::min(alpha_e[k], ((u_i[k] - u_c[k]) > 0.) ? std::min(1.0, (u_i_max[k] - u_c[k]) / (u_i[k] - u_c[k])) : std::min(1.0, (u_i_min[k] - u_c[k]) / (u_i[k] - u_c[k])));
-          if (this->parameters.debug)
-            std::cout << "\talpha_e[" << k << "]: " << alpha_e[k] << std::endl;
+          if (this->parameters.debug & this->parameters.SlopeLimiting)
+            LOGL(5, "\talpha_e[" << k << "]: " << alpha_e[k]);
         }
     }
 

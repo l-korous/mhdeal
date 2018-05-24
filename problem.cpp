@@ -8,7 +8,6 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   Triangulation<dim>& triangulation_,
 #endif
   InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions, Adaptivity<dim>* adaptivity) :
-  mpi_communicator(MPI_COMM_WORLD),
   parameters(parameters),
   equations(equations),
   prev_triangulation(triangulation_),
@@ -22,7 +21,6 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   prev_dof_handler(prev_triangulation),
   quadrature(parameters.quadrature_order),
   face_quadrature(parameters.quadrature_order),
-  verbose_cout(std::cout, false),
   last_output_time(0.), last_snapshot_time(0.), time(0.),
   time_step(0),
   adaptivity_step(0),
@@ -109,11 +107,11 @@ void Problem<equationsType, dim>::setup_system()
   constraints.close();
 
 #ifdef HAVE_MPI 
-  SparsityTools::distribute_sparsity_pattern(dsp, dof_handler->n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
+  SparsityTools::distribute_sparsity_pattern(dsp, dof_handler->n_locally_owned_dofs_per_processor(), MPI_COMM_WORLD, locally_relevant_dofs);
 #endif
 
-  system_rhs.reinit(locally_owned_dofs, mpi_communicator);
-  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
+  system_rhs.reinit(locally_owned_dofs, MPI_COMM_WORLD);
+  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, MPI_COMM_WORLD);
   precalculate_global();
 }
 
@@ -238,16 +236,16 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
       cell->get_dof_indices(dof_indices);
       prev_cell->get_dof_indices(prev_dof_indices);
 
-      if (parameters.debug)
+      if (parameters.debug & parameters.Assembling)
       {
-        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": Current cell: " << ith_cell << std::endl;
-        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": - level: " << cell->level() << std::endl;
+        LOGL(1, "Current cell: " << ith_cell);
+        LOGL(2, "level: " << cell->level());
         for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t vertex " << v_i << ": " << cell->vertex(v_i) << std::endl;
-        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": Previous cell: " << ith_cell << std::endl;
-        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": - level: " << prev_cell->level() << std::endl;
+          LOGL(2, "vertex " << v_i << ": " << cell->vertex(v_i));
+        LOGL(1, "Previous cell: " << ith_cell);
+        LOGL(2, "level: " << prev_cell->level());
         for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t vertex " << v_i << ": " << prev_cell->vertex(v_i) << std::endl;
+          LOGL(2, "vertex " << v_i << ": " << prev_cell->vertex(v_i));
       }
 
       ith_cell++;
@@ -258,14 +256,14 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
       // Assemble the face integrals.
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        if (parameters.debug)
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": Face: " << face_no << std::endl;
+        if (parameters.debug & parameters.Assembling)
+          LOGL(2, ": Face: " << face_no);
 
         // Face that is internal wrt. prev_cell
         if (std::get<2>(*subcell_iter) == currentMoreRefined && assembling_utils.is_refinement_within_current_cell(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter)))
         {
-          if (parameters.debug)
-            std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tFace within cell" << std::endl;
+          if (parameters.debug & parameters.Assembling)
+            LOGL(3, "Face within cell");
           fe_v_face.reinit(cell, face_no);
           fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
           JxW = fe_v_face.get_JxW_values();
@@ -276,13 +274,13 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
         // Boundary face - here we pass the boundary id
         else if (prev_cell->at_boundary(face_no))
         {
-          if (parameters.debug)
-            std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \tboundary" << std::endl;
+          if (parameters.debug & parameters.Assembling)
+            LOGL(3, ": \tboundary");
 
           if (parameters.is_periodic_boundary(prev_cell->face(face_no)->boundary_id()))
           {
-            if (parameters.debug)
-              std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tperiodic" << std::endl;
+            if (parameters.debug & parameters.Assembling)
+              LOGL(3, "periodic");
             
             const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(prev_cell, face_no))->second;
             typename DoFHandler<dim>::active_cell_iterator neighbor(prev_cell);
@@ -292,12 +290,12 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
             const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
 
             neighbor->get_dof_indices(prev_dof_indices_neighbor);
-            if (parameters.debug)
+            if ((parameters.debug & parameters.PeriodicBoundaries) && (parameters.debug & parameters.Assembling))
             {
-              std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \tNeighbor: " << std::endl;
-              std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": - level: " << neighbor->level() << std::endl;
+              LOGL(3, "Neighbor: ");
+              LOGL(3, "level: " << neighbor->level());
               for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
-                std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t vertex " << v_i << ": " << neighbor->vertex(v_i) << std::endl;
+                LOGL(4, "vertex " << v_i << ": " << neighbor->vertex(v_i));
             }
 
             if (std::get<2>(*subcell_iter) == currentMoreRefined)
@@ -351,19 +349,19 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
               const typename DoFHandler<dim>::active_cell_iterator neighbor_child = prev_cell->neighbor_child_on_subface(face_no, subface_no);
               neighbor_child->get_dof_indices(prev_dof_indices_neighbor);
 
-              if (parameters.debug)
+              if (parameters.debug & parameters.Assembling)
               {
-                std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tFace NOT within cell, neighbor: " << std::endl;
+                LOGL(3, "Face NOT within cell, neighbor: ");
                 for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
-                  std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\t vertex " << v_i << ": " << neighbor_child->vertex(v_i) << std::endl;
+                  LOGL(4, "vertex " << v_i << ": " << neighbor_child->vertex(v_i));
               }
 
               Assert(!neighbor_child->has_children(), ExcInternalError());
 
               if ((std::get<2>(*subcell_iter) == equallyRefined) || (std::get<2>(*subcell_iter) == prevMoreRefined))
               {
-                if (parameters.debug)
-                  std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\t - Current equally or less refined" << std::endl;
+                if (parameters.debug & parameters.Assembling)
+                  LOGL(3, "- Current equally or less refined");
                 fe_v_prev_face_neighbor.reinit(neighbor_child, neighbor_face_no);
                 fe_v_prev_subface.reinit(prev_cell, face_no, subface_no, fe_v_prev_face_neighbor.get_quadrature_points());
                 fe_v_face.reinit(cell, face_no, fe_v_prev_face_neighbor.get_quadrature_points());
@@ -377,13 +375,13 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
               }
               else
               {
-                if (parameters.debug)
-                  std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\t - Current more refined" << std::endl;
+                if (parameters.debug & parameters.Assembling)
+                  LOGL(3, "- Current more refined");
                 int asdf = prev_cell->face(face_no)->number_of_children();
                 if (assembling_utils.is_refinement_compatible_with_subface(face_no, std::get<3>(*subcell_iter), std::get<4>(*subcell_iter), subface_no, prev_cell->face(face_no)->refinement_case()))
                 {
-                  if (parameters.debug)
-                    std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\t - Neighbor compatible with subface" << std::endl;
+                  if (parameters.debug & parameters.Assembling)
+                    LOGL(3, "- Neighbor compatible with subface");
                   fe_v_face.reinit(cell, face_no);
                   fe_v_prev_face.reinit(prev_cell, face_no, fe_v_face.get_quadrature_points());
                   fe_v_prev_face_neighbor.reinit(neighbor_child, neighbor_face_no, fe_v_face.get_quadrature_points());
@@ -391,20 +389,20 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                   normals = fe_v_face.get_all_normal_vectors();
                   assemble_face_term(face_no, fe_v_face, fe_v_prev_face, fe_v_prev_face_neighbor, false, numbers::invalid_unsigned_int, cell_rhs, JxW, normals);
                 }
-                else if (parameters.debug)
-                  std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\t - Neighbor NOT compatible with subface" << std::endl;
+                else if (parameters.debug & parameters.Assembling)
+                  LOGL(3, "- Neighbor NOT compatible with subface");
 
               }
             }
           }
           else if (prev_cell->neighbor_is_coarser(face_no))
           {
-            if (parameters.debug)
+            if (parameters.debug & parameters.Assembling)
             {
-              std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \tLess neighbors, neighbor: " << std::endl;
-              std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": - level: " << prev_cell->neighbor(face_no)->level() << std::endl;
+              LOGL(3, ": \tLess neighbors, neighbor: ");
+              LOGL(3, ": - level: " << prev_cell->neighbor(face_no)->level());
               for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
-                std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t vertex " << v_i << ": " << prev_cell->neighbor(face_no)->vertex(v_i) << std::endl;
+                LOGL(4, ": \t vertex " << v_i << ": " << prev_cell->neighbor(face_no)->vertex(v_i));
             }
 
             const typename DoFHandler<dim>::cell_iterator neighbor = prev_cell->neighbor(face_no);
@@ -446,11 +444,11 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
             unsigned int neighbor_face_no = prev_cell->neighbor_face_no(face_no);
             neighbor->get_dof_indices(prev_dof_indices_neighbor);
 
-            if (parameters.debug)
+            if (parameters.debug & parameters.Assembling)
             {
-              std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \tSame neighbor, neighbor: " << std::endl;
+              LOGL(3, ": \tSame neighbor, neighbor: ");
               for (unsigned int v_i = 0; v_i < GeometryInfo<dim>::vertices_per_cell; ++v_i)
-                std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t vertex " << v_i << ": " << neighbor->vertex(v_i) << std::endl;
+                LOGL(4, ": \t vertex " << v_i << ": " << neighbor->vertex(v_i));
             }
             if (std::get<2>(*subcell_iter) == equallyRefined)
             {
@@ -599,11 +597,11 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
     }
     if (std::isnan(val))
     {
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": isnan: " << val << std::endl;
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v_cell.get_fe().system_to_component_index(i).first) << std::endl;
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": point: " << fe_v_cell.quadrature_point(0)[0] << ", " << fe_v_cell.quadrature_point(0)[1] << ", " << fe_v_cell.quadrature_point(0)[2] << std::endl;
+      LOG(0, ": isnan: " << val);
+      LOG(0, ": i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v_cell.get_fe().system_to_component_index(i).first));
+      LOG(0, ": point: " << fe_v_cell.quadrature_point(0)[0] << ", " << fe_v_cell.quadrature_point(0)[1] << ", " << fe_v_cell.quadrature_point(0)[2]);
       for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
-        std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": W [" << j << "]: " << (double)W_prev[0][j] << std::endl;
+        LOGL(1, ": W [" << j << "]: " << (double)W_prev[0][j]);
       exit(1);
     }
     cell_rhs(i) += val;
@@ -668,24 +666,21 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
     this->numFlux->numerical_normal_flux(normals[q], Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
 
     // Some debugging outputs.
-    if (parameters.debug)
+    if ((parameters.debug & parameters.Assembling) || (parameters.debug & parameters.NumFlux))
     {
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tpoint_i: " << q << std::endl;
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tq: " << fe_v.quadrature_point(q) << ", n: " << normals[q][0] << ", " << normals[q][1] << ", " << normals[q][2] << std::endl;
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tWplus: ";
+      LOGL(2, "point_i: " << q);
+      LOGL(2, "q: " << fe_v.quadrature_point(q) << ", n: " << normals[q][0] << ", " << normals[q][1] << ", " << normals[q][2]);
+      LOGL(2, "Wplus: ");
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << Wplus_old[q][i] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
+        LOGL(3, Wplus_old[q][i] << (i < 7 ? ", " : ""));
 
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tWminus: ";
+      LOGL(2, "Wminus: ");
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << Wminus_old[q][i] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
+        LOGL(3, Wminus_old[q][i] << (i < 7 ? ", " : ""));
 
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": \t\tNum F: ";
+      LOGL(2, "Num F: ");
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        std::cout << normal_fluxes_old[q][i] << (i < 7 ? ", " : "");
-      std::cout << std::endl;
+        LOGL(3, normal_fluxes_old[q][i] << (i < 7 ? ", " : ""));
     }
   }
 
@@ -707,12 +702,12 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
         if (std::isnan(val))
         {
           numFlux->numerical_normal_flux(normals[q], Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": isnan: " << val << std::endl;
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v.get_fe().system_to_component_index(i).first) << std::endl;
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2] << std::endl;
-          std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": normal: " << normals[q][0] << ", " << normals[q][1] << ", " << normals[q][2] << std::endl;
+          LOG(0, ": isnan: " << val);
+          LOG(0, ": i: " << i << ", ci: " << (!is_primitive[i] ? 1 : fe_v.get_fe().system_to_component_index(i).first));
+          LOG(0, ": point: " << fe_v.quadrature_point(q)[0] << ", " << fe_v.quadrature_point(q)[1] << ", " << fe_v.quadrature_point(q)[2]);
+          LOG(0, ": normal: " << normals[q][0] << ", " << normals[q][1] << ", " << normals[q][2]);
           for (int j = 0; j < Equations<equationsType, dim>::n_components; j++)
-            std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j] << std::endl;
+            LOGL(1, ": W+ [" << j << "]: " << (double)Wplus_old[q][j] << ", W- [" << j << "]: " << (double)Wminus_old[q][j] << ", F [" << j << "]: " << (double)normal_fluxes_old[q][j]);
           exit(1);
         }
       }
@@ -740,7 +735,7 @@ Problem<equationsType, dim>::solve()
 #endif
   {
     AztecOO solver;
-    LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
+    LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, MPI_COMM_WORLD);
 
     Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), completely_distributed_solution.begin());
     Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
@@ -830,10 +825,10 @@ void Problem<equationsType, dim>::output_results() const
   std::ofstream output_vtu((filename + ".vtu").c_str());
   data_out.write_vtu(output_vtu);
 
-  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+  if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
   {
     std::vector<std::string> filenames;
-    for (unsigned int i = 0; i < Utilities::MPI::n_mpi_processes(mpi_communicator); ++i)
+    for (unsigned int i = 0; i < Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD); ++i)
       filenames.push_back(filename_base + "-" + Utilities::int_to_string(i, 4) + ".vtu");
 
     std::ofstream pvtu_master_output((filename_base + ".pvtu").c_str());
@@ -862,7 +857,7 @@ void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& 
 {
   std::ofstream m;
   std::stringstream ssm;
-  ssm << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
+  ssm << time_step << "-" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << "." << suffix;
   m.open(ssm.str());
   mat.print(m);
   m.close();
@@ -873,7 +868,7 @@ void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& v
 {
   std::ofstream n;
   std::stringstream ssn;
-  ssn << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
+  ssn << time_step << "-" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << "." << suffix;
   n.open(ssn.str());
   vec.print(n, 10, false, false);
   n.close();
@@ -884,8 +879,8 @@ void Problem<equationsType, dim>::run()
 {
   // Preparations.
   setup_system();
-  current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
-  current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_limited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
+  current_unlimited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
   setup_initial_solution();
 
 #ifdef OUTPUT_BASE
@@ -896,18 +891,22 @@ void Problem<equationsType, dim>::run()
   while (time < parameters.final_time)
   {
     // Some output.
-    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+    if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
     {
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": Step: " << time_step << ", T: " << time << std::endl;
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ": - adaptivity step: " << adaptivity_step << std::endl;
-      std::cout << Utilities::MPI::this_mpi_process(mpi_communicator) << ":    Number of active cells:       " << triangulation.n_global_active_cells() << std::endl << "   Number of degrees of freedom: " << dof_handler->n_dofs() << std::endl << std::endl;
+      LOGL(0, "Step: " << time_step << ", T: " << time);
+      LOGL(0, "- adaptivity step: " << adaptivity_step);
+      LOGL(0, "- number of active cells:       " << triangulation.n_global_active_cells() << std::endl << " Number of degrees of freedom: " << dof_handler->n_dofs());
     }
 
     // Assemble
     system_rhs = 0;
     system_matrix = 0;
-
+    
+    if (parameters.debug & parameters.BasicSteps)
+      LOG(1, "assembling...");
     assemble_system();
+    if (parameters.debug & parameters.BasicSteps)
+      LOGL(1, "done.");
 
     // Output matrix & rhs if required.
     if (parameters.output_matrix)
@@ -924,16 +923,31 @@ void Problem<equationsType, dim>::run()
 
     // Postprocess if required
     if ((this->time > this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
+    {
+      if (parameters.debug & parameters.BasicSteps)
+        LOG(1, "postprocessing...");
       postprocess();
+      if (parameters.debug & parameters.BasicSteps)
+        LOGL(1, "done.");
+    }
     else
       current_limited_solution = current_unlimited_solution;
 
     // Output VTK, calculate CFL, etc.
+    if (parameters.debug & parameters.BasicSteps)
+      LOG(1, "outputting...");
     handle_outputs();
+    if (parameters.debug & parameters.BasicSteps)
+      LOGL(1, "done.");
 
+    if (parameters.debug & parameters.BasicSteps)
+      LOG(1, "refining...");
     this->refined_mesh = this->adaptivity->refine_mesh(this->time_step, this->time, this->current_limited_solution, *dof_handler, triangulation, this->mapping);
     if (this->refined_mesh)
     {
+      if (parameters.debug & parameters.BasicSteps)
+        LOGL(0, "refined.");
+
       // Use the old dof_handler to prepare for solution transfer.
 #ifdef HAVE_MPI
       parallel::distributed::SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> soltrans(prev_dof_handler);
@@ -941,7 +955,11 @@ void Problem<equationsType, dim>::run()
       SolutionTransfer<dim, TrilinosWrappers::MPI::Vector> soltrans(prev_dof_handler);
 #endif
       // Replace the old triangulation by the current one before the current one gets refined.
+      if (parameters.debug & parameters.BasicSteps)
+        LOG(1, "refining prev mesh...");
       bool prev_mesh_refined = this->adaptivity->refine_prev_mesh(prev_dof_handler, prev_triangulation);
+      if (parameters.debug & parameters.BasicSteps)
+        LOGL(0, "refined.");
 
       // If this is the initial step (where we are looking for a good mesh to capture the initial condition, 
       // then we do not need to transfer anything.
@@ -955,22 +973,34 @@ void Problem<equationsType, dim>::run()
       }
 
       // Refine the current triangulation.
+      for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler->begin_active(); cell != dof_handler->end(); ++cell)
+        if(cell->is_locally_owned())
+          if(cell->refine_flag_set())
+            LOGL(3, cell->active_cell_index());
+
       triangulation.execute_coarsening_and_refinement();
 
       // Process the refinement (DOFs, matrix, rhs, vectors)
+      if (parameters.debug & parameters.BasicSteps)
+        LOG(1, "setup_system()...");
       this->setup_system();
+      if (parameters.debug & parameters.BasicSteps)
+        LOGL(1, "done.");
 
-      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
-      current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      current_limited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
+      current_unlimited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
 
       // The rest is not meaningful for the initial step.
       // What we do is that we do not progress the solution, we instead keep the previous one, and interpolate it on the adapted mesh.
       // If that mesh is not adapted, we do not do it of course.
       if ((time_step > 0) && prev_mesh_refined)
       {
+        if (parameters.debug & parameters.BasicSteps)
+          LOGL(1, "interpolating...");
+
         // Now interpolate the solution
         TrilinosWrappers::MPI::Vector interpolated_solution;
-        interpolated_solution.reinit(prev_locally_owned_dofs, mpi_communicator);
+        interpolated_solution.reinit(prev_locally_owned_dofs, MPI_COMM_WORLD);
 #ifdef HAVE_MPI
         soltrans.interpolate(interpolated_solution);
 #else
@@ -978,25 +1008,36 @@ void Problem<equationsType, dim>::run()
 #endif
 
         // Put the interpolated solution back to the previous one.
-        prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
+        prev_solution.reinit(prev_locally_relevant_dofs, MPI_COMM_WORLD);
         this->prev_solution = interpolated_solution;
         prev_constraints.distribute(prev_solution);
+
+        if (parameters.debug & parameters.BasicSteps)
+          LOGL(1, "done");
       }
     }
     else
     {
+      if (parameters.debug & parameters.BasicSteps)
+        LOGL(1, "NOT refined.");
+
       if (this->adaptivity->refine_prev_mesh(prev_dof_handler, prev_triangulation))
         prev_triangulation.execute_coarsening_and_refinement();
+
+      if (parameters.debug & parameters.BasicSteps)
+        LOG(1, "setup_system()...");
       this->setup_system();
-      
-      LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(prev_locally_owned_dofs, mpi_communicator);
+      if (parameters.debug & parameters.BasicSteps)
+        LOGL(1, "done.");
+
+      LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(prev_locally_owned_dofs, MPI_COMM_WORLD);
       completely_distributed_solution = this->current_limited_solution;
       prev_constraints.distribute(completely_distributed_solution);
-      prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
+      prev_solution.reinit(prev_locally_relevant_dofs, MPI_COMM_WORLD);
       this->prev_solution = completely_distributed_solution;
 
-      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
-      current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      current_limited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
+      current_unlimited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
 
       // We do not move the solution if we are adapting. It may be a waste, but we do not move forward with a 'bad' solution.
       ++time_step;
@@ -1019,7 +1060,7 @@ void Problem<equationsType, dim>::handle_outputs()
   }
 
   calculate_cfl_condition();
-  double global_cfl_time_step = Utilities::MPI::min(this->cfl_time_step, this->mpi_communicator);
+  double global_cfl_time_step = Utilities::MPI::min(this->cfl_time_step, MPI_COMM_WORLD);
   parameters.time_step = global_cfl_time_step;
 }
 

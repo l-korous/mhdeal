@@ -106,13 +106,8 @@ public:
   TrilinosWrappers::MPI::Vector system_rhs;
   TrilinosWrappers::SparseMatrix system_matrix;
 
-  // Rest is technical.
-  ConditionalOStream verbose_cout;
-
   ConstraintMatrix constraints, prev_constraints;
-
-  MPI_Comm mpi_communicator;
-
+  
   double last_output_time, last_snapshot_time, time;
   // Adaptivity step is increased always, but if mesh is refined, time step does not progress. Therefore, there can be more adaptivity steps in one time step.
   int time_step, adaptivity_step;
