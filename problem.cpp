@@ -43,6 +43,10 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 {
   assembling_utils.set_problem(this);
   triangulation.copy_triangulation(prev_triangulation);
+  std::vector<DealIIExtensions::FacePair<dim> > matched_pairs;
+  for (std::vector<std::array<int, 3> >::const_iterator it = parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
+    dealii::GridTools::collect_periodic_faces(triangulation, (*it)[0], (*it)[1], (*it)[2], matched_pairs);
+  triangulation.add_periodicity(matched_pairs);
   dof_handler = new DoFHandler<dim>(triangulation);
 
   n_quadrature_points_cell = quadrature.get_points().size();

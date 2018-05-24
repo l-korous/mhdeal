@@ -35,7 +35,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
   parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.1);
-  parameters.refinements = { 15, 15, 1 };
+  parameters.refinements = { 10, 10, 1 };
   parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = false;
@@ -57,8 +57,8 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   */
 
   max_cells = 4000;
-  refine_every_nth_time_step = 10;
-  perform_n_initial_refinements = 10;
+  refine_every_nth_time_step = 1;
+  perform_n_initial_refinements = 0;
   refine_threshold = 0.2;
   coarsen_threshold = 0.05;
 }

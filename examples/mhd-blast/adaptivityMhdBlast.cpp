@@ -269,6 +269,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
         {
           if (cell->refine_flag_set())
           {
+            std::cout << "cell refined: " << cell->active_cell_index() << std::endl;
             const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
             typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
             auto this_cell_index = cell->active_cell_index();
@@ -276,6 +277,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
             neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
             if (cell->refine_flag_set() || neighbor->refine_flag_set())
             {
+              std::cout << "neighbor refined: " << neighbor->active_cell_index() << std::endl;
               cell->set_refine_flag(RefinementPossibilities<dim>::cut_xyz);
               neighbor->set_refine_flag(RefinementPossibilities<dim>::cut_xyz);
             }
