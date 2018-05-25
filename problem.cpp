@@ -973,11 +973,6 @@ void Problem<equationsType, dim>::run()
       }
 
       // Refine the current triangulation.
-      for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler->begin_active(); cell != dof_handler->end(); ++cell)
-        if(cell->is_locally_owned())
-          if(cell->refine_flag_set())
-            LOGL(3, cell->active_cell_index());
-
       triangulation.execute_coarsening_and_refinement();
 
       // Process the refinement (DOFs, matrix, rhs, vectors)

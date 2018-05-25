@@ -50,6 +50,7 @@
 #include <deal.II/numerics/solution_transfer.h>
 
 #include <deal.II/lac/trilinos_sparse_matrix.h>
+#include <deal.II/lac/vector.h>
 #include <deal.II/lac/trilinos_precondition.h>
 #include <deal.II/lac/trilinos_solver.h>
 #include <Sacado.hpp>
