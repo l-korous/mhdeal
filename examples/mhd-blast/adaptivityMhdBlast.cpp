@@ -169,6 +169,8 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
         {
           if (cell->refine_flag_set())
           {
+            if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+              LOGL(2, "prev_cell refined: " << cell->active_cell_index());
             const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
             typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
             auto this_cell_index = cell->active_cell_index();
@@ -176,6 +178,8 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
             neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
             if (cell->refine_flag_set() || neighbor->refine_flag_set())
             {
+              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+                LOGL(2, "prev_neighbor refined: " << neighbor->active_cell_index());
               cell->set_refine_flag(RefinementPossibilities<dim>::cut_xyz);
               neighbor->clear_coarsen_flag();
               neighbor->set_refine_flag(RefinementPossibilities<dim>::cut_xyz);
@@ -195,6 +199,7 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
         }
       }
     }
+    prev_triangulation.prepare_coarsening_and_refinement();
   }
 
   return true;
@@ -239,6 +244,8 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
 
   GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells[0]);
   
+  triangulation.prepare_coarsening_and_refinement();
+
   // If possible, use aniso (only for non-distributed triangulation).
 #ifndef HAVE_MPI
   for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
@@ -300,6 +307,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
         }
       }
     }
+    triangulation.prepare_coarsening_and_refinement();
   }
 
   return true;

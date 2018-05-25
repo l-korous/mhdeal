@@ -941,7 +941,7 @@ void Problem<equationsType, dim>::run()
       LOGL(1, "done.");
 
     if (parameters.debug & parameters.BasicSteps)
-      LOG(1, "refining...");
+      LOGL(1, "refining...");
     this->refined_mesh = this->adaptivity->refine_mesh(this->time_step, this->time, this->current_limited_solution, *dof_handler, triangulation, this->mapping);
     if (this->refined_mesh)
     {
@@ -956,7 +956,7 @@ void Problem<equationsType, dim>::run()
 #endif
       // Replace the old triangulation by the current one before the current one gets refined.
       if (parameters.debug & parameters.BasicSteps)
-        LOG(1, "refining prev mesh...");
+        LOGL(1, "refining prev mesh...");
       bool prev_mesh_refined = this->adaptivity->refine_prev_mesh(prev_dof_handler, prev_triangulation);
       if (parameters.debug & parameters.BasicSteps)
         LOGL(0, "refined.");
