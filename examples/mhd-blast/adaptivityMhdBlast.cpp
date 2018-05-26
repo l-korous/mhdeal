@@ -2,9 +2,9 @@
 #include "dealiiExtensions.h"
 
 template <int dim>
-AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
+AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, MPI_Comm& mpi_communicator, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
 ) :
-  Adaptivity<dim>(parameters),
+  Adaptivity<dim>(parameters, mpi_communicator),
   last_time_step(0),
   adaptivity_step(0),
   max_cells(max_cells), refine_every_nth_time_step(refine_every_nth_time_step), perform_n_initial_refinements(perform_n_initial_refinements), refine_threshold(refine_threshold), coarsen_threshold(coarsen_threshold)
@@ -134,62 +134,7 @@ bool AdaptivityMhdBlast<dim>::refine_prev_mesh(const DoFHandler<dim>& prev_dof_h
   if (!prev_adapted[1])
     return false;
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(prev_triangulation, prev_gradient_indicator[1], this->refine_threshold, this->coarsen_threshold, prev_max_cells[1]);
-
-  // Fix for periodic boundaries.
-  if (this->parameters.periodic_boundaries.size() > 0)
-  {
-    DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
-    for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != this->parameters.periodic_boundaries.end(); it++)
-      DealIIExtensions::make_periodicity_map_dg(prev_dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
-    for (typename DoFHandler<dim>::active_cell_iterator cell = prev_dof_handler.begin_active(); cell != prev_dof_handler.end(); ++cell)
-    {
-      if (!cell->is_locally_owned())
-        continue;
-      
-      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
-      {
-        if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
-        {
-          if (cell->refine_flag_set())
-          {
-            if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-              LOGL(2, "prev_cell refined: " << cell->active_cell_index());
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-            auto this_cell_index = cell->active_cell_index();
-            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-            if (cell->refine_flag_set() || neighbor->refine_flag_set())
-            {
-              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-                LOGL(2, "prev_neighbor refined: " << neighbor->active_cell_index());
-              cell->set_refine_flag();
-              neighbor->clear_coarsen_flag();
-              neighbor->set_refine_flag();
-            }
-            else
-              neighbor->clear_coarsen_flag();
-          }
-          cell->clear_coarsen_flag();
-        }
-        if (cell->level() > 0)
-        {
-          if (this->parameters.is_periodic_boundary(cell->parent()->face(face_no)->boundary_id()))
-          {
-            for (int i = 0; i < cell->parent()->n_children(); i++)
-              cell->parent()->child(i)->clear_coarsen_flag();
-          }
-        }
-      }
-    }
-  }
-
-  TrilinosWrappers::MPI::Vector vector;
-  vector.compress(VectorOperation::add);
-  const double norm = vector.l2_norm();
-
-  return true;
+  return refine_internal(prev_dof_handler, prev_triangulation, prev_gradient_indicator[1], prev_max_cells[1]);
 }
 
 template <int dim>
@@ -229,11 +174,54 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   prev_max_cells[1] = prev_max_cells[0];
   prev_max_cells[0] = max_cells + (int)std::floor((time / 0.5) * 10000.);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells[0]);
+  return refine_internal(dof_handler, triangulation, gradient_indicator, prev_max_cells[0]);
+}
+
+template <int dim>
+unsigned int get_cell_id(typename DoFHandler<dim>::active_cell_iterator cell)
+{
+  unsigned int toReturn = 0;
+  std::vector<unsigned short> children;
+  typename DoFHandler<dim>::cell_iterator m_cell = cell;
+  while (m_cell->level() > 0)
+  {
+    for (int i = 0; i < m_cell->parent()->n_children(); i++)
+      if (m_cell->parent()->child(i)->index() == m_cell->index())
+        children.push_back(i);
+    m_cell = m_cell->parent();
+  }
+  toReturn = m_cell->index();
+  for (int i = 0; i < children.size(); i++)
+  {
+    toReturn = toReturn << 3;
+    toReturn += children[i];
+  }
+  return toReturn;
+}
+
+template <int dim>
+bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler,
+#ifdef HAVE_MPI
+  parallel::distributed::Triangulation<dim>& triangulation
+#else
+  Triangulation<dim>& triangulation
+#endif
+  , const Vector<double>& gradient_indicator, const int& prev_max_cells
+) const
+{
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, prev_max_cells);
 
   // Fix for periodic boundaries.
   if (this->parameters.periodic_boundaries.size() > 0)
   {
+    int size_i = 100 * triangulation.n_global_active_cells();
+    IndexSet is_local(size_i);
+    IndexSet is_ghost(size_i);
+    is_local.add_index(Utilities::MPI::this_mpi_process(this->mpi_communicator));
+    is_ghost.add_index(Utilities::MPI::this_mpi_process(this->mpi_communicator));
+    is_local.add_index(size_i - Utilities::MPI::this_mpi_process(this->mpi_communicator) - 1);
+    is_ghost.add_index(size_i - Utilities::MPI::this_mpi_process(this->mpi_communicator) - 1);
+
     DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
     for (std::vector<std::array<int, 3> >::const_iterator it = this->parameters.periodic_boundaries.begin(); it != this->parameters.periodic_boundaries.end(); it++)
       DealIIExtensions::make_periodicity_map_dg(dof_handler, (*it)[0], (*it)[1], (*it)[2], periodic_cell_map);
@@ -242,31 +230,34 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
       if (!cell->is_locally_owned())
         continue;
 
+      is_local.add_index(Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell));
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
         if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
         {
-          if (cell->refine_flag_set())
+          const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+          typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+          auto this_cell_index = cell->active_cell_index();
+          auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+          neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+
+          if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+            LOGL(2, "adding ghost cell: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
+          is_ghost.add_index(Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
+
+          neighbor->clear_coarsen_flag();
+          cell->clear_coarsen_flag();
+
+          if (cell->refine_flag_set() || neighbor->refine_flag_set())
           {
             if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-              LOGL(2, "cell refined: " << cell->active_cell_index());
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-            auto this_cell_index = cell->active_cell_index();
-            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-            if (cell->refine_flag_set() || neighbor->refine_flag_set())
             {
-              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-                LOGL(2, "neighbor refined: " << neighbor->active_cell_index());
-              cell->set_refine_flag();
-              neighbor->clear_coarsen_flag();
-              neighbor->set_refine_flag();
+              LOGL(2, "cell refined: " << cell->active_cell_index());
+              LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
             }
-            else
-              neighbor->clear_coarsen_flag();
+            cell->set_refine_flag();
+            neighbor->set_refine_flag();
           }
-          cell->clear_coarsen_flag();
         }
         if (cell->level() > 0)
         {
@@ -278,17 +269,61 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
         }
       }
     }
+
+    is_local.compress();
+    is_ghost.compress();
+    TrilinosWrappers::MPI::Vector vec(is_local, this->mpi_communicator);
+
+    for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    {
+      if (!cell->is_locally_owned())
+        continue;
+
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+      {
+        if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+        {
+          if (cell->refine_flag_set())
+            vec[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell)] += 1.;
+        }
+      }
+    }
+    
+    vec.compress(VectorOperation::add);
+    TrilinosWrappers::MPI::Vector vec_with_ghosts(is_local, is_ghost, vec.get_mpi_communicator());
+    vec_with_ghosts = vec;
+
+    for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    {
+      if (!cell->is_locally_owned())
+        continue;
+      if (!cell->refine_flag_set())
+      {
+        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        {
+          if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+          {
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+            auto this_cell_index = cell->active_cell_index();
+            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+            if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+              LOGL(2, "sought neighbor: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
+            if (vec_with_ghosts[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor)] > 0.5)
+            {
+              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+                LOGL(0, "Refined from other proc.: " << cell->active_cell_index());
+              cell->set_refine_flag();
+              neighbor->set_refine_flag();
+            }
+          }
+        }
+      }
+    }
   }
 
-  TrilinosWrappers::MPI::Vector vector;
-  vector.compress(VectorOperation::add);
-  const double norm = vector.l2_norm();
-
-  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
-    if (cell->is_locally_owned())
-      if (cell->refine_flag_set())
-        LOGL(3, cell->active_cell_index());
-
+  triangulation.prepare_coarsening_and_refinement();
   return true;
 }
 

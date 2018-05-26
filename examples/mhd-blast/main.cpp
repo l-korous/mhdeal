@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::limit_level_difference_at_vertices), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
 #else
     Triangulation<DIMENSION> triangulation;
 #endif
@@ -89,9 +89,9 @@ int main(int argc, char *argv[])
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
-    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
+    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
-    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions, &adaptivity);
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, mpi_communicator, initial_condition, boundary_conditions, &adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }

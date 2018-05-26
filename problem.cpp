@@ -7,12 +7,13 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 #else
   Triangulation<dim>& triangulation_,
 #endif
+  MPI_Comm& mpi_communicator,
   InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions, Adaptivity<dim>* adaptivity) :
   parameters(parameters),
   equations(equations),
   prev_triangulation(triangulation_),
 #ifdef HAVE_MPI
-  triangulation(MPI_COMM_WORLD),
+  triangulation(mpi_communicator),
 #endif
   initial_condition(initial_condition),
   boundary_conditions(boundary_conditions),
@@ -37,7 +38,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe_v_prev_subface(mapping, fe, face_quadrature, face_update_flags),
   fe_v_prev_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
   adaptivity(adaptivity),
-  refined_mesh(false)
+  refined_mesh(false),
+  mpi_communicator(mpi_communicator)
 {
   assembling_utils.set_problem(this);
   triangulation.copy_triangulation(prev_triangulation);
@@ -107,11 +109,11 @@ void Problem<equationsType, dim>::setup_system()
   constraints.close();
 
 #ifdef HAVE_MPI 
-  SparsityTools::distribute_sparsity_pattern(dsp, dof_handler->n_locally_owned_dofs_per_processor(), MPI_COMM_WORLD, locally_relevant_dofs);
+  SparsityTools::distribute_sparsity_pattern(dsp, dof_handler->n_locally_owned_dofs_per_processor(), mpi_communicator, locally_relevant_dofs);
 #endif
 
-  system_rhs.reinit(locally_owned_dofs, MPI_COMM_WORLD);
-  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, MPI_COMM_WORLD);
+  system_rhs.reinit(locally_owned_dofs, mpi_communicator);
+  system_matrix.reinit(locally_owned_dofs, locally_owned_dofs, dsp, mpi_communicator);
   precalculate_global();
 }
 
@@ -735,7 +737,7 @@ Problem<equationsType, dim>::solve()
 #endif
   {
     AztecOO solver;
-    LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, MPI_COMM_WORLD);
+    LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
 
     Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), completely_distributed_solution.begin());
     Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
@@ -812,7 +814,7 @@ void Problem<equationsType, dim>::output_results() const
     subdomain(i) = triangulation.locally_owned_subdomain();
   data_out.add_data_vector(subdomain, "subdomain");
 #endif
-  
+
   data_out.build_patches(this->parameters.patches);
 
   static unsigned int output_file_number = 0;
@@ -825,10 +827,10 @@ void Problem<equationsType, dim>::output_results() const
   std::ofstream output_vtu((filename + ".vtu").c_str());
   data_out.write_vtu(output_vtu);
 
-  if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
+  if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
   {
     std::vector<std::string> filenames;
-    for (unsigned int i = 0; i < Utilities::MPI::n_mpi_processes(MPI_COMM_WORLD); ++i)
+    for (unsigned int i = 0; i < Utilities::MPI::n_mpi_processes(mpi_communicator); ++i)
       filenames.push_back(filename_base + "-" + Utilities::int_to_string(i, 4) + ".vtu");
 
     std::ofstream pvtu_master_output((filename_base + ".pvtu").c_str());
@@ -836,7 +838,7 @@ void Problem<equationsType, dim>::output_results() const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -857,7 +859,7 @@ void Problem<equationsType, dim>::output_matrix(TrilinosWrappers::SparseMatrix& 
 {
   std::ofstream m;
   std::stringstream ssm;
-  ssm << time_step << "-" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << "." << suffix;
+  ssm << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
   m.open(ssm.str());
   mat.print(m);
   m.close();
@@ -868,7 +870,7 @@ void Problem<equationsType, dim>::output_vector(TrilinosWrappers::MPI::Vector& v
 {
   std::ofstream n;
   std::stringstream ssn;
-  ssn << time_step << "-" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << "." << suffix;
+  ssn << time_step << "-" << Utilities::MPI::this_mpi_process(mpi_communicator) << "." << suffix;
   n.open(ssn.str());
   vec.print(n, 10, false, false);
   n.close();
@@ -879,8 +881,8 @@ void Problem<equationsType, dim>::run()
 {
   // Preparations.
   setup_system();
-  current_limited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
-  current_unlimited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
+  current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   setup_initial_solution();
 
 #ifdef OUTPUT_BASE
@@ -891,7 +893,7 @@ void Problem<equationsType, dim>::run()
   while (time < parameters.final_time)
   {
     // Some output.
-    if (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
       LOGL(0, "Step: " << time_step << ", T: " << time);
       LOGL(0, "- adaptivity step: " << adaptivity_step);
@@ -982,8 +984,8 @@ void Problem<equationsType, dim>::run()
       if (parameters.debug & parameters.BasicSteps)
         LOGL(1, "done.");
 
-      current_limited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
-      current_unlimited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
+      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
       // The rest is not meaningful for the initial step.
       // What we do is that we do not progress the solution, we instead keep the previous one, and interpolate it on the adapted mesh.
@@ -995,7 +997,7 @@ void Problem<equationsType, dim>::run()
 
         // Now interpolate the solution
         TrilinosWrappers::MPI::Vector interpolated_solution;
-        interpolated_solution.reinit(prev_locally_owned_dofs, MPI_COMM_WORLD);
+        interpolated_solution.reinit(prev_locally_owned_dofs, mpi_communicator);
 #ifdef HAVE_MPI
         soltrans.interpolate(interpolated_solution);
 #else
@@ -1003,7 +1005,7 @@ void Problem<equationsType, dim>::run()
 #endif
 
         // Put the interpolated solution back to the previous one.
-        prev_solution.reinit(prev_locally_relevant_dofs, MPI_COMM_WORLD);
+        prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
         this->prev_solution = interpolated_solution;
         prev_constraints.distribute(prev_solution);
 
@@ -1025,14 +1027,14 @@ void Problem<equationsType, dim>::run()
       if (parameters.debug & parameters.BasicSteps)
         LOGL(1, "done.");
 
-      LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(prev_locally_owned_dofs, MPI_COMM_WORLD);
+      LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(prev_locally_owned_dofs, mpi_communicator);
       completely_distributed_solution = this->current_limited_solution;
       prev_constraints.distribute(completely_distributed_solution);
-      prev_solution.reinit(prev_locally_relevant_dofs, MPI_COMM_WORLD);
+      prev_solution.reinit(prev_locally_relevant_dofs, mpi_communicator);
       this->prev_solution = completely_distributed_solution;
 
-      current_limited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
-      current_unlimited_solution.reinit(locally_relevant_dofs, MPI_COMM_WORLD);
+      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
       // We do not move the solution if we are adapting. It may be a waste, but we do not move forward with a 'bad' solution.
       ++time_step;
@@ -1055,7 +1057,7 @@ void Problem<equationsType, dim>::handle_outputs()
   }
 
   calculate_cfl_condition();
-  double global_cfl_time_step = Utilities::MPI::min(this->cfl_time_step, MPI_COMM_WORLD);
+  double global_cfl_time_step = Utilities::MPI::min(this->cfl_time_step, mpi_communicator);
   parameters.time_step = global_cfl_time_step;
 }
 

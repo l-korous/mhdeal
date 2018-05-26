@@ -8,7 +8,7 @@ template <int dim>
 class Adaptivity
 {
 public:
-  Adaptivity(Parameters<dim>& parameters);
+  Adaptivity(Parameters<dim>& parameters, MPI_Comm& mpi_communicator);
   virtual bool refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation
@@ -27,5 +27,6 @@ public:
 
   protected:
   Parameters<dim>& parameters;
+  MPI_Comm& mpi_communicator;
 };
 #endif

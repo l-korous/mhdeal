@@ -28,6 +28,7 @@ public:
 #else
     Triangulation<dim>& triangulation,
 #endif
+    MPI_Comm& mpi_communicator, 
     InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions, Adaptivity<dim>* adaptivity = 0);
   void run();
 
@@ -101,6 +102,8 @@ public:
   TrilinosWrappers::MPI::Vector     current_limited_solution;
   TrilinosWrappers::MPI::Vector     current_unlimited_solution;
   TrilinosWrappers::MPI::Vector     prev_solution;
+
+  MPI_Comm& mpi_communicator;
 
   // The system being assembled.
   TrilinosWrappers::MPI::Vector system_rhs;
