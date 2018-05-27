@@ -377,12 +377,6 @@ namespace DealIIExtensions
       // refinement level.
       if (cell_1->has_children())
       {
-        std::stringstream ss;
-        ss << cell_2->active_cell_index();
-        ss << " ";
-        ss << cell_2->level_subdomain_id();
-        Assert((cell_1->has_children() && cell_2->has_children()) || (!cell_1->has_children() && !cell_2->has_children()),
-          ExcMessage("Refinement levels of the matched cells must match. " + ss.str()));
       }
       // taken from make_periodicity_constraints: make sure faces are not artificial
       const unsigned int face_1_index = face_1->nth_active_fe_index(0);

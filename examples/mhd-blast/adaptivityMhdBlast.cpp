@@ -113,7 +113,7 @@ void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& sol
       average_jumps[i] = jump(i) / area(i);
       sum_of_average_jumps += average_jumps[i];
     }
-    gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps * cell->diameter() * cell->diameter() * cell->diameter();
+    gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps * cell->diameter() * cell->diameter() * cell->diameter() * cell->diameter();
   }
   for (int i = 0; i < gradient_indicator.size(); i++)
     if (gradient_indicator[i] < SMALL)
@@ -190,7 +190,7 @@ unsigned int get_cell_id(typename DoFHandler<dim>::active_cell_iterator cell)
         children.push_back(i);
     m_cell = m_cell->parent();
   }
-  toReturn = m_cell->index();
+  toReturn = m_cell->index() + 1000;
   for (int i = 0; i < children.size(); i++)
   {
     toReturn = toReturn << 3;
@@ -214,7 +214,7 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
   // Fix for periodic boundaries.
   if (this->parameters.periodic_boundaries.size() > 0)
   {
-    int size_i = 100 * triangulation.n_global_active_cells();
+    unsigned int size_i = 1e9;
     IndexSet is_local(size_i);
     IndexSet is_ghost(size_i);
     is_local.add_index(Utilities::MPI::this_mpi_process(this->mpi_communicator));
@@ -230,11 +230,15 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
       if (!cell->is_locally_owned())
         continue;
 
+unsigned int as = cell->active_cell_index();
       is_local.add_index(Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell));
+if(as != cell->active_cell_index())
+exit(1);
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
         if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
         {
+          cell->clear_coarsen_flag();
           const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
           typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
           auto this_cell_index = cell->active_cell_index();
@@ -245,9 +249,6 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
             LOGL(2, "adding ghost cell: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
           is_ghost.add_index(Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
 
-          neighbor->clear_coarsen_flag();
-          cell->clear_coarsen_flag();
-
           if (cell->refine_flag_set() || neighbor->refine_flag_set())
           {
             if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
@@ -256,15 +257,11 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
               LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
             }
             cell->set_refine_flag();
+            if(neighbor->is_locally_owned())
+{
+neighbor->clear_coarsen_flag();
             neighbor->set_refine_flag();
-          }
-        }
-        if (cell->level() > 0)
-        {
-          if (this->parameters.is_periodic_boundary(cell->parent()->face(face_no)->boundary_id()))
-          {
-            for (int i = 0; i < cell->parent()->n_children(); i++)
-              cell->parent()->child(i)->clear_coarsen_flag();
+}
           }
         }
       }
@@ -291,6 +288,8 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
     
     vec.compress(VectorOperation::add);
     TrilinosWrappers::MPI::Vector vec_with_ghosts(is_local, is_ghost, vec.get_mpi_communicator());
+    LOGL(0, vec.size());
+    LOGL(0, vec_with_ghosts.size());
     vec_with_ghosts = vec;
 
     for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
@@ -314,8 +313,13 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
             {
               if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
                 LOGL(0, "Refined from other proc.: " << cell->active_cell_index());
-              cell->set_refine_flag();
+cell->clear_coarsen_flag();              
+cell->set_refine_flag();
+if(neighbor->is_locally_owned())
+{
+  neighbor->clear_coarsen_flag();
               neighbor->set_refine_flag();
+}
             }
           }
         }
