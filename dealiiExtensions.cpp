@@ -380,7 +380,7 @@ namespace DealIIExtensions
         std::stringstream ss;
         ss << cell_2->active_cell_index();
         ss << " ";
-        ss << cell_2->subdomain_id();
+        ss << cell_2->level_subdomain_id();
         Assert((cell_1->has_children() && cell_2->has_children()) || (!cell_1->has_children() && !cell_2->has_children()),
           ExcMessage("Refinement levels of the matched cells must match. " + ss.str()));
       }
