@@ -943,7 +943,7 @@ void Problem<equationsType, dim>::run()
       LOGL(1, "done.");
 
     if (parameters.debug & parameters.BasicSteps)
-      LOGL(1, "refining...");
+      LOG(1, "refining...");
     this->refined_mesh = this->adaptivity->refine_mesh(this->time_step, this->time, this->current_limited_solution, *dof_handler, triangulation, this->mapping);
     if (this->refined_mesh)
     {
@@ -958,7 +958,7 @@ void Problem<equationsType, dim>::run()
 #endif
       // Replace the old triangulation by the current one before the current one gets refined.
       if (parameters.debug & parameters.BasicSteps)
-        LOGL(1, "refining prev mesh...");
+        LOG(1, "refining prev mesh...");
       bool prev_mesh_refined = this->adaptivity->refine_prev_mesh(prev_dof_handler, prev_triangulation);
       if (parameters.debug & parameters.BasicSteps)
         LOGL(0, "refined.");
@@ -993,7 +993,7 @@ void Problem<equationsType, dim>::run()
       if ((time_step > 0) && prev_mesh_refined)
       {
         if (parameters.debug & parameters.BasicSteps)
-          LOGL(1, "interpolating...");
+          LOG(1, "interpolating...");
 
         // Now interpolate the solution
         TrilinosWrappers::MPI::Vector interpolated_solution;

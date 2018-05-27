@@ -230,10 +230,7 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
       if (!cell->is_locally_owned())
         continue;
 
-unsigned int as = cell->active_cell_index();
       is_local.add_index(Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell));
-if(as != cell->active_cell_index())
-exit(1);
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
         if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
@@ -257,11 +254,11 @@ exit(1);
               LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
             }
             cell->set_refine_flag();
-            if(neighbor->is_locally_owned())
-{
-neighbor->clear_coarsen_flag();
-            neighbor->set_refine_flag();
-}
+            if (neighbor->is_locally_owned())
+            {
+              neighbor->clear_coarsen_flag();
+              neighbor->set_refine_flag();
+            }
           }
         }
       }
@@ -285,11 +282,9 @@ neighbor->clear_coarsen_flag();
         }
       }
     }
-    
+
     vec.compress(VectorOperation::add);
     TrilinosWrappers::MPI::Vector vec_with_ghosts(is_local, is_ghost, vec.get_mpi_communicator());
-    LOGL(0, vec.size());
-    LOGL(0, vec_with_ghosts.size());
     vec_with_ghosts = vec;
 
     for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
@@ -313,13 +308,13 @@ neighbor->clear_coarsen_flag();
             {
               if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
                 LOGL(0, "Refined from other proc.: " << cell->active_cell_index());
-cell->clear_coarsen_flag();              
-cell->set_refine_flag();
-if(neighbor->is_locally_owned())
-{
-  neighbor->clear_coarsen_flag();
-              neighbor->set_refine_flag();
-}
+              cell->clear_coarsen_flag();
+              cell->set_refine_flag();
+              if (neighbor->is_locally_owned())
+              {
+                neighbor->clear_coarsen_flag();
+                neighbor->set_refine_flag();
+              }
             }
           }
         }
