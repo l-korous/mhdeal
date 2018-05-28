@@ -178,28 +178,6 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
 }
 
 template <int dim>
-unsigned int get_cell_id(typename DoFHandler<dim>::active_cell_iterator cell)
-{
-  unsigned int toReturn = 0;
-  std::vector<unsigned short> children;
-  typename DoFHandler<dim>::cell_iterator m_cell = cell;
-  while (m_cell->level() > 0)
-  {
-    for (int i = 0; i < m_cell->parent()->n_children(); i++)
-      if (m_cell->parent()->child(i)->index() == m_cell->index())
-        children.push_back(i);
-    m_cell = m_cell->parent();
-  }
-  toReturn = m_cell->index() + 1000;
-  for (int i = 0; i < children.size(); i++)
-  {
-    toReturn = toReturn << 3;
-    toReturn += children[i];
-  }
-  return toReturn;
-}
-
-template <int dim>
 bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation
@@ -308,6 +286,55 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
             {
               if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
                 LOGL(0, "Refined from other proc.: " << cell->active_cell_index());
+              vec[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell)] += 1.;
+              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+              {
+                LOGL(2, "cell refined: " << cell->active_cell_index());
+                LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
+              }
+              cell->clear_coarsen_flag();
+              cell->set_refine_flag();
+              if (neighbor->is_locally_owned())
+              {
+                neighbor->clear_coarsen_flag();
+                neighbor->set_refine_flag();
+              }
+            }
+          }
+        }
+      }
+    }
+
+    vec.compress(VectorOperation::add);
+    TrilinosWrappers::MPI::Vector vec_with_ghosts_2(is_local, is_ghost, vec.get_mpi_communicator());
+    vec_with_ghosts_2 = vec;
+
+    for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    {
+      if (!cell->is_locally_owned())
+        continue;
+      if (!cell->refine_flag_set())
+      {
+        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        {
+          if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+          {
+            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+            auto this_cell_index = cell->active_cell_index();
+            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+            if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+              LOGL(2, "sought neighbor: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
+            if (vec_with_ghosts_2[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor)] > 0.5)
+            {
+              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+                LOGL(0, "Refined from other proc. 2 : " << cell->active_cell_index());
+              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+              {
+                LOGL(2, "cell refined: " << cell->active_cell_index());
+                LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
+              }
               cell->clear_coarsen_flag();
               cell->set_refine_flag();
               if (neighbor->is_locally_owned())

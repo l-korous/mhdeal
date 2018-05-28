@@ -48,7 +48,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.patches = 0;
   parameters.output_step = -5.e-4;
   parameters.final_time = 1.;
-  parameters.debug = parameters.BasicSteps;// | parameters.Adaptivity | parameters.PeriodicBoundaries;
+  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
   /*
   parameters.output_matrix = true;
@@ -56,9 +56,9 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  max_cells = 2000;
-  refine_every_nth_time_step = 10;
-  perform_n_initial_refinements = 10;
+  max_cells = 1000;
+  refine_every_nth_time_step = 5;
+  perform_n_initial_refinements = 5;
   refine_threshold = 0.2;
   coarsen_threshold = 0.05;
 }

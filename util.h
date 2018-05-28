@@ -140,4 +140,26 @@ public:
 #define BASIS_FN_COUNT 32
 
 static const double My_PI = 3.14159265358979323846;
+
+template <int dim>
+unsigned int get_cell_id(typename DoFHandler<dim>::active_cell_iterator cell)
+{
+  unsigned int toReturn = 0;
+  std::vector<unsigned short> children;
+  typename DoFHandler<dim>::cell_iterator m_cell = cell;
+  while (m_cell->level() > 0)
+  {
+    for (int i = 0; i < m_cell->parent()->n_children(); i++)
+      if (m_cell->parent()->child(i)->index() == m_cell->index())
+        children.push_back(i);
+    m_cell = m_cell->parent();
+  }
+  toReturn = m_cell->index() + 1000;
+  for (int i = 0; i < children.size(); i++)
+  {
+    toReturn = toReturn << 3;
+    toReturn += children[i];
+  }
+  return toReturn;
+}
 #endif

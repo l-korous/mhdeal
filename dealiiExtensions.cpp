@@ -98,13 +98,10 @@ namespace DealIIExtensions
               if (face_pair_it == cell_map.end())
               {
                 MPI_Comm mpi_communicator(MPI_COMM_WORLD);
-                std::cout << "Proc: " << Utilities::MPI::this_mpi_process(mpi_communicator) << std::endl;
-                std::cout << "Something wrong (unable to find in cell_map)" << std::endl;
-                std::cout << "Current cell: " << std::endl;
-                std::cout << "- level: " << cell->level() << std::endl;
+                LOGL(0, "Something wrong (unable to find in cell_map): " << get_cell_id<DH::dimension>(cell));
                 for (unsigned int v_i = 0; v_i < GeometryInfo<DH::dimension>::vertices_per_cell; ++v_i)
-                  std::cout << "\t vertex " << v_i << ": " << cell->vertex(v_i) << std::endl;
-                std::cout << "- face: " << face << ", boundary: " << boundary_id << std::endl;
+                  LOGL(1, "vertex " << v_i << ": " << cell->vertex(v_i));
+                LOGL(0, "- face: " << face << ", boundary: " << boundary_id);
                 exit(1);
               }
               const FacePair<DH::dimension>& face_pair = face_pair_it->second;
