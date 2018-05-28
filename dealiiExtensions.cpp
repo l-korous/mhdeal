@@ -98,7 +98,7 @@ namespace DealIIExtensions
               if (face_pair_it == cell_map.end())
               {
                 MPI_Comm mpi_communicator(MPI_COMM_WORLD);
-                LOGL(0, "Something wrong (unable to find in cell_map): " << get_cell_id<DH::dimension>(cell) << get_cell_id<DH::dimension>(cell->parent()));
+                LOGL(0, "Something wrong (unable to find in cell_map): " << get_cell_id<DH::dimension>(cell) << " " << get_cell_id<DH::dimension>(cell->parent()));
                 for (unsigned int v_i = 0; v_i < GeometryInfo<DH::dimension>::vertices_per_cell; ++v_i)
                   LOGL(1, "vertex " << v_i << ": " << cell->vertex(v_i));
                 LOGL(0, "- face: " << face << ", boundary: " << boundary_id);

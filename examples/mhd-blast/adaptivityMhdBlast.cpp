@@ -221,15 +221,16 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
           neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
 
           if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-            LOGL(2, "adding ghost cell: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
+            LOGL(2, "adding ghost cell: " << get_cell_id<dim>(neighbor));
+  
           is_ghost.add_index(Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
 
           if (cell->refine_flag_set() || neighbor->refine_flag_set())
           {
             if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
             {
-              LOGL(2, "cell refined: " << cell->active_cell_index());
-              LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
+              LOGL(2, "cell refined: " << get_cell_id<dim>(cell));
+              LOGL(2, "neighbor refined: " << get_cell_id<dim>(neighbor));
             }
             cell->set_refine_flag();
             if (neighbor->is_locally_owned())
@@ -269,36 +270,34 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
     {
       if (!cell->is_locally_owned())
         continue;
-      if (!cell->refine_flag_set())
+
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
         {
-          if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+          const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+          typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+          auto this_cell_index = cell->active_cell_index();
+          auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+          neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+          if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+            LOGL(2, "sought neighbor: " << get_cell_id<dim>(neighbor));
+          if (vec_with_ghosts[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor)] > 0.5)
           {
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-            auto this_cell_index = cell->active_cell_index();
-            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
             if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-              LOGL(2, "sought neighbor: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
-            if (vec_with_ghosts[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor)] > 0.5)
+              LOGL(0, "Refined from other proc.: " << get_cell_id<dim>(cell));
+            vec[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell)] += 1.;
+            if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
             {
-              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-                LOGL(0, "Refined from other proc.: " << cell->active_cell_index());
-              vec[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(cell)] += 1.;
-              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-              {
-                LOGL(2, "cell refined: " << cell->active_cell_index());
-                LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
-              }
-              cell->clear_coarsen_flag();
-              cell->set_refine_flag();
-              if (neighbor->is_locally_owned())
-              {
-                neighbor->clear_coarsen_flag();
-                neighbor->set_refine_flag();
-              }
+              LOGL(2, "cell refined: " << get_cell_id<dim>(cell));
+              LOGL(2, "neighbor refined: " << get_cell_id<dim>(neighbor));
+            }
+            cell->clear_coarsen_flag();
+            cell->set_refine_flag();
+            if (neighbor->is_locally_owned())
+            {
+              neighbor->clear_coarsen_flag();
+              neighbor->set_refine_flag();
             }
           }
         }
@@ -313,35 +312,32 @@ bool AdaptivityMhdBlast<dim>::refine_internal(const DoFHandler<dim>& dof_handler
     {
       if (!cell->is_locally_owned())
         continue;
-      if (!cell->refine_flag_set())
+      for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
-        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
+        if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
         {
-          if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+          const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
+          typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
+          auto this_cell_index = cell->active_cell_index();
+          auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
+          neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
+          if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
+            LOGL(2, "sought neighbor: " << get_cell_id<dim>(neighbor));
+          if (vec_with_ghosts_2[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor)] > 0.5)
           {
-            const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-            typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-            auto this_cell_index = cell->active_cell_index();
-            auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-            neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
             if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-              LOGL(2, "sought neighbor: " << Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor));
-            if (vec_with_ghosts_2[Utilities::MPI::n_mpi_processes(this->mpi_communicator) + 1 + get_cell_id<dim>(neighbor)] > 0.5)
+              LOGL(0, "Refined from other proc. 2 : " << get_cell_id<dim>(cell));
+            if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
             {
-              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-                LOGL(0, "Refined from other proc. 2 : " << cell->active_cell_index());
-              if ((this->parameters.debug & this->parameters.Adaptivity) && (this->parameters.debug & this->parameters.PeriodicBoundaries))
-              {
-                LOGL(2, "cell refined: " << cell->active_cell_index());
-                LOGL(2, "neighbor refined: " << neighbor->subdomain_id() << " : " << neighbor->active_cell_index());
-              }
-              cell->clear_coarsen_flag();
-              cell->set_refine_flag();
-              if (neighbor->is_locally_owned())
-              {
-                neighbor->clear_coarsen_flag();
-                neighbor->set_refine_flag();
-              }
+              LOGL(2, "cell refined: " << get_cell_id<dim>(cell));
+              LOGL(2, "neighbor refined: " << get_cell_id<dim>(neighbor));
+            }
+            cell->clear_coarsen_flag();
+            cell->set_refine_flag();
+            if (neighbor->is_locally_owned())
+            {
+              neighbor->clear_coarsen_flag();
+              neighbor->set_refine_flag();
             }
           }
         }
