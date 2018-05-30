@@ -14,67 +14,10 @@ public:
   InitialCondition(Parameters<dim>&);
 
   // To be overwritten.
-  virtual void vector_value(const std::vector<Point<dim> >& , std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-  Parameters<dim>& getParams() const;
+  virtual void vector_value(const std::vector<Point<dim> >& , std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const = 0;
 
-private:
+protected:
   Parameters<dim>& parameters;
-};
-
-template <EquationsType equationsType, int dim>
-class SimpleICEuler : public InitialCondition<equationsType, dim>
-{
-public:
-  SimpleICEuler(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-template <EquationsType equationsType, int dim>
-class SimpleICMHD : public InitialCondition<equationsType, dim>
-{
-public:
-  SimpleICMHD(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-template <EquationsType equationsType, int dim>
-class EulerBlastIC : public InitialCondition<equationsType, dim>
-{
-public:
-  EulerBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-template <EquationsType equationsType, int dim>
-class MHDBlastIC : public InitialCondition<equationsType, dim>
-{
-public:
-  MHDBlastIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-};
-
-
-template <EquationsType equationsType, int dim>
-class TitovDemoulinIC : public InitialCondition<equationsType,dim>
-{
-public:
-  TitovDemoulinIC(Parameters<dim>&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
-  
-private:
-  double beta;
-  double Lg;
-  double invLg;
-  double N_t;
-  double R_t;
-  double d2R_t;
-  double L2R_t;
-  double q_mag;
-  double iSgn;
-  double heliFactor;
-  double Tc2Tp;
-  double t_rho;
-  double densGrad;
 };
 
 #endif

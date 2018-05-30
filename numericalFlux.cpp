@@ -150,7 +150,7 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
   const n_comp_array &Wminus_, n_comp_array &normal_flux, double& max_speed) const
 {
   n_comp_array flux_lf;
-  if (this->parameters.debug)
+  if (this->parameters.debug & this->parameters.NumFlux)
   {
     NumFluxLaxFriedrich<equationsType, dim> lf(this->parameters);
     lf.numerical_normal_flux(normal, Wplus_, Wminus_, flux_lf, max_speed);
@@ -239,14 +239,12 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       normal_flux[j] = Fl[j];
     normal_flux[5] = 0.;
     this->Q_inv(normal_flux, normal_flux, normal);
-    if (this->parameters.debug)
+    if (this->parameters.debug & this->parameters.NumFlux)
       for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
-          {
-            std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
-          }
+            LOGL(5, "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j]);
       }
     return;
   }
@@ -255,14 +253,12 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       normal_flux[j] = Fr[j];
     normal_flux[5] = 0.;
     this->Q_inv(normal_flux, normal_flux, normal);
-    if (this->parameters.debug)
+    if (this->parameters.debug & this->parameters.NumFlux)
       for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
-          {
-            std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
-          }
+            LOGL(5, "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j]);
       }
     return;
   }
@@ -339,13 +335,13 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       normal_flux[j] = Fl[j] + spd[0] * (Ulst[j] - ul[j]);
     normal_flux[5] = 0.;
     this->Q_inv(normal_flux, normal_flux, normal);
-    if (this->parameters.debug)
+    if (this->parameters.debug & this->parameters.NumFlux)
       for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
-            std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
+            LOGL(5, "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j]);
           }
       }
     return;
@@ -355,14 +351,12 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       normal_flux[j] = Fr[j] + spd[4] * (Urst[j] - ur[j]);
     normal_flux[5] = 0.;
     this->Q_inv(normal_flux, normal_flux, normal);
-    if (this->parameters.debug)
+    if (this->parameters.debug & this->parameters.NumFlux)
       for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
-          {
-            std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
-          }
+            LOGL(5, "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j]);
       }
     return;
   }
@@ -417,13 +411,13 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       normal_flux[j] = Fl[j] + spd[1] * Uldst[j] - spd[0] * ul[j] - cm*Ulst[j];
     normal_flux[5] = 0.;
     this->Q_inv(normal_flux, normal_flux, normal);
-    if (this->parameters.debug)
+    if (this->parameters.debug & this->parameters.NumFlux)
       for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
           {
-            std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
+            LOGL(5, "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j]);
           }
       }
     return;
@@ -435,14 +429,12 @@ void NumFluxHLLD<equationsType, dim>::numerical_normal_flux(const Tensor<1, dim>
       normal_flux[j] = Fr[j] + spd[3] * Urdst[j] - spd[4] * ur[j] - cm*Urst[j];
     normal_flux[5] = 0.;
     this->Q_inv(normal_flux, normal_flux, normal);
-    if (this->parameters.debug)
+    if (this->parameters.debug & this->parameters.NumFlux)
       for (int j = 0; j < n_comp; j++)
       {
         if ((std::abs(flux_lf[j]) > 1e-10) && (std::abs(normal_flux[j]) > 1e-10))
           if (std::abs(flux_lf[j] - normal_flux[j]) > 1e-8)
-          {
-            std::cout << "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j] << std::endl;
-          }
+            LOGL(5, "n: " << normal << ", component: " << j << ", L-F: " << flux_lf[j] << ", result: " << normal_flux[j]);
       }
     return;
   }

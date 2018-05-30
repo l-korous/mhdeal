@@ -27,6 +27,7 @@
 #include <deal.II/hp/mapping_collection.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria_iterator.h>
+#include "parameters.h"
 
 namespace DealIIExtensions {
   template<size_t dim, size_t spacedim = dim>
@@ -50,8 +51,7 @@ namespace DealIIExtensions {
   void
     make_sparser_flux_sparsity_pattern(const DH &dof, SparsityPattern &sparsity,
       const ConstraintMatrix &constraints,
-      // Vector of [boundary marker 1, boundary marker 2, orientation]
-      const std::vector<std::array<int, 3> >& boundaries,
+      const Parameters<DH::dimension>& parameters,
       const PeriodicCellMap<DH::dimension>& cell_map,
       FEFaceValues<DH::dimension>* fe_face = NULL,
       const bool keep_constrained_dofs = true);

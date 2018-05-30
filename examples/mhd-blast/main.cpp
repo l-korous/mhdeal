@@ -1,6 +1,8 @@
 #include "util.h"
 #include "problem.h"
 #include "equationsMhd.h"
+#include "initialConditionMhdBlast.h"
+#include "adaptivityMhdBlast.h"
 #include "parameters.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
@@ -22,25 +24,43 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   triangulation.add_periodicity(matched_pairs);
 }
 
+// Parameters that are specific for this example.
+int max_cells;
+int refine_every_nth_time_step;
+int perform_n_initial_refinements;
+double refine_threshold;
+double coarsen_threshold;
+
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.output_file_prefix = "mb-solution";
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.01);
-  parameters.refinements = { 100, 150, 1 };
-  parameters.limit = true;
+  parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.1);
+  parameters.refinements = { 10, 10, 1 };
+  parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.cfl_coefficient = .05;
-  parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
-
-  parameters.patches = 1;
-  parameters.output_step = 1.e-2;
-
+  parameters.lax_friedrich_stabilization_value = 0.5;
+  parameters.cfl_coefficient = .025;
+  parameters.quadrature_order = 1;
+  parameters.polynomial_order_dg = 0;
+  parameters.patches = 0;
+  parameters.output_step = -5.e-4;
   parameters.final_time = 1.;
+  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries;
+
+  /*
+  parameters.output_matrix = true;
+  parameters.output_rhs = true;
+  parameters.output_solution = true;
+  */
+
+  max_cells = 1000;
+  refine_every_nth_time_step = 5;
+  perform_n_initial_refinements = 5;
+  refine_threshold = 0.2;
+  coarsen_threshold = 0.05;
 }
 
 int main(int argc, char *argv[])
@@ -57,19 +77,21 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::smoothing_on_refinement | Triangulation<DIMENSION>::smoothing_on_coarsening));
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
 #else
     Triangulation<DIMENSION> triangulation;
-#endif    
+#endif
     set_triangulation(triangulation, parameters);
 
-    MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionMhdBlast<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
+    // Adaptivity
+    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
-    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, mpi_communicator, initial_condition, boundary_conditions, &adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }
@@ -77,7 +99,7 @@ int main(int argc, char *argv[])
   {
     std::cerr << std::endl << std::endl
       << "----------------------------------------------------"
-      << std::endl;
+      << std::endl; 
     std::cerr << "Exception on processing: " << std::endl
       << exc.what() << std::endl
       << "Aborting!" << std::endl

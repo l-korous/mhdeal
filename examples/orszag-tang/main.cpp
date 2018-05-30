@@ -2,6 +2,7 @@
 #include "problem.h"
 #include "equationsMhd.h"
 #include "parameters.h"
+#include "initialConditionOT.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
 #define DIMENSION 3
@@ -22,23 +23,25 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   triangulation.add_periodicity(matched_pairs);
 }
 
-void set_parameters(Parameters<DIMENSION>& parameters)
+void set_parameters(Parameters<DIMENSION>& parameters)  
 {
-  parameters.corner_a = Point<DIMENSION>(-0.2, -0.2, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.001);
-  parameters.refinements = { 60, 60, 1 };
-  parameters.limit = true;
   parameters.slope_limiter = parameters.vertexBased;
+  parameters.corner_a = Point<DIMENSION>(0., 0., 0.);
+  parameters.corner_b = Point<DIMENSION>(1., 1., 0.001);
+  parameters.refinements = { 160, 160, 1 };
+  parameters.limit = false;
   parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .05;
+  parameters.start_limiting_at = .05;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
-  parameters.patches = 1;
-  parameters.output_step = -1.e-3;
-  parameters.final_time = 1.;
+  parameters.patches = 0;
+  parameters.output_step = 1.e-2;
+  parameters.final_time = .5;
+  parameters.debug = false;
 }
 
 int main(int argc, char *argv[])
@@ -55,13 +58,13 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::smoothing_on_refinement | Triangulation<DIMENSION>::smoothing_on_coarsening));
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
 #else
     Triangulation<DIMENSION> triangulation;
 #endif    
     set_triangulation(triangulation, parameters);
 
-    MHDBlastIC<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionOT<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
