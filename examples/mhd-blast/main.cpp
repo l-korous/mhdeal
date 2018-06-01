@@ -33,8 +33,8 @@ double coarsen_threshold;
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.1);
+  parameters.corner_a = Point<DIMENSION>(-0.2, -0.2, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.1);
   parameters.refinements = { 10, 10, 1 };
   parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
@@ -42,13 +42,13 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .025;
+  parameters.cfl_coefficient = .05;
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
   parameters.output_step = -5.e-4;
   parameters.final_time = 1.;
-  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries;
+  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries | parameters.Assembling;
 
   /*
   parameters.output_matrix = true;
@@ -56,7 +56,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  max_cells = 1000;
+  max_cells = 500;
   refine_every_nth_time_step = 5;
   perform_n_initial_refinements = 5;
   refine_threshold = 0.2;
@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
 #else
-    Triangulation<DIMENSION> triangulation;
+    Triangulation<DIMENSION> triangulation(Triangulation<DIMENSION>::limit_level_difference_at_vertices);
 #endif
     set_triangulation(triangulation, parameters);
 
@@ -91,7 +91,8 @@ int main(int argc, char *argv[])
     // Adaptivity
     AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
-    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, mpi_communicator, initial_condition, boundary_conditions, &adaptivity);
+    Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
+    problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }

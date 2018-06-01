@@ -8,6 +8,7 @@
 #include "feTaylor.h"
 #include "numericalFlux.h"
 #include "slopeLimiter.h"
+#include "adaptivity.h"
 
 // Class that accepts all input from the user, provides interface for output, etc.
 // Should not be changed.
@@ -27,13 +28,12 @@ public:
   // Technical matters done only once after creation.
   void setup_system();
 
-  // Sets up initial values for current & previous solution.
-  void setup_initial_solution();
-
   // Performs a single global assembly.
   void assemble_system(bool assemble_matrix = true);
 
   void postprocess();
+  
+  void set_adaptivity(Adaptivity<dim>* adaptivity);
 
   // Performs a single global assembly.
   void calculate_cfl_condition();
@@ -47,11 +47,11 @@ public:
   
   void output_base();
   void output_results() const;
-  void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix, int time_step, int newton_step = -1) const;
-  void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix, int time_step, int newton_step = -1) const;
+  void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix) const;
+  void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix) const;
 
   // Solves the assembled system
-  void solve(TrilinosWrappers::MPI::Vector &newton_update, bool reset_matrix = true);
+  void solve(bool reset_matrix = true);
 
   void move_time_step_handle_outputs();
 
@@ -61,9 +61,6 @@ public:
 #else
   Triangulation<dim>& triangulation;
 #endif
-
-  void save();
-  void load();
 
   // Equations - passed as a constructor parameter
   Equations<equationsType, dim>& equations;
@@ -93,29 +90,20 @@ public:
   TrilinosWrappers::MPI::Vector     current_limited_solution;
   TrilinosWrappers::MPI::Vector     current_unlimited_solution;
   TrilinosWrappers::MPI::Vector     prev_solution;
-  TrilinosWrappers::MPI::Vector     lin_solution;
   
   // The system being assembled.
   TrilinosWrappers::MPI::Vector system_rhs;
   TrilinosWrappers::SparseMatrix system_matrix;
 
   // Rest is technical.
-  ConditionalOStream verbose_cout;
-
   ConstraintMatrix constraints;
-
   MPI_Comm mpi_communicator;
 
-  bool initial_step;
-  bool assemble_only_rhs;
-
-  double last_output_time, last_snapshot_time, time;
+  double last_output_time, time;
   int time_step;
   double cfl_time_step;
   // For CFL.
   double max_signal_speed;
-
-  AztecOO solver;
 
   DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
   FEValuesExtractors::Vector mag;
@@ -134,16 +122,15 @@ public:
   const UpdateFlags face_update_flags;
   const UpdateFlags neighbor_face_update_flags;
   // DOF indices both on the currently assembled element and the neighbor.
-  FEValues<dim>* fe_v_cell;
+  FEValues<dim> fe_v_cell;
   FEFaceValues<dim> fe_v_face;
   FESubfaceValues<dim> fe_v_subface;
   FEFaceValues<dim> fe_v_face_neighbor;
   FESubfaceValues<dim> fe_v_subface_neighbor;
   std::vector<types::global_dof_index> dof_indices;
   std::vector<types::global_dof_index> dof_indices_neighbor;
-  std::array<double, Equations<equationsType, dim>::n_components> Wplus_old, Wminus_old;
+  std::vector<std::array<double, Equations<equationsType, dim>::n_components> > Wplus_old, Wminus_old;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > normal_fluxes_old;
-  std::array<double, Equations<equationsType, dim>::n_components> W_lin;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev;
   std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > fluxes_old;
 
@@ -151,8 +138,5 @@ public:
   std::array <bool, BASIS_FN_COUNT> is_primitive;
   std::array <bool, BASIS_FN_COUNT> basis_fn_is_constant;
 
-  // This is here and not in the loop because of tests - we test by looking at the last res_norm.
-  double res_norm;
-  // Utility
-  static bool is_periodic_boundary(int boundary_id, const Parameters<dim>& parameters) ;
+  Adaptivity<dim>* adaptivity;
 };

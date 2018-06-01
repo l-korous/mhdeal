@@ -28,7 +28,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-10., -10., 0.);
   parameters.corner_b = Point<DIMENSION>(10., 10., 20.);
-  parameters.refinements = { 10, 10, 10 };
+  parameters.refinements = { 20, 20, 20 };
   parameters.limit = false;
   parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
