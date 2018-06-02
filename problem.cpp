@@ -216,10 +216,12 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
           Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
           neighbor->get_dof_indices(dof_indices_neighbor);
 
-          const std::pair<unsigned int, unsigned int> faceno_subfaceno = cell->neighbor_of_coarser_neighbor(face_no);
-          const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
+          const std::pair<unsigned int, unsigned int> faceno_subfaceno = 
+            (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()) ?
+              cell->periodic_neighbor_of_coarser_periodic_neighbor(face_no) :
+            cell->neighbor_of_coarser_neighbor(face_no));
 
-          Assert(neighbor->neighbor_child_on_subface(neighbor_face_no, neighbor_subface_no) == cell, ExcInternalError());
+          const unsigned int neighbor_face_no = faceno_subfaceno.first, neighbor_subface_no = faceno_subfaceno.second;
 
           fe_v_face.reinit(cell, face_no);
           fe_v_subface_neighbor.reinit(neighbor, neighbor_face_no, neighbor_subface_no);

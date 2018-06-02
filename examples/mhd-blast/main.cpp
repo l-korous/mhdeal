@@ -33,8 +33,8 @@ double coarsen_threshold;
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.2, -0.2, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.2, 0.2, 0.1);
+  parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.1);
   parameters.refinements = { 10, 10, 1 };
   parameters.limit = false;
   parameters.slope_limiter = parameters.vertexBased;
@@ -46,9 +46,9 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = -5.e-4;
+  parameters.output_step = 1.e-3;
   parameters.final_time = 1.;
-  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries | parameters.Assembling;
+  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
   /*
   parameters.output_matrix = true;
@@ -57,8 +57,8 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   */
 
   max_cells = 500;
-  refine_every_nth_time_step = 5;
-  perform_n_initial_refinements = 5;
+  refine_every_nth_time_step = 3;
+  perform_n_initial_refinements = 10;
   refine_threshold = 0.2;
   coarsen_threshold = 0.05;
 }
