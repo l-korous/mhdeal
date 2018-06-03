@@ -34,26 +34,26 @@ double coarsen_threshold;
 void set_parameters(Parameters<DIMENSION>& parameters)  
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-5., -5., 0.);
-  parameters.corner_b = Point<DIMENSION>(5., 5., 8.);
-  parameters.refinements = { 5, 5, 4 };
-  parameters.limit = true;
+  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
+  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
+  parameters.refinements = { 40, 80, 40 };
+  parameters.limit = false;
   parameters.use_div_free_space_for_B = true;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
   parameters.start_limiting_at = -.05;
-  parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.quadrature_order = 1;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
   parameters.output_step = 1.e-2;
-  parameters.final_time = 10.;
+  parameters.final_time = 20.;
 
-  max_cells = 3000;
-  refine_every_nth_time_step = 10;
-  perform_n_initial_refinements = 20;
-  refine_threshold = 0.1;
-  coarsen_threshold = 0.05;
+  max_cells = 3500;
+  refine_every_nth_time_step = 25;
+  perform_n_initial_refinements = 25;
+  refine_threshold = 0.10;
+  coarsen_threshold = 0.15;
 }
 
 int main(int argc, char *argv[])
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Run the problem - entire transient problem.
-    problem.set_adaptivity(&adaptivity);
+    //problem.set_adaptivity(&adaptivity);
     problem.run();
   }
   catch (std::exception &exc)

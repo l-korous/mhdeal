@@ -45,7 +45,7 @@ public:
   void assemble_face_term(const unsigned int face_no, const FEFaceValuesBase<dim> &fe_v, const FEFaceValuesBase<dim> &fe_v_neighbor, const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs);
   
   void output_base();
-  void output_results() const;
+  void output_results(bool use_prev_solution = false) const;
   void output_matrix(TrilinosWrappers::SparseMatrix& mat, const char* suffix) const;
   void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix) const;
 

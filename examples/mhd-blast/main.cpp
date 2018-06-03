@@ -38,7 +38,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.refinements = { 10, 15, 1 };
   parameters.limit = true;
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = false;
+  parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
@@ -58,9 +58,9 @@ void set_parameters(Parameters<DIMENSION>& parameters)
 
   max_cells = 3000;
   refine_every_nth_time_step = 10;
-  perform_n_initial_refinements = 15;
-  refine_threshold = 0.25;
-  coarsen_threshold = 0.05;
+  perform_n_initial_refinements = 20;
+  refine_threshold = 0.2;
+  coarsen_threshold = 0.2;
 }
 
 int main(int argc, char *argv[])
