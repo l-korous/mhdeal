@@ -18,7 +18,7 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 {
   GridGenerator::subdivided_hyper_rectangle(triangulation, parameters.refinements, parameters.corner_a, parameters.corner_b, true);
 
-  std::vector<DealIIExtensions::FacePair<DIMENSION> > matched_pairs;
+  std::vector<dealii::GridTools::PeriodicFacePair< dealii::TriaIterator<dealii::CellAccessor<DIMENSION> > > > matched_pairs;
   for (std::vector<std::array<int, 3> >::const_iterator it = parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
     dealii::GridTools::collect_periodic_faces(triangulation, (*it)[0], (*it)[1], (*it)[2], matched_pairs);
   triangulation.add_periodicity(matched_pairs);
@@ -33,22 +33,22 @@ double coarsen_threshold;
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.1);
-  parameters.refinements = { 10, 10, 1 };
-  parameters.limit = false;
+  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.1);
+  parameters.refinements = { 10, 15, 1 };
+  parameters.limit = true;
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = false;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .05;
-  parameters.quadrature_order = 1;
-  parameters.polynomial_order_dg = 0;
+  parameters.quadrature_order = 5;
+  parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = 1.e-3;
+  parameters.output_step = 1.e-2;
   parameters.final_time = 1.;
-  parameters.debug = parameters.BasicSteps | parameters.Adaptivity | parameters.PeriodicBoundaries;
+  parameters.debug = parameters.BasicSteps;// | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
   /*
   parameters.output_matrix = true;
@@ -56,10 +56,10 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  max_cells = 500;
-  refine_every_nth_time_step = 3;
-  perform_n_initial_refinements = 10;
-  refine_threshold = 0.2;
+  max_cells = 3000;
+  refine_every_nth_time_step = 10;
+  perform_n_initial_refinements = 15;
+  refine_threshold = 0.25;
   coarsen_threshold = 0.05;
 }
 

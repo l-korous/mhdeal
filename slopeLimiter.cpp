@@ -2,6 +2,12 @@
 #include "problem.h"
 
 template <EquationsType equationsType, int dim>
+void VertexBasedSlopeLimiter<equationsType, dim>::flush_cache()
+{
+  this->postprocessData.clear();
+}
+
+template <EquationsType equationsType, int dim>
 void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::MPI::Vector& current_limited_solution, TrilinosWrappers::MPI::Vector& current_unlimited_solution)
 {
   int cell_count = 0;
@@ -70,13 +76,7 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
               // Only now we know this vertex is at a periodic boundary
               if (face->vertex_index(face_i) == data->vertexIndex[vertex_i])
               {
-                const DealIIExtensions::FacePair<dim>&  face_pair = this->periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-                data->neighbor_dof_indices[vertex_i][neighbor_i].resize(this->dofs_per_cell);
-                typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-                auto this_cell_index = cell->active_cell_index();
-                auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-                neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-                neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
+               // Do stuff
               }
             }
           }
@@ -149,8 +149,8 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
           if (this->is_primitive[i])
           {
             if (std::abs(u_c[this->component_ii[i]]) < SMALL)
-            continue;
-          
+              continue;
+
             // Here we rely on the fact, that the constant basis fn is the first one.
             if (!u_i_extrema_set[this->component_ii[i]])
             {
@@ -192,6 +192,12 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
     for (int i = 0; i < data->lambda_indices_to_multiply_all_B_components.size(); i++)
       current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= alpha_e_B;
   }
+}
+
+template <EquationsType equationsType, int dim>
+void BarthJespersenSlopeLimiter<equationsType, dim>::flush_cache()
+{
+  this->postprocessData.clear();
 }
 
 template <EquationsType equationsType, int dim>
@@ -263,13 +269,7 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
               // Only now we know this vertex is at a periodic boundary
               if (face->vertex_index(face_i) == data->vertexIndex[vertex_i])
               {
-                const DealIIExtensions::FacePair<dim>&  face_pair = this->periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-                data->neighbor_dof_indices[vertex_i][neighbor_i].resize(this->dofs_per_cell);
-                typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-                auto this_cell_index = cell->active_cell_index();
-                auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-                neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-                neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
+                // Do stuff
               }
             }
           }

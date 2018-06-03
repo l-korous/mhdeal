@@ -15,15 +15,7 @@ public:
 #else
     Triangulation<dim>& triangulation
 #endif
-    , const Mapping<dim>& mapping);
-  virtual bool refine_prev_mesh(const DoFHandler<dim>& prev_dof_handler,
-#ifdef HAVE_MPI
-    parallel::distributed::Triangulation<dim>& triangulation
-#else
-    Triangulation<dim>& triangulation
-#endif
-  ) const = 0;
-  virtual bool process_element(const typename Triangulation<dim>::active_cell_iterator& cell, int ith_cell, int time_step) const = 0;
+    , const Mapping<dim>& mapping) = 0;
 
   protected:
   Parameters<dim>& parameters;

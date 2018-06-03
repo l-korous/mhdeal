@@ -1,7 +1,7 @@
-#include "adaptivityMhdBlast.h"
+#include "adaptivityTD.h"
 
 template <int dim>
-AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, MPI_Comm& mpi_communicator, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
+AdaptivityTD<dim>::AdaptivityTD(Parameters<dim>& parameters, MPI_Comm& mpi_communicator, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
 ) :
   Adaptivity<dim>(parameters, mpi_communicator),
   last_time_step(0),
@@ -11,9 +11,9 @@ AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, MPI_Com
 }
 
 template <int dim>
-void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping, Vector<double>& gradient_indicator)
+void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler, const Mapping<dim>& mapping, Vector<double>& gradient_indicator)
 {
-  FEValuesExtractors::Scalar scalars[2];
+  FEValuesExtractors::Scalar scalars[dim];
   scalars[0].component = 0;
   scalars[1].component = 4;
   const QGauss<dim - 1> face_quadrature(1);
@@ -27,7 +27,7 @@ void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& sol
       continue;
     Point<dim> jump;
     Point<dim> area;
-    for (unsigned int face_no = 0; face_no < 4; ++face_no)
+    for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
     {
       typename DoFHandler<dim>::face_iterator face = cell->face(face_no);
       if (!face->at_boundary())
@@ -106,12 +106,12 @@ void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& sol
     }
     double average_jumps[dim];
     double sum_of_average_jumps = 0.;
-    for (unsigned int i = 0; i < 2; ++i)
+    for (unsigned int i = 0; i < dim; ++i)
     {
       average_jumps[i] = jump(i) / area(i);
       sum_of_average_jumps += average_jumps[i];
     }
-    gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps * cell->diameter() * cell->diameter() * cell->diameter() * cell->diameter();
+    gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps * cell->diameter();
   }
   for (int i = 0; i < gradient_indicator.size(); i++)
     if (gradient_indicator[i] < SMALL)
@@ -119,7 +119,7 @@ void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& sol
 }
 
 template <int dim>
-bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler,
+bool AdaptivityTD<dim>::refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler,
 #ifdef HAVE_MPI
   parallel::distributed::Triangulation<dim>& triangulation
 #else
@@ -137,11 +137,11 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   Vector<double> gradient_indicator(triangulation.n_active_cells());
   calculate_jumps(solution, dof_handler, mapping, gradient_indicator);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, this->max_cells + (int)std::floor((time / 0.5) * 10000.));
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, this->max_cells + (int)std::floor(time * 10000.));
 
   triangulation.prepare_coarsening_and_refinement();
 
   return true;
 }
 
-template class AdaptivityMhdBlast<3>;
+template class AdaptivityTD<3>;

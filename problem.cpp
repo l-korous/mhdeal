@@ -29,7 +29,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe_v_face_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
   fe_v_subface(mapping, fe, face_quadrature, face_update_flags),
   fe_v_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
-  adaptivity(0)
+  adaptivity(0),
+  solver(new AztecOO())
 {
   n_quadrature_points_cell = quadrature.get_points().size();
   fluxes_old.resize(n_quadrature_points_cell);
@@ -45,9 +46,9 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
     this->numFlux = new NumFluxLaxFriedrich<equationsType, dim>(this->parameters);
 
   if (parameters.slope_limiter == parameters.vertexBased)
-    this->slopeLimiter = new VertexBasedSlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, periodic_cell_map, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive);
+    this->slopeLimiter = new VertexBasedSlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive);
   else if (parameters.slope_limiter == parameters.barthJespersen)
-    this->slopeLimiter = new BarthJespersenSlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, periodic_cell_map, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive);
+    this->slopeLimiter = new BarthJespersenSlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive);
 }
 
 template <EquationsType equationsType, int dim>
@@ -157,29 +158,10 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     {
       // Boundary face - here we pass the boundary id
       if (cell->at_boundary(face_no) && !(this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id())))
-        /*
-        {
-          const DealIIExtensions::FacePair<dim>&  face_pair = periodic_cell_map.find(std::make_pair(cell, face_no))->second;
-          typename DoFHandler<dim>::active_cell_iterator neighbor(cell);
-          auto this_cell_index = cell->active_cell_index();
-          auto zeroth_found_cell_index = (*(face_pair.cell[0])).active_cell_index();
-          neighbor = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.cell[1] : face_pair.cell[0]);
-          const unsigned int neighbor_face = ((zeroth_found_cell_index == this_cell_index && face_no == face_pair.face_idx[0]) ? face_pair.face_idx[1] : face_pair.face_idx[0]);
-
-          neighbor->get_dof_indices(dof_indices_neighbor);
-
-          fe_v_face.reinit(cell, face_no);
-          fe_v_face_neighbor.reinit(neighbor, neighbor_face);
-
-          assemble_face_term(face_no, fe_v_face, fe_v_face_neighbor, false, cell->face(face_no)->boundary_id(), cell_rhs);
-        }
-        else
-        */
         {
           fe_v_face.reinit(cell, face_no);
           assemble_face_term(face_no, fe_v_face, fe_v_face, true, cell->face(face_no)->boundary_id(), cell_rhs);
         }
-      //}
       else
       {
         // Here the neighbor face is more split than the current one (has children with respect to the current face of the current element), we need to assemble sub-face by sub-face
@@ -485,7 +467,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
 
 template <EquationsType equationsType, int dim>
 void
-Problem<equationsType, dim>::solve(bool reset_matrix)
+Problem<equationsType, dim>::solve()
 {
   // Direct solver is only usable without MPI, as it is not distributed.
 #ifndef HAVE_MPI
@@ -500,30 +482,34 @@ Problem<equationsType, dim>::solve(bool reset_matrix)
   else
 #endif
   {
-    AztecOO solver;
+    if (time_step == 0 || this->reset_after_refinement)
+    {
+      delete solver;
+      solver = new AztecOO();
+    }
+
     dealii::LinearAlgebraTrilinos::MPI::Vector completely_distributed_solution(locally_owned_dofs, mpi_communicator);
 
     Epetra_Vector x(View, system_matrix.trilinos_matrix().DomainMap(), completely_distributed_solution.begin());
     Epetra_Vector b(View, system_matrix.trilinos_matrix().RangeMap(), system_rhs.begin());
 
-    solver.SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
-    solver.SetAztecOption(AZ_solver, AZ_gmres);
-    solver.SetRHS(&b);
-    solver.SetLHS(&x);
+    solver->SetAztecOption(AZ_output, (parameters.output == Parameters<dim>::quiet_solver ? AZ_none : AZ_all));
+    solver->SetAztecOption(AZ_solver, AZ_gmres);
+    solver->SetRHS(&b);
+    solver->SetLHS(&x);
 
-    solver.SetAztecOption(AZ_precond, AZ_dom_decomp);
-    solver.SetAztecOption(AZ_subdomain_solve, AZ_ilut);
-    solver.SetAztecOption(AZ_overlap, 0);
-    solver.SetAztecOption(AZ_reorder, 0);
-    solver.SetAztecParam(AZ_drop, parameters.ilut_drop);
-    solver.SetAztecParam(AZ_ilut_fill, parameters.ilut_fill);
-    solver.SetAztecParam(AZ_athresh, parameters.ilut_atol);
-    solver.SetAztecParam(AZ_rthresh, parameters.ilut_rtol);
+    solver->SetAztecOption(AZ_precond, AZ_dom_decomp);
+    solver->SetAztecOption(AZ_subdomain_solve, AZ_ilut);
+    solver->SetAztecOption(AZ_overlap, 0);
+    solver->SetAztecOption(AZ_reorder, 0);
+    solver->SetAztecParam(AZ_drop, parameters.ilut_drop);
+    solver->SetAztecParam(AZ_ilut_fill, parameters.ilut_fill);
+    solver->SetAztecParam(AZ_athresh, parameters.ilut_atol);
+    solver->SetAztecParam(AZ_rthresh, parameters.ilut_rtol);
 
-    if (reset_matrix)
-      solver.SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
-
-    solver.Iterate(parameters.max_iterations, parameters.linear_residual);
+    solver->SetUserMatrix(const_cast<Epetra_CrsMatrix *> (&system_matrix.trilinos_matrix()));
+    
+    solver->Iterate(parameters.max_iterations, parameters.linear_residual);
 
     constraints.distribute(completely_distributed_solution);
     current_unlimited_solution = completely_distributed_solution;
@@ -673,13 +659,20 @@ void Problem<equationsType, dim>::run()
     solve();
 
     // Postprocess if required
-    if ((this->time > this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
+    if ((this->time >= this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
       postprocess();
     else
       current_limited_solution = current_unlimited_solution;
 
     move_time_step_handle_outputs();
   }
+}
+
+template <EquationsType equationsType, int dim>
+void Problem<equationsType, dim>::perform_reset_after_refinement()
+{
+  this->reset_after_refinement = true;
+  this->slopeLimiter->flush_cache();
 }
 
 template <EquationsType equationsType, int dim>
@@ -742,9 +735,12 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
         prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
         constraints.distribute(prev_solution);
       }
+
+      this->perform_reset_after_refinement();
     }
     else
     {
+      this->reset_after_refinement = false;
       this->prev_solution = this->current_limited_solution;
       ++time_step;
       time += parameters.time_step;

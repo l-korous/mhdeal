@@ -3,14 +3,13 @@
 
 #include "equationsMhd.h"
 #include "parameters.h"
-#include "dealiiExtensions.h"
 
 template <EquationsType equationsType, int dim>
 class SlopeLimiter
 {
 public:
   SlopeLimiter(const Parameters<dim>& parameters, const MappingQ1<dim>& mapping, const FESystem<dim>& fe, DoFHandler<dim>& dof_handler, 
-    DealIIExtensions::PeriodicCellMap<dim>& periodic_cell_map, unsigned int& dofs_per_cell,
+     unsigned int& dofs_per_cell,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation,
 #else
@@ -21,16 +20,16 @@ public:
     mapping(mapping),
     fe(fe),
     dof_handler(dof_handler),
-    periodic_cell_map(periodic_cell_map),
     dofs_per_cell(dofs_per_cell),
     triangulation(triangulation),
     dof_indices(dof_indices),
     component_ii(component_ii),
     is_primitive(is_primitive)
     {};
-  
+
   // Not const because of caching.
   virtual void postprocess(TrilinosWrappers::MPI::Vector& current_limited_solution, TrilinosWrappers::MPI::Vector& current_unlimited_solution) = 0;
+  virtual void flush_cache() = 0;
 protected:
   // Performs a single global assembly.
   struct PostprocessData
@@ -55,7 +54,6 @@ protected:
   const MappingQ1<dim>& mapping;
   const FESystem<dim>& fe;
   DoFHandler<dim>& dof_handler;
-  DealIIExtensions::PeriodicCellMap<dim>& periodic_cell_map;
   unsigned int& dofs_per_cell;
   std::vector<types::global_dof_index>& dof_indices;
   std::array <unsigned short, BASIS_FN_COUNT>& component_ii;
@@ -66,7 +64,7 @@ template <EquationsType equationsType, int dim>
 class VertexBasedSlopeLimiter : public SlopeLimiter<equationsType, dim>
 {
 public:
-  VertexBasedSlopeLimiter(const Parameters<dim>& parameters, const MappingQ1<dim>& mapping, const FESystem<dim>& fe, DoFHandler<dim>& dof_handler, DealIIExtensions::PeriodicCellMap<dim>& periodic_cell_map, 
+  VertexBasedSlopeLimiter(const Parameters<dim>& parameters, const MappingQ1<dim>& mapping, const FESystem<dim>& fe, DoFHandler<dim>& dof_handler,  
     unsigned int& dofs_per_cell,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation,
@@ -74,16 +72,17 @@ public:
     Triangulation<dim>& triangulation,
 #endif
     std::vector<types::global_dof_index>& dof_indices, std::array <unsigned short, BASIS_FN_COUNT>& component_ii, std::array <bool, BASIS_FN_COUNT>& is_primitive) : 
-    SlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, periodic_cell_map, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive) {};
+    SlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive) {};
   // Not const because of caching.
   virtual void postprocess(TrilinosWrappers::MPI::Vector& current_limited_solution, TrilinosWrappers::MPI::Vector& current_unlimited_solution);
+  void flush_cache();
 };
 
 template <EquationsType equationsType, int dim>
 class BarthJespersenSlopeLimiter : public SlopeLimiter<equationsType, dim>
 {
 public:
-  BarthJespersenSlopeLimiter(const Parameters<dim>& parameters, const MappingQ1<dim>& mapping, const FESystem<dim>& fe, DoFHandler<dim>& dof_handler, DealIIExtensions::PeriodicCellMap<dim>& periodic_cell_map, 
+  BarthJespersenSlopeLimiter(const Parameters<dim>& parameters, const MappingQ1<dim>& mapping, const FESystem<dim>& fe, DoFHandler<dim>& dof_handler,  
     unsigned int& dofs_per_cell,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation,
@@ -91,9 +90,10 @@ public:
     Triangulation<dim>& triangulation,
 #endif
     std::vector<types::global_dof_index>& dof_indices, std::array <unsigned short, BASIS_FN_COUNT>& component_ii, std::array <bool, BASIS_FN_COUNT>& is_primitive) : 
-    SlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, periodic_cell_map, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive) {};
+    SlopeLimiter<equationsType, dim>(parameters, mapping, fe, dof_handler, dofs_per_cell, triangulation, dof_indices, component_ii, is_primitive) {};
   // Not const because of caching.
   virtual void postprocess(TrilinosWrappers::MPI::Vector& current_limited_solution, TrilinosWrappers::MPI::Vector& current_unlimited_solution);
+  void flush_cache();
 };
 
 #endif

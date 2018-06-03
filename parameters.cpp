@@ -2,7 +2,7 @@
 
 template <int dim>
 Parameters<dim>::Parameters() {
-  this->start_limiting_at = 0.;
+  this->start_limiting_at = -1.;
   this->gas_gamma = 5. / 3.;
   this->limit = true;
   this->slope_limiter = vertexBased;

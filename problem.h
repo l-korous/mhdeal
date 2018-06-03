@@ -3,7 +3,6 @@
 #include "parameters.h"
 #include "initialCondition.h"
 #include "boundaryConditions.h"
-#include "dealiiExtensions.h"
 #include "feDivFree.h"
 #include "feTaylor.h"
 #include "numericalFlux.h"
@@ -51,9 +50,12 @@ public:
   void output_vector(TrilinosWrappers::MPI::Vector& vec, const char* suffix) const;
 
   // Solves the assembled system
-  void solve(bool reset_matrix = true);
+  void solve();
 
   void move_time_step_handle_outputs();
+
+  void perform_reset_after_refinement();
+  bool reset_after_refinement;
 
   // Triangulation - passed as a constructor parameter
 #ifdef HAVE_MPI
@@ -80,6 +82,7 @@ public:
   // Dofs calculated by this MPI process + all Dofs on all neighboring cells.
   IndexSet locally_relevant_dofs;
 
+  AztecOO* solver;
   const MappingQ1<dim> mapping;
   const FESystem<dim> fe;
   DoFHandler<dim> dof_handler;
@@ -105,7 +108,6 @@ public:
   // For CFL.
   double max_signal_speed;
 
-  DealIIExtensions::PeriodicCellMap<dim> periodic_cell_map;
   FEValuesExtractors::Vector mag;
   void precalculate_global();
   unsigned int dofs_per_cell;

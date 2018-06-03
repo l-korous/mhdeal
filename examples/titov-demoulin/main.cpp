@@ -3,6 +3,7 @@
 #include "equationsMhd.h"
 #include "parameters.h"
 #include "initialConditionTD.h"
+#include "adaptivityTD.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
 #define DIMENSION 3
@@ -17,29 +18,42 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 {
   GridGenerator::subdivided_hyper_rectangle(triangulation, parameters.refinements, parameters.corner_a, parameters.corner_b, true);
 
-  std::vector<DealIIExtensions::FacePair<DIMENSION> > matched_pairs;
+  std::vector<dealii::GridTools::PeriodicFacePair< dealii::TriaIterator<dealii::CellAccessor<DIMENSION> > > > matched_pairs;
   for (std::vector<std::array<int, 3> >::const_iterator it = parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
     dealii::GridTools::collect_periodic_faces(triangulation, (*it)[0], (*it)[1], (*it)[2], matched_pairs);
   triangulation.add_periodicity(matched_pairs);
 }
 
+// Parameters that are specific for this example.
+int max_cells;
+int refine_every_nth_time_step;
+int perform_n_initial_refinements;
+double refine_threshold;
+double coarsen_threshold;
+
 void set_parameters(Parameters<DIMENSION>& parameters)  
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-10., -10., 0.);
-  parameters.corner_b = Point<DIMENSION>(10., 10., 20.);
-  parameters.refinements = { 20, 20, 20 };
-  parameters.limit = false;
-  parameters.use_div_free_space_for_B = false;
+  parameters.corner_a = Point<DIMENSION>(-5., -5., 0.);
+  parameters.corner_b = Point<DIMENSION>(5., 5., 8.);
+  parameters.refinements = { 5, 5, 4 };
+  parameters.limit = true;
+  parameters.use_div_free_space_for_B = true;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .05;
-  parameters.start_limiting_at = .05;
-  parameters.quadrature_order = 1;
-  parameters.polynomial_order_dg = 0;
+  parameters.cfl_coefficient = .01;
+  parameters.start_limiting_at = -.05;
+  parameters.quadrature_order = 5;
+  parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = -1.e-2;
+  parameters.output_step = 1.e-2;
   parameters.final_time = 10.;
+
+  max_cells = 3000;
+  refine_every_nth_time_step = 10;
+  perform_n_initial_refinements = 20;
+  refine_threshold = 0.1;
+  coarsen_threshold = 0.05;
 }
 
 int main(int argc, char *argv[])
@@ -67,9 +81,12 @@ int main(int argc, char *argv[])
     BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
+    // Adaptivity
+    AdaptivityTD<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Run the problem - entire transient problem.
+    problem.set_adaptivity(&adaptivity);
     problem.run();
   }
   catch (std::exception &exc)

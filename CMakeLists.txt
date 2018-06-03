@@ -8,8 +8,6 @@ SET(TARGET_SRC
   equations.h
   equationsMhd.cpp
   feIsConstInterface.h
-  dealiiExtensions.cpp
-  dealiiExtensions.h
   feDivFree.h
   feDivFree.cpp
   feTaylor.h
