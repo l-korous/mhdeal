@@ -30,7 +30,8 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   fe_v_subface(mapping, fe, face_quadrature, face_update_flags),
   fe_v_subface_neighbor(mapping, fe, face_quadrature, neighbor_face_update_flags),
   adaptivity(0),
-  solver(new AztecOO())
+  solver(new AztecOO()),
+  reset_after_refinement(true)
 {
   n_quadrature_points_cell = quadrature.get_points().size();
   fluxes_old.resize(n_quadrature_points_cell);
@@ -482,7 +483,7 @@ Problem<equationsType, dim>::solve()
   else
 #endif
   {
-    if (time_step == 0 || this->reset_after_refinement)
+    if (this->reset_after_refinement)
     {
       delete solver;
       solver = new AztecOO();
@@ -545,7 +546,7 @@ void Problem<equationsType, dim>::output_base()
 }
 
 template <EquationsType equationsType, int dim>
-void Problem<equationsType, dim>::output_results() const
+void Problem<equationsType, dim>::output_results(bool use_prev_solution) const
 {
   typename Equations<equationsType, dim>::Postprocessor postprocessor(parameters);
 
@@ -553,10 +554,10 @@ void Problem<equationsType, dim>::output_results() const
   data_out.attach_dof_handler(dof_handler);
 
   // Solution components.
-  data_out.add_data_vector(current_limited_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
+  data_out.add_data_vector(use_prev_solution ? prev_solution : current_limited_solution, equations.component_names(), DataOut<dim>::type_dof_data, equations.component_interpretation());
 
   // Derived quantities.
-  data_out.add_data_vector(current_limited_solution, postprocessor);
+  data_out.add_data_vector(use_prev_solution ? prev_solution : current_limited_solution, postprocessor);
 
 #ifdef HAVE_MPI
   // Subdomains.
@@ -571,7 +572,7 @@ void Problem<equationsType, dim>::output_results() const
   static unsigned int output_file_number = 0;
 
 #ifdef HAVE_MPI
-  const std::string filename_base = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3);
+  const std::string filename_base = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : (use_prev_solution ? "prev_solution" : "solution")) + "-" + Utilities::int_to_string(output_file_number, 3);
 
   const std::string filename = (filename_base + "-" + Utilities::int_to_string(triangulation.locally_owned_subdomain(), 4));
 
@@ -591,7 +592,7 @@ void Problem<equationsType, dim>::output_results() const
     data_out.write_pvtu_record(visit_master_output, filenames);
   }
 #else
-  std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : "solution") + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
+  std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : (use_prev_solution ? "prev_solution" : "solution")) + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
   data_out.write_vtk(output);
 #endif
@@ -626,7 +627,7 @@ void Problem<equationsType, dim>::run()
 {
   // Preparations.
   setup_system();
-  current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+  current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
   current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
   prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
@@ -635,19 +636,21 @@ void Problem<equationsType, dim>::run()
   exit(1);
 #endif
 
+  int adaptivity_step = 0;
   while (time < parameters.final_time)
   {
     // Some output.
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     {
-      LOGL(0, "Step: " << time_step << ", T: " << time);
+      LOGL(0, "Step: " << time_step << ", T: " << time << ", adaptivity step: " << (this->adaptivity ? adaptivity_step++ : 0));
       LOGL(0, "- number of active cells:       " << triangulation.n_global_active_cells() << std::endl << " Number of degrees of freedom: " << dof_handler.n_dofs());
     }
 
     // Assemble
     system_rhs = 0;
-    system_matrix = 0;
-    assemble_system();
+    if(reset_after_refinement)
+      system_matrix = 0;
+    assemble_system(this->reset_after_refinement);
 
     // Output matrix & rhs if required.
     if (parameters.output_matrix)
@@ -694,7 +697,10 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
   if (this->adaptivity)
   {
     // refine mesh
-    bool refined = this->adaptivity->refine_mesh(time_step, time, current_limited_solution, dof_handler, triangulation, mapping);
+    // we use the unlimited solution here for two reasons:
+    // - it has ghost elements
+    // - it is a useful indicator where to refine
+    bool refined = this->adaptivity->refine_mesh(time_step, time, current_unlimited_solution, dof_handler, triangulation, mapping);
     if (refined)
     {
       // transfer solution
@@ -713,7 +719,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
       // reinit structures, periodicity, etc.
       this->setup_system();
 
-      current_limited_solution.reinit(locally_relevant_dofs, mpi_communicator);
+      current_limited_solution.reinit(locally_owned_dofs, mpi_communicator);
       current_unlimited_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
       // Now interpolate the solution
@@ -728,13 +734,9 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
 #endif
         prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
         this->prev_solution = interpolated_solution;
-        constraints.distribute(prev_solution);
       }
       else
-      {
         prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
-        constraints.distribute(prev_solution);
-      }
 
       this->perform_reset_after_refinement();
     }
@@ -748,6 +750,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
   }
   else
   {
+    this->reset_after_refinement = false;
     this->prev_solution = this->current_limited_solution;
     ++time_step;
     time += parameters.time_step;
