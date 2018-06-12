@@ -1,12 +1,13 @@
 SET(TARGET "mhdeal")
 
 SET(TARGET_SRC
+  adaptivity.cpp
+  adaptivity.h
+  util.cpp
   util.h
   equations.h
   equationsMhd.cpp
   feIsConstInterface.h
-  dealiiExtensions.cpp
-  dealiiExtensions.h
   feDivFree.h
   feDivFree.cpp
   feTaylor.h
@@ -56,17 +57,19 @@ DEAL_II_INITIALIZE_CACHED_VARIABLES()
 PROJECT(${TARGET})
 IF(WIN32)
 SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG")
-    IF(NOT(CMAKE_BUILD_TYPE EQUAL "DEBUG"))
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Ob2 /Oi /Ot /GL")
+    IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Od /MP")
+    ELSE()
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Ob2 /Oi /Ot /GL /MP")
     ENDIF()
 ELSE()
-    IF(NOT(CMAKE_BUILD_TYPE EQUAL "DEBUG"))
+    IF(NOT(CMAKE_BUILD_TYPE STREQUAL "Debug"))
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
     ENDIF()
 ENDIF()
 include_directories(${DEAL_II_INCLUDE_DIRS})
 add_library(${TARGET} ${TARGET_SRC})
-IF(CMAKE_BUILD_TYPE EQUAL "DEBUG")
+IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 DEAL_II_SETUP_TARGET(${TARGET} DEBUG)
 ELSE()
 DEAL_II_SETUP_TARGET(${TARGET} RELEASE)

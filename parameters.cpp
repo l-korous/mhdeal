@@ -2,25 +2,15 @@
 
 template <int dim>
 Parameters<dim>::Parameters() {
-  this->start_limiting_at = 0.;
+  this->start_limiting_at = -1.;
   this->gas_gamma = 5. / 3.;
-  this->use_iterative_improvement = false;
-  this->limit_in_nonlin_loop = false;
-  this->automatic_damping = false;
-  this->automatic_cfl = false;
-  this->initial_and_max_newton_damping = 1.;
-  this->decrease_factor = .9;
-  this->increase_factor = 1. / this->decrease_factor;
-  this->stagnation_coefficient = 1.e-2;
-  this->bad_step_coefficient = 2.;
   this->limit = true;
   this->slope_limiter = vertexBased;
   this->output_file_prefix = "";
   this->lax_friedrich_stabilization_value = .5;
-  this->snapshot_step = 1.;
   this->time_step = 1.e-6;
 
-  this->debug = false;
+  this->debug = 0;
   this->output_matrix = false;
   this->output = quiet_solver;
   this->output_rhs = false;
@@ -33,8 +23,6 @@ Parameters<dim>::Parameters() {
   this->ilut_drop = 1e-6;
   this->ilut_atol = 1e-6;
   this->ilut_rtol = 1.0;
-  this->newton_max_iterations = 30;
-  this->newton_residual_norm_threshold = 1e-8;
 }
 
 template <int dim>
@@ -47,10 +35,11 @@ void Parameters<dim>::delete_old_outputs(MPI_Comm& mpi_communicator) const
     std::stringstream ss;
     ss << "del";
     ss << " " << this->output_file_prefix << "*.vtk";
-    ss << " " << this->output_file_prefix << "*.newton_update";
     ss << " " << this->output_file_prefix << "*.current_solution";
+    ss << " " << this->output_file_prefix << "*.prev_solution";
     ss << " " << this->output_file_prefix << "*.matrix";
     ss << " " << this->output_file_prefix << "*.rhs";
+    ss << " " << this->output_file_prefix << "*.solution";
     system(ss.str().c_str());
 #else
     std::stringstream ss;
@@ -59,13 +48,23 @@ void Parameters<dim>::delete_old_outputs(MPI_Comm& mpi_communicator) const
     ss << " " << this->output_file_prefix << "*.vtu";
     ss << " " << this->output_file_prefix << "*.pvtu";
     ss << " " << this->output_file_prefix << "*.vtk";
-    ss << " " << this->output_file_prefix << "*.newton_update";
     ss << " " << this->output_file_prefix << "*.current_solution";
+    ss << " " << this->output_file_prefix << "*.prev_solution";
+    ss << " " << this->output_file_prefix << "*.solution";
     ss << " " << this->output_file_prefix << "*.matrix";
     ss << " " << this->output_file_prefix << "*.rhs";
     system(ss.str().c_str());
 #endif
   }
+}
+
+template <int dim>
+bool Parameters<dim>::is_periodic_boundary(int boundary_id) const
+{
+  for (int pb = 0; pb < this->periodic_boundaries.size(); pb++)
+    if (this->periodic_boundaries[pb][0] == boundary_id || this->periodic_boundaries[pb][1] == boundary_id)
+      return true;
+  return false;
 }
 
 template class Parameters<3>;

@@ -1,5 +1,5 @@
-#ifndef _INITIAL_CONDITION_OT_H
-#define _INITIAL_CONDITION_OT_H
+#ifndef _INITIAL_CONDITION_MHD_BLAST_H
+#define _INITIAL_CONDITION_MHD_BLAST_H
 
 #include "util.h"
 #include "parameters.h"
@@ -8,10 +8,10 @@
 
 // Initial condition
 template <EquationsType equationsType, int dim>
-class InitialConditionOT : public InitialCondition<equationsType, dim>
+class InitialConditionMhdBlast : public InitialCondition<equationsType, dim>
 {
 public:
-  InitialConditionOT(Parameters<dim>&);
+  InitialConditionMhdBlast(Parameters<dim>&);
   void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
 };
 

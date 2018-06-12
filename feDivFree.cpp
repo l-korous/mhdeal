@@ -20,21 +20,13 @@ FE_DG_DivFree<dim, spacedim>::FE_DG_DivFree()
   this->system_to_component_table[6] = std::pair<unsigned int, unsigned int>(1, 6);
   this->system_to_component_table[7] = std::pair<unsigned int, unsigned int>(2, 7);
   this->system_to_component_table[8] = std::pair<unsigned int, unsigned int>(2, 8);
-  const unsigned int n_dofs = this->dofs_per_cell;
-  for (unsigned int ref_case = RefinementCase<dim>::cut_x; ref_case < RefinementCase<dim>::isotropic_refinement + 1; ++ref_case)
+  this->reinit_restriction_and_prolongation_matrices();
+  // Fill prolongation matrices with embedding operators
+  if (dim == spacedim)
   {
-    // do nothing, as anisotropic refinement is not implemented so far
-    if (dim != 2 && ref_case != RefinementCase<dim>::isotropic_refinement)
-      continue;
-
-    const unsigned int nc = GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
-    for (unsigned int i = 0; i < nc; ++i)
-    {
-      this->prolongation[ref_case - 1][i].reinit(n_dofs, n_dofs);
-      // Fill prolongation matrices with embedding operators
-      for (unsigned int j = 0; j < n_dofs; ++j)
-        this->prolongation[ref_case - 1][i](j, j) = 1.;
-    }
+    FETools::compute_embedding_matrices(*this, this->prolongation);
+    // Fill restriction matrices with L2-projection
+    FETools::compute_projection_matrices(*this, this->restriction);
   }
 }
 

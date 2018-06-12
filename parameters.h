@@ -11,15 +11,18 @@ public:
   // Parameters constructor takes a triangulation as an attribute (passed by reference), and the constructor is responsible for filling out the triangulation.
   Parameters();
 
+  void delete_old_outputs(MPI_Comm& mpi_communicator) const;
+
+  bool is_periodic_boundary(int boundary_id) const;
+
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
 
   // Limiter
+  bool limit;
   enum Limiter { vertexBased, barthJespersen};
   Limiter slope_limiter;
-
-  // Perform iterative improvements.
-  bool use_iterative_improvement;
+  double start_limiting_at;
 
   // Flux enumeration - for potentially adding more fluxes, decision which one to use is then made in Equations<>::numerical_normal_flux.
   enum NumFluxType { hlld, lax_friedrich };
@@ -28,7 +31,7 @@ public:
   double lax_friedrich_stabilization_value;
 
   // Output step - either < 0 (output all steps), or > 0 (time difference between two outputs)
-  double output_step, snapshot_step;
+  double output_step;
   // File name
   std::string output_file_prefix;
 
@@ -45,25 +48,6 @@ public:
   // Gas gamma value.
   double gas_gamma;
 
-  // Nonlinear solver
-  // Damping factor in Newton
-  double initial_and_max_newton_damping;
-  // Make damping factor variable
-  bool automatic_damping;
-  // Make CFL coefficient variable
-  bool automatic_cfl;
-  double decrease_factor;
-  double increase_factor;
-  bool limit, limit_in_nonlin_loop;
-  // Maximum allowed nonlinear iterations count, fail if exceeded
-  int newton_max_iterations;
-  // Tolerance for nonlinear residual norm, succeed the nonlinear loop if norm < newton_residual_norm_threshold
-  double newton_residual_norm_threshold;
-  // If relative change between the previous non-linear step and the current one is smaller than this, then we say that the current step was SUCCESSFUL.
-  double stagnation_coefficient;
-  // If relative change between the previous non-linear step and the current one is larger than this, then we say that the current step was NOT SUCCESSFUL.
-  double bad_step_coefficient;
-
   // Linear solver type enumeration
   enum SolverType { gmres, direct };
   // Linear solver type selected
@@ -73,7 +57,7 @@ public:
   // Verbosity selected
   OutputType output;
 
-  // Tolerance for linear residual norm, succeed the linear loop if norm < newton_residual_norm_threshold
+  // Tolerance for linear residual norm
   double linear_residual;
   // Maximum allowed linear iterations count, succeed the linear loop exceeded
   int max_iterations;
@@ -89,17 +73,24 @@ public:
   int polynomial_order_dg;
   // Quadrature order.
   int quadrature_order;
-  // Debugging purposes
-  bool debug;
 
   Point<dim> corner_a;
   Point<dim> corner_b;
   std::vector<unsigned int> refinements;
   std::vector<std::array<int, 3> > periodic_boundaries;
 
-  void delete_old_outputs(MPI_Comm& mpi_communicator) const;
-
-  double start_limiting_at;
+  // Debugging
+  enum DebuggingFlag
+  {
+    None = 0,
+    BasicSteps = 1,
+    PeriodicBoundaries = 2,
+    Assembling = 4,
+    SlopeLimiting = 8,
+    NumFlux = 16,
+    Adaptivity = 32
+  };
+  int debug;
 };
 
 #endif

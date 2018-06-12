@@ -1,7 +1,6 @@
 get_filename_component(TARGET ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-SET(TARGET_SRC
-  main.cpp
-)
+FILE(GLOB SRC_FILES *.cpp *.h)
+SET(TARGET_SRC ${SRC_FILES})
 
 # Usually, you will not need to modify anything beyond this point...
 
@@ -31,7 +30,7 @@ DEAL_II_INITIALIZE_CACHED_VARIABLES()
 PROJECT(${TARGET})
 include_directories(../..)
 add_executable(${TARGET} ${TARGET_SRC})
-IF(CMAKE_BUILD_TYPE EQUAL "DEBUG")
+IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 DEAL_II_SETUP_TARGET(${TARGET} DEBUG)
 ELSE()
 DEAL_II_SETUP_TARGET(${TARGET} RELEASE)
