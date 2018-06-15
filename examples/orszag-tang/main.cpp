@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
     InitialConditionOT<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
+    BoundaryCondition<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Put together the problem.

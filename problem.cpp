@@ -7,7 +7,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
 #else
   Triangulation<dim>& triangulation,
 #endif
-  InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions) :
+  InitialCondition<equationsType, dim>& initial_condition, BoundaryCondition<equationsType, dim>& boundary_conditions) :
   mpi_communicator(MPI_COMM_WORLD),
   parameters(parameters),
   equations(equations),

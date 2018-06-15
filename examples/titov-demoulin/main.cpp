@@ -3,6 +3,7 @@
 #include "equationsMhd.h"
 #include "parameters.h"
 #include "initialConditionTD.h"
+#include "boundaryConditionTD.h"
 #include "adaptivityTD.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
@@ -36,7 +37,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
   parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
-  parameters.refinements = { 40, 80, 40 };
+  parameters.refinements = { 30, 60, 30 };
   parameters.limit = false;
   parameters.use_div_free_space_for_B = true;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
@@ -46,7 +47,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 1.e-2;
+  parameters.output_step = -1.e-2;
   parameters.final_time = 20.;
 
   max_cells = 3500;
@@ -78,15 +79,16 @@ int main(int argc, char *argv[])
 
     InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
+    BoundaryConditionTitovDemoulin<DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
     AdaptivityTD<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
-    // Run the problem - entire transient problem.
+    // Set adaptivity
     //problem.set_adaptivity(&adaptivity);
+    // Run the problem - entire transient problem.
     problem.run();
   }
   catch (std::exception &exc)

@@ -1,5 +1,5 @@
-#ifndef _INITIAL_CONDITION_OT_H
-#define _INITIAL_CONDITION_OT_H
+#ifndef _INITIAL_CONDITION_TD_H
+#define _INITIAL_CONDITION_TD_H
 
 #include "util.h"
 #include "parameters.h"

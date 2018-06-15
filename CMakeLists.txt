@@ -15,8 +15,8 @@ SET(TARGET_SRC
   equationsMhd.h
   parameters.cpp
   parameters.h
-  boundaryConditions.cpp
-  boundaryConditions.h
+  boundaryCondition.cpp
+  boundaryCondition.h
   initialCondition.cpp
   initialCondition.h
   problem.cpp

@@ -2,7 +2,7 @@
 #include "equationsMhd.h"
 #include "parameters.h"
 #include "initialCondition.h"
-#include "boundaryConditions.h"
+#include "boundaryCondition.h"
 #include "feDivFree.h"
 #include "feTaylor.h"
 #include "numericalFlux.h"
@@ -21,7 +21,7 @@ public:
 #else
     Triangulation<dim>& triangulation,
 #endif
-    InitialCondition<equationsType, dim>& initial_condition, BoundaryConditions<equationsType, dim>& boundary_conditions);
+    InitialCondition<equationsType, dim>& initial_condition, BoundaryCondition<equationsType, dim>& boundary_conditions);
   void run();
 
   // Technical matters done only once after creation.
@@ -74,7 +74,7 @@ public:
   InitialCondition<equationsType, dim>& initial_condition;
 
   // Boundary conditions - passed as a constructor parameter
-  BoundaryConditions<equationsType, dim>& boundary_conditions;
+  BoundaryCondition<equationsType, dim>& boundary_conditions;
 
   // Dofs calculated by this MPI process.
   IndexSet locally_owned_dofs;

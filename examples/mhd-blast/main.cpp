@@ -33,18 +33,19 @@ double coarsen_threshold;
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 0.1);
-  parameters.refinements = { 10, 15, 1 };
-  parameters.limit = true;
+  parameters.corner_a = Point<DIMENSION>(-0.5, -0.5, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.5, 0.1);
+  parameters.refinements = { 150, 150, 1 };
+  parameters.limit = false;
+  parameters.output_file_prefix = "lf-";
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
-  parameters.num_flux_type = Parameters<DIMENSION>::hlld;
-  parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .05;
-  parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.num_flux_type = Parameters<DIMENSION>::lax_friedrich;
+  parameters.lax_friedrich_stabilization_value = 1.5;
+  parameters.cfl_coefficient = .02;
+  parameters.quadrature_order = 1;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
   parameters.output_step = 1.e-2;
   parameters.final_time = 1.;
@@ -85,14 +86,15 @@ int main(int argc, char *argv[])
 
     InitialConditionMhdBlast<EQUATIONS, DIMENSION> initial_condition(parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditions<EQUATIONS, DIMENSION> boundary_conditions(parameters);
+    BoundaryCondition<EQUATIONS, DIMENSION> boundary_conditions(parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
     AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
-    problem.set_adaptivity(&adaptivity);
+    // Set adaptivity
+    //problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }
