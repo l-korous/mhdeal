@@ -2,6 +2,7 @@
 #include "problem.h"
 #include "equationsMhd.h"
 #include "parameters.h"
+#include "parametersTD.h"
 #include "initialConditionTD.h"
 #include "boundaryConditionTD.h"
 #include "adaptivityTD.h"
@@ -25,21 +26,14 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   triangulation.add_periodicity(matched_pairs);
 }
 
-// Parameters that are specific for this example.
-int max_cells;
-int refine_every_nth_time_step;
-int perform_n_initial_refinements;
-double refine_threshold;
-double coarsen_threshold;
-
-void set_parameters(Parameters<DIMENSION>& parameters)  
+void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
   parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
   parameters.refinements = { 30, 60, 30 };
   parameters.limit = false;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
@@ -50,11 +44,41 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_step = -1.e-2;
   parameters.final_time = 20.;
 
-  max_cells = 3500;
-  refine_every_nth_time_step = 25;
-  perform_n_initial_refinements = 25;
-  refine_threshold = 0.10;
-  coarsen_threshold = 0.15;
+  parameters.max_cells = 3500;
+  parameters.refine_every_nth_time_step = 25;
+  parameters.perform_n_initial_refinements = 25;
+  parameters.refine_threshold = 0.10;
+  parameters.coarsen_threshold = 0.15;
+
+  // plasma beta
+  td_parameters.beta = 0.05;
+
+  // coronal height scale
+  td_parameters.L_G = 0.;
+
+  // Torus winding number
+  td_parameters.N_t = -3.0;
+
+  // Torus major radius
+  td_parameters.R= 4.0;
+
+  // Magnetic charge separation distance
+  td_parameters.L = 2.0;
+
+  // Geometrical factor
+  td_parameters.d = 2.0;
+  
+  // "Helicity" factor inside tho loop (used later in B_theta_internal calcs)
+  td_parameters.H = 2.0 * (td_parameters.N_t * td_parameters.N_t) / (td_parameters.R * td_parameters.R);
+
+  // The coronal/prominence temperature ratio
+  td_parameters.Tc2Tp = 1.0;
+
+  td_parameters.omega_0 = 0.3;
+
+  td_parameters.t_drive = 2.0;
+
+  td_parameters.t_ramp = 1.0;
 }
 
 int main(int argc, char *argv[])
@@ -66,7 +90,8 @@ int main(int argc, char *argv[])
   {
     // Initialization of parameters. See parameters.h for description of the individual parameters
     Parameters<DIMENSION> parameters;
-    set_parameters(parameters);
+    TitovDemoulinParameters td_parameters;
+    set_parameters(parameters, td_parameters);
     parameters.delete_old_outputs(mpi_communicator);
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
@@ -77,13 +102,13 @@ int main(int argc, char *argv[])
 #endif    
     set_triangulation(triangulation, parameters);
 
-    InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters);
+    InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTitovDemoulin<DIMENSION> boundary_conditions(parameters);
+    BoundaryConditionTitovDemoulin<DIMENSION> boundary_conditions(parameters, td_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
-    AdaptivityTD<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
+    AdaptivityTD<DIMENSION> adaptivity(parameters, mpi_communicator);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity

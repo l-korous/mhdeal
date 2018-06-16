@@ -1,12 +1,10 @@
 #include "adaptivityTD.h"
 
 template <int dim>
-AdaptivityTD<dim>::AdaptivityTD(Parameters<dim>& parameters, MPI_Comm& mpi_communicator, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
-) :
+AdaptivityTD<dim>::AdaptivityTD(Parameters<dim>& parameters, MPI_Comm& mpi_communicator) :
   Adaptivity<dim>(parameters, mpi_communicator),
   last_time_step(0),
-  adaptivity_step(0),
-  max_cells(max_cells), refine_every_nth_time_step(refine_every_nth_time_step), perform_n_initial_refinements(perform_n_initial_refinements), refine_threshold(refine_threshold), coarsen_threshold(coarsen_threshold)
+  adaptivity_step(0)
 {
 }
 
@@ -127,9 +125,9 @@ bool AdaptivityTD<dim>::refine_mesh(int time_step, double time, TrilinosWrappers
 #endif
   , const Mapping<dim>& mapping)
 {
-  if (time_step % this->refine_every_nth_time_step)
+  if (time_step % this->parameters.refine_every_nth_time_step)
     return false;
-  if (++adaptivity_step > (time_step == 0 ? this->perform_n_initial_refinements : 1))
+  if (++adaptivity_step > (time_step == 0 ? this->parameters.perform_n_initial_refinements : 1))
   {
     adaptivity_step = 0;
     return false;
@@ -137,7 +135,7 @@ bool AdaptivityTD<dim>::refine_mesh(int time_step, double time, TrilinosWrappers
   Vector<double> gradient_indicator(triangulation.n_active_cells());
   calculate_jumps(solution, dof_handler, mapping, gradient_indicator);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->refine_threshold, this->coarsen_threshold, this->max_cells + (int)std::floor(time * 10000.));
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->parameters.refine_threshold, this->parameters.coarsen_threshold, this->parameters.max_cells + (int)std::floor(time * 10000.));
 
   triangulation.prepare_coarsening_and_refinement();
 

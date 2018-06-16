@@ -91,6 +91,13 @@ public:
     Adaptivity = 32
   };
   int debug;
+
+  // Adaptivity
+  int max_cells;
+  int refine_every_nth_time_step;
+  int perform_n_initial_refinements;
+  double refine_threshold;
+  double coarsen_threshold;
 };
 
 #endif

@@ -5,28 +5,24 @@
 #include "parameters.h"
 #include "initialCondition.h"
 #include "equations.h"
+#include "parametersTD.h"
 
 template <EquationsType equationsType, int dim>
 class InitialConditionTitovDemoulin : public InitialCondition<equationsType, dim>
 {
 public:
-  InitialConditionTitovDemoulin(Parameters<dim>&);
+  InitialConditionTitovDemoulin(Parameters<dim>&, TitovDemoulinParameters&);
   void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
 
 private:
-  double beta;
-  double Lg;
-  double invLg;
-  double N_t;
-  double R_t;
-  double d2R_t;
-  double L2R_t;
-  double q_mag;
+  TitovDemoulinParameters& td_parameters;
+  double invL_G;
   double iSgn;
-  double heliFactor;
-  double Tc2Tp;
-  double t_rho;
   double densGrad;
+  double d2R;
+  double L2R;
+  double R2L;
+  double q_mag;
 };
 
 #endif

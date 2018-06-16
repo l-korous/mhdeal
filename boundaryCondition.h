@@ -15,7 +15,7 @@ public:
   BoundaryCondition(Parameters<dim>& parameters);
 
   // Values for this boundary identifier.
-  virtual void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus) const;
+  virtual void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
 
   double compute_energy_from_given_pressure(const InputVector &W, double pressure) const;
 

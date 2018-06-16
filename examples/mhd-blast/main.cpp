@@ -24,30 +24,23 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   triangulation.add_periodicity(matched_pairs);
 }
 
-// Parameters that are specific for this example.
-int max_cells;
-int refine_every_nth_time_step;
-int perform_n_initial_refinements;
-double refine_threshold;
-double coarsen_threshold;
-
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.5, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.5, 0.1);
-  parameters.refinements = { 150, 150, 1 };
-  parameters.limit = false;
-  parameters.output_file_prefix = "lf-";
+  parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.1);
+  parameters.refinements = { 50, 50, 1 };
+  parameters.limit = true;
+  parameters.output_file_prefix = "limited";
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = false;
+  parameters.use_div_free_space_for_B = true;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
-  parameters.num_flux_type = Parameters<DIMENSION>::lax_friedrich;
-  parameters.lax_friedrich_stabilization_value = 1.5;
+  parameters.num_flux_type = Parameters<DIMENSION>::hlld;
+  parameters.lax_friedrich_stabilization_value = 0.75;
   parameters.cfl_coefficient = .02;
-  parameters.quadrature_order = 1;
-  parameters.polynomial_order_dg = 0;
+  parameters.quadrature_order = 5;
+  parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = 1.e-2;
+  parameters.output_step = -1.e-2;
   parameters.final_time = 1.;
   parameters.debug = parameters.BasicSteps;// | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
@@ -57,11 +50,11 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  max_cells = 3000;
-  refine_every_nth_time_step = 10;
-  perform_n_initial_refinements = 20;
-  refine_threshold = 0.2;
-  coarsen_threshold = 0.2;
+  parameters.max_cells = 3000;
+  parameters.refine_every_nth_time_step = 10;
+  parameters.perform_n_initial_refinements = 20;
+  parameters.refine_threshold = 0.2;
+  parameters.coarsen_threshold = 0.2;
 }
 
 int main(int argc, char *argv[])
@@ -90,7 +83,7 @@ int main(int argc, char *argv[])
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
-    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, mpi_communicator, max_cells, refine_every_nth_time_step, perform_n_initial_refinements, refine_threshold, coarsen_threshold);
+    AdaptivityMhdBlast<DIMENSION> adaptivity(parameters, mpi_communicator);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity

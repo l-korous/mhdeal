@@ -5,7 +5,7 @@ template<>
 BoundaryCondition<EquationsTypeMhd, 3>::BoundaryCondition(Parameters<3>& parameters) : parameters(parameters) {};
 
 template <EquationsType equationsType, int dim>
-void BoundaryCondition<equationsType, dim>::bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus) const
+void BoundaryCondition<equationsType, dim>::bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const
 {
   for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
     result[di] = W_plus[di];
