@@ -11,6 +11,8 @@ template <int dim>
 class BoundaryConditionTitovDemoulin : public BoundaryCondition<EquationsTypeMhd, dim>
 {
 public:
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
+
   BoundaryConditionTitovDemoulin(Parameters<dim>&, TitovDemoulinParameters&);
 
   void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
