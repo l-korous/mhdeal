@@ -3,6 +3,7 @@
 
 #include "util.h"
 #include "parameters.h"
+#include "initialCondition.h"
 #include "boundaryCondition.h"
 #include "equations.h"
 #include "parametersTD.h"
