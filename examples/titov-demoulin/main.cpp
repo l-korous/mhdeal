@@ -55,6 +55,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
 
   // coronal height scale
   td_parameters.L_G = 0.;
+  // Shouldn't be 20? According to page 10/456 of https://github.com/l-korous/doctoral-thesis/blob/master/_reference/Modeling%20of%20H%CE%B1%20Eruptive%20Events%20Observed%20at%20the%20Solar.pdf
 
   // Torus winding number
   td_parameters.N_t = -3.0;
@@ -73,6 +74,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
 
   // The coronal/prominence temperature ratio
   td_parameters.Tc2Tp = 1.0;
+  // Shouldn't be 10? According to page 10/456 of https://github.com/l-korous/doctoral-thesis/blob/master/_reference/Modeling%20of%20H%CE%B1%20Eruptive%20Events%20Observed%20at%20the%20Solar.pdf
 
   td_parameters.omega_0 = 0.3;
 
