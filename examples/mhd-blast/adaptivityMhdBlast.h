@@ -8,7 +8,7 @@ template <int dim>
 class AdaptivityMhdBlast : public Adaptivity<dim>
 {
 public:
-  AdaptivityMhdBlast(Parameters<dim>&, MPI_Comm& mpi_communicator, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold);
+  AdaptivityMhdBlast(Parameters<dim>&, MPI_Comm& mpi_communicator);
   bool refine_mesh(int time_step, double time, TrilinosWrappers::MPI::Vector& solution, const DoFHandler<dim>& dof_handler,
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<dim>& triangulation

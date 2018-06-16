@@ -1,8 +1,7 @@
 #include "adaptivityMhdBlast.h"
 
 template <int dim>
-AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, MPI_Comm& mpi_communicator, int max_cells, int refine_every_nth_time_step, int perform_n_initial_refinements, double refine_threshold, double coarsen_threshold
-) :
+AdaptivityMhdBlast<dim>::AdaptivityMhdBlast(Parameters<dim>& parameters, MPI_Comm& mpi_communicator) :
   Adaptivity<dim>(parameters, mpi_communicator),
   last_time_step(0),
   adaptivity_step(0),
