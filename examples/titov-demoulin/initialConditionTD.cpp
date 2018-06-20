@@ -201,7 +201,7 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
     value_list[pp][3] = 0.0;
 
     // energy density
-    value_list[pp][4] = (pressure / (this->parameters.gas_gamma - 1.0)) + (B_loc[0] * B_loc[0] + B_loc[1] * B_loc[1] + B_loc[2] * B_loc[2]);
+    value_list[pp][4] = (pressure / (this->parameters.gas_gamma - 1.0)) + 0.5 * (B_loc[0] * B_loc[0] + B_loc[1] * B_loc[1] + B_loc[2] * B_loc[2]);
 
     value_list[pp][5] = B_loc[0];
     value_list[pp][6] = B_loc[1];                  // magnetic field
