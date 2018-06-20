@@ -26,9 +26,9 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.25, -0.25, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.25, 0.25, 0.01);
-  parameters.refinements = { 120, 120, 1 };
+  parameters.corner_a = Point<DIMENSION>(-0.5, -0.5, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.5, 0.1);
+  parameters.refinements = { 10, 10, 1 };
   parameters.limit = true;
   parameters.output_file_prefix = "sln";
   parameters.slope_limiter = parameters.vertexBased;
@@ -40,7 +40,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = 1.e-5;
+  parameters.output_step = 1.e-3;
   parameters.final_time = 1.;
   parameters.debug = parameters.BasicSteps;// | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
@@ -51,7 +51,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   */
 
   parameters.max_cells = 3000;
-  parameters.refine_every_nth_time_step = 10;
+  parameters.refine_every_nth_time_step = 50;
   parameters.perform_n_initial_refinements = 20;
   parameters.refine_threshold = 0.2;
   parameters.coarsen_threshold = 0.2;
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::limit_level_difference_at_vertices));
 #else
     Triangulation<DIMENSION> triangulation(Triangulation<DIMENSION>::limit_level_difference_at_vertices);
 #endif
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity
-    //problem.set_adaptivity(&adaptivity);
+    problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }

@@ -81,6 +81,9 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.t_drive = 2.0;
 
   td_parameters.t_ramp = 1.0;
+
+  // density jump half-width...
+  double t_rho = 0.12;
 }
 
 int main(int argc, char *argv[])
@@ -106,7 +109,7 @@ int main(int argc, char *argv[])
 
     InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTitovDemoulin<DIMENSION> boundary_conditions(parameters, td_parameters);
+    BoundaryConditionTDFree<DIMENSION> boundary_conditions(parameters, td_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity

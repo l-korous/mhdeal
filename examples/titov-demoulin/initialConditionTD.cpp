@@ -26,6 +26,9 @@ InitialConditionTitovDemoulin<equationsType, dim>::InitialConditionTitovDemoulin
 
   // Sign of winding: corresponds to sign of I_O in TD paper
   iSgn = (td_parameters.N_t >= 0) ? 1.0 : -1.0;
+
+  // Inverse value of density jump half-width
+  densGrad = 1.0 / td_parameters.t_rho;
 }
 
 /***************************************************************************
@@ -83,7 +86,7 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
       double kr = 2.0 * sqrt(r_maj * this->td_parameters.R / ((r_maj + this->td_parameters.R) * (r_maj + this->td_parameters.R) + x * x));
 
       //---- Sew-up internal and external solutions
-      if (r_min>1.0) { //---- external region 
+      if (r_min > 1.0) { //---- external region 
                        // Elliptical integrals
         double Ek, Kk;
         Complete_Elliptic_Integrals_Modulus(kr, Kk, Ek);
@@ -115,7 +118,7 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
     }
 
     // calculate derivatives of vector potential
-    for (unsigned int i = 0; i<3; ++i) {
+    for (unsigned int i = 0; i < 3; ++i) {
       dP[i][0] = (P[2 * i][0] - P[2 * i + 1][0]) * idd;
       dP[i][1] = (P[2 * i][1] - P[2 * i + 1][1]) * idd;
       dP[i][2] = (P[2 * i][2] - P[2 * i + 1][2]) * idd;
@@ -198,7 +201,7 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
     value_list[pp][3] = 0.0;
 
     // energy density
-    value_list[pp][4] = pressure / (this->parameters.gas_gamma - 1.0) + B_loc[0] * B_loc[0] + B_loc[1] * B_loc[1] + B_loc[2] * B_loc[2];
+    value_list[pp][4] = (pressure / (this->parameters.gas_gamma - 1.0)) + 0.5 * (B_loc[0] * B_loc[0] + B_loc[1] * B_loc[1] + B_loc[2] * B_loc[2]);
 
     value_list[pp][5] = B_loc[0];
     value_list[pp][6] = B_loc[1];                  // magnetic field
