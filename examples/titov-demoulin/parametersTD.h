@@ -35,6 +35,9 @@ struct TitovDemoulinParameters
   double t_drive;
 
   double t_ramp;
+
+  // density jump half-width...
+    double t_rho = 0.12;
 };
 
 #endif

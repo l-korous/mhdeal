@@ -8,12 +8,12 @@
 #include "parametersTD.h"
 
 template <int dim>
-class BoundaryConditionTitovDemoulin : public BoundaryCondition<EquationsTypeMhd, dim>
+class BoundaryConditionTDWithVortices : public BoundaryCondition<EquationsTypeMhd, dim>
 {
 public:
   typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
 
-  BoundaryConditionTitovDemoulin(Parameters<dim>&, TitovDemoulinParameters&);
+  BoundaryConditionTDWithVortices(Parameters<dim>&, TitovDemoulinParameters&);
 
   void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
 
@@ -26,6 +26,38 @@ private:
   double omega_1(double x, double y) const;
   double omega_2(double x, double y) const;
   double omega(double time) const;
+};
+
+template <int dim>
+class BoundaryConditionTDFree : public BoundaryCondition<EquationsTypeMhd, dim>
+{
+public:
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
+
+  BoundaryConditionTDFree(Parameters<dim>&, TitovDemoulinParameters&);
+
+  void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
+};
+
+template <int dim>
+class BoundaryConditionTDInitialState : public BoundaryCondition<EquationsTypeMhd, dim>
+{
+public:
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
+
+  BoundaryConditionTDInitialState(Parameters<dim>&, TitovDemoulinParameters&);
+
+  void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
+
+private:
+  TitovDemoulinParameters& td_parameters;
+  double invL_G;
+  double iSgn;
+  double densGrad;
+  double d2R;
+  double L2R;
+  double R2L;
+  double q_mag;
 };
 
 #endif
