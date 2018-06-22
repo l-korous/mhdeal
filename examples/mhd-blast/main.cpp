@@ -26,21 +26,21 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
-  parameters.corner_a = Point<DIMENSION>(-0.5, -0.5, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.5, 0.1);
-  parameters.refinements = { 10, 10, 1 };
-  parameters.limit = true;
-  parameters.output_file_prefix = "sln";
+  parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 1.0 / 400.);
+  parameters.refinements = { 400, 600, 1 };
+  parameters.limit = false;
+  parameters.output_file_prefix = "P0-400-600-BTaylor-CFL0.1";
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.use_div_free_space_for_B = true;
-  //parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
+  parameters.use_div_free_space_for_B = false;
+  parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.75;
   parameters.cfl_coefficient = .01;
-  parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.quadrature_order = 1;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 1.e-3;
+  parameters.output_step = 1.e-1;
   parameters.final_time = 1.;
   parameters.debug = parameters.BasicSteps;// | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity
-    problem.set_adaptivity(&adaptivity);
+    //problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }
