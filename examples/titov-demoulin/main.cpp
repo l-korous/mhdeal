@@ -29,14 +29,14 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-12., -12., 0.);
-  parameters.corner_b = Point<DIMENSION>(12., 12., 20.);
-  parameters.refinements = { 50, 60, 50 };
+  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
+  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
+  parameters.refinements = { 50, 100, 50 };
   parameters.limit = false;
   parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .01;
+  parameters.cfl_coefficient = .001;
   parameters.start_limiting_at = -.05;
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
@@ -55,35 +55,27 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
 
   // coronal height scale
   td_parameters.L_G = 0.;
-  // Shouldn't be 20? According to page 10/456 of https://github.com/l-korous/doctoral-thesis/blob/master/_reference/Modeling%20of%20H%CE%B1%20Eruptive%20Events%20Observed%20at%20the%20Solar.pdf
 
   // Torus winding number
   td_parameters.N_t = 0.3;
 
   // Torus major radius
-  td_parameters.R= 8.0;
+  td_parameters.R= 3.0;
 
   // Magnetic charge separation distance
-  td_parameters.L = 2.0;
+  td_parameters.L = 1.5;
 
   // Geometrical factor
-  td_parameters.d = 2.0;
+  td_parameters.d = 1.5;
   
-  // "Helicity" factor inside tho loop (used later in B_theta_internal calcs)
-  td_parameters.H = 2.0 * (td_parameters.N_t * td_parameters.N_t) / (td_parameters.R * td_parameters.R);
-
   // The coronal/prominence temperature ratio
   td_parameters.Tc2Tp = 1.0;
-  // Shouldn't be 10? According to page 10/456 of https://github.com/l-korous/doctoral-thesis/blob/master/_reference/Modeling%20of%20H%CE%B1%20Eruptive%20Events%20Observed%20at%20the%20Solar.pdf
 
   td_parameters.omega_0 = 0.3;
 
   td_parameters.t_drive = 2.0;
 
   td_parameters.t_ramp = 1.0;
-
-  // density jump half-width...
-  double t_rho = 0.12;
 }
 
 int main(int argc, char *argv[])

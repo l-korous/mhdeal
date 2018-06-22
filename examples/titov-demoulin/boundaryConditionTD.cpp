@@ -104,6 +104,9 @@ BoundaryConditionTDInitialState<dim>::BoundaryConditionTDInitialState(Parameters
 
   // Sign of winding: corresponds to sign of I_O in TD paper
   iSgn = (td_parameters.N_t >= 0) ? 1.0 : -1.0;
+
+  // "Helicity" factor inside tho loop (used later in B_theta_internal calcs)
+  H = 2.0 * (td_parameters.N_t * td_parameters.N_t) / (td_parameters.R * td_parameters.R);
 }
 
 template <int dim>
@@ -252,7 +255,7 @@ void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, cons
   replaced by smoother rho~tgh(r_min-1) profile (TPCR-like).
   */
 
-  double rho_0 = 0.5 * (1.0 - td_parameters.Tc2Tp) * tanh(densGrad*(r_min - 1.0)) + 0.5 * (1 + td_parameters.Tc2Tp);
+  double rho_0 = 0.5 * (1.0 - td_parameters.Tc2Tp) * tanh(r_min - 1.0) + 0.5 * (1 + td_parameters.Tc2Tp);
 
   if (r_min > 1.0) { // external region
 
@@ -266,7 +269,7 @@ void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, cons
 
     result[0] = rho_0 * exp(-zz * td_parameters.Tc2Tp * invL_G);   // mass density in the loop
 
-    B_loc.sadd(1.0, (iSgn * (sqrt(1.0 + td_parameters.H * (1.0 - r_min * r_min)) + td_parameters.R / r_maj - 1.0)), theta0);
+    B_loc.sadd(1.0, (iSgn * (sqrt(1.0 + H * (1.0 - r_min * r_min)) + td_parameters.R / r_maj - 1.0)), theta0);
 
     pressure = td_parameters.beta * exp(-zz * invL_G);
   }
