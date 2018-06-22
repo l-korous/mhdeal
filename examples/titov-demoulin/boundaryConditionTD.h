@@ -6,6 +6,7 @@
 #include "initialCondition.h"
 #include "boundaryCondition.h"
 #include "equations.h"
+#include "initialConditionTD.h"
 #include "parametersTD.h"
 
 template <int dim>
@@ -52,6 +53,7 @@ public:
 
 private:
   TitovDemoulinParameters& td_parameters;
+  InitialConditionTitovDemoulin<EquationsTypeMhd, dim> ic;
   double invL_G;
   double iSgn;
   double d2R;

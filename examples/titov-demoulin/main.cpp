@@ -36,12 +36,12 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .001;
+  parameters.cfl_coefficient = .01;
   parameters.start_limiting_at = -.05;
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = -1.e-2;
+  parameters.output_step = 1.e-1;
   parameters.final_time = 20.;
 
   parameters.max_cells = 3500;
@@ -57,7 +57,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.L_G = 0.;
 
   // Torus winding number
-  td_parameters.N_t = 0.3;
+  td_parameters.N_t = 5.0;
 
   // Torus major radius
   td_parameters.R= 3.0;

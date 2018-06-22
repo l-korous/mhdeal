@@ -20,8 +20,8 @@ InitialConditionTitovDemoulin<equationsType, dim>::InitialConditionTitovDemoulin
 
   //======================= Calculate dependent TD model parameters
   // Normalised magnetic charge corresponding to global equilibrium (Eq. 6)
-  q_mag = 0.25 * fabs(td_parameters.N_t) * (log(8.0 * td_parameters.R) - 1.25) * (1 + L2R * L2R) * sqrt(1 + L2R * L2R) / L2R;
-  // Should be ? q_mag = 0.25 * fabs(td_parameters.N_t) * (log(8.0 * td_parameters.R) - 1.25) * (1 + R2L * R2L) * sqrt(1 + R2L * R2L) / (L2R * L2R);
+  // q_mag = 0.25 * fabs(td_parameters.N_t) * (log(8.0 * td_parameters.R) - 1.25) * (1 + L2R * L2R) * sqrt(1 + L2R * L2R) / L2R;
+  q_mag = 0.25 * fabs(td_parameters.N_t) * (log(8.0 * td_parameters.R) - 1.25) * (1 + R2L * R2L) * sqrt(1 + R2L * R2L) / (R2L * R2L);
   // This would reflect q_{maq} to be |q| from page 10/456 of https://github.com/l-korous/doctoral-thesis/blob/master/_reference/Modeling%20of%20H%CE%B1%20Eruptive%20Events%20Observed%20at%20the%20Solar.pdf
 
   // Sign of winding: corresponds to sign of I_O in TD paper
