@@ -29,9 +29,9 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
-  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
-  parameters.refinements = { 30, 60, 30 };
+  parameters.corner_a = Point<DIMENSION>(-12., -12., 0.);
+  parameters.corner_b = Point<DIMENSION>(12., 12., 20.);
+  parameters.refinements = { 50, 60, 50 };
   parameters.limit = false;
   parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
@@ -58,10 +58,10 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   // Shouldn't be 20? According to page 10/456 of https://github.com/l-korous/doctoral-thesis/blob/master/_reference/Modeling%20of%20H%CE%B1%20Eruptive%20Events%20Observed%20at%20the%20Solar.pdf
 
   // Torus winding number
-  td_parameters.N_t = -3.0;
+  td_parameters.N_t = 0.3;
 
   // Torus major radius
-  td_parameters.R= 4.0;
+  td_parameters.R= 8.0;
 
   // Magnetic charge separation distance
   td_parameters.L = 2.0;
