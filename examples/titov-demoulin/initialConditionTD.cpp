@@ -177,22 +177,19 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
     replaced by smoother rho~tgh(r_min-1) profile (TPCR-like).
     */
 
-    double rho_0 = 0.5 * (1.0 - td_parameters.Tc2Tp) * tanh(r_min - 1.0) + 0.5 * (1 + td_parameters.Tc2Tp);
+    // double rho_0 = 0.5 * (1.0 - td_parameters.Tc2Tp) * tanh(r_min - 1.0) + 0.5 * (1 + td_parameters.Tc2Tp);
 
-    if (r_min > 1.0) { // external region
-
-      value_list[pp][0] = rho_0 * exp(-zz * invL_G);         // mass density outside
-
+    // external region
+    if (r_min > 1.0) {
+      value_list[pp][0] = td_parameters.rho_0 * (1.0 / td_parameters.Tc2Tp) * exp(-zz * invL_G);         // mass density outside
       B_loc.sadd(1.0, iSgn * td_parameters.R / r_maj, theta0);
-
       pressure = td_parameters.beta * exp(-zz * invL_G);
     }
-    else { // inside the torus
-
+    // inside the torus
+    else {
+      double rho_0 = 1.0;
       value_list[pp][0] = rho_0 * exp(-zz * td_parameters.Tc2Tp * invL_G);   // mass density in the loop
-
       B_loc.sadd(1.0, (iSgn * (sqrt(1.0 + H * (1.0 - r_min * r_min)) + td_parameters.R / r_maj - 1.0)), theta0);
-
       pressure = td_parameters.beta * exp(-zz * invL_G);
     }
 

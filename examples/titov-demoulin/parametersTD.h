@@ -6,6 +6,9 @@ struct TitovDemoulinParameters
   // plasma beta
   double beta;
 
+  // plasma beta
+  double rho_0;
+
   // coronal height scale
   double L_G;
 

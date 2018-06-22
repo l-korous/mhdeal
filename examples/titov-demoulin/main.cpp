@@ -56,6 +56,9 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   // coronal height scale
   td_parameters.L_G = 0.;
 
+  // coronal height scale
+  td_parameters.rho_0 = 1.;
+
   // Torus winding number
   td_parameters.N_t = 5.0;
 
@@ -69,7 +72,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.d = 1.5;
   
   // The coronal/prominence temperature ratio
-  td_parameters.Tc2Tp = 1.0;
+  td_parameters.Tc2Tp = 10.;
 
   td_parameters.omega_0 = 0.3;
 
