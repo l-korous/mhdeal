@@ -53,8 +53,8 @@ private:
   TitovDemoulinParameters& td_parameters;
   double invL_G;
   double iSgn;
-  double densGrad;
   double d2R;
+  double H;
   double L2R;
   double R2L;
   double q_mag;

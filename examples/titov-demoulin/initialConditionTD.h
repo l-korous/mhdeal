@@ -16,9 +16,9 @@ public:
 
 private:
   TitovDemoulinParameters& td_parameters;
+  double H;
   double invL_G;
   double iSgn;
-  double densGrad;
   double d2R;
   double L2R;
   double R2L;
