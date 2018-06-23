@@ -8,7 +8,7 @@ Parameters<dim>::Parameters() {
   this->slope_limiter = vertexBased;
   this->output_file_prefix = "";
   this->lax_friedrich_stabilization_value = .5;
-  this->time_step = 1.e-6;
+  this->current_time_step_length = 1.e-6;
 
   this->debug = 0;
   this->output_matrix = false;

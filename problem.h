@@ -103,7 +103,7 @@ public:
   MPI_Comm mpi_communicator;
 
   double last_output_time, time;
-  int time_step;
+  int time_step_number;
   double cfl_time_step;
   // For CFL.
   double max_signal_speed;

@@ -18,6 +18,9 @@ struct TitovDemoulinParameters
   // Torus major radius
   double R;
 
+  // Torus minor radius
+  double r;
+
   // Magnetic charge separation distance
   double L;
 

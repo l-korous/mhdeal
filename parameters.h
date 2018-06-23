@@ -68,7 +68,7 @@ public:
   double ilut_drop;
 
   // Global - obvious
-  double time_step, final_time, cfl_coefficient;
+  double current_time_step_length, final_time, cfl_coefficient;
   // Polynomial order for the flow part.
   int polynomial_order_dg;
   // Quadrature order.
