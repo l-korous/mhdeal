@@ -29,9 +29,9 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
-  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
-  parameters.refinements = { 50, 100, 50 };
+  parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
+  parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
+  parameters.refinements = { 80, 160, 80 };
   parameters.limit = false;
   parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
@@ -41,7 +41,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 1.e-1;
+  parameters.output_step = 2.e-1;
   parameters.final_time = 20.;
 
   parameters.max_cells = 3500;
@@ -63,7 +63,10 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.N_t = 5.0;
 
   // Torus major radius
-  td_parameters.R= 3.0;
+  td_parameters.R = 3.0;
+
+  // Torus major radius
+  td_parameters.r = 1.0;
 
   // Magnetic charge separation distance
   td_parameters.L = 1.5;
