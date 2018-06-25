@@ -26,6 +26,7 @@ public:
   static double compute_pressure(const InputVector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters);
 
   static double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W);
+  static std::array<double, dim> compute_magnetic_field_curl(const std::vector<Tensor<1, dim> > &W);
 
   // Compute the matrix of MHD fluxes.
   static void compute_flux_matrix(const InputVector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters);
