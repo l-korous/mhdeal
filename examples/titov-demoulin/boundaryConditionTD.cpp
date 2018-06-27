@@ -42,28 +42,29 @@ double BoundaryConditionTDWithVortices<dim>::omega(double time) const
 }
 
 template <int dim>
-void BoundaryConditionTDWithVortices<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const
+void BoundaryConditionTDWithVortices<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, 
+  values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator&) const
 {
   // For other than z=0 boundaries, we use do-nothing
   if (point[2] > SMALL)
   {
     for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
-      result[di] = W_plus[di];
+      result[di] = values[di];
     return;
   }
 
   double x = point[0], y = point[1];
-  result[0] = W_plus[0];
+  result[0] = values[0];
   result[1] = result[0] * (-omega(time) * this->eps * ((y - y_1) * omega_1(x, y) + (y - y_2) * omega_2(x, y)));
   result[2] = result[0] * (omega(time) * (x / this->eps) * (omega_1(x, y) + omega_2(x, y)));
   result[3] = 0.0;
 
   // energy density
-  result[4] = W_plus[4];
+  result[4] = values[4];
 
-  result[5] = W_plus[5];
-  result[6] = W_plus[6];
-  result[7] = W_plus[7];
+  result[5] = values[5];
+  result[6] = values[6];
+  result[7] = values[7];
 }
 
 template <int dim>
@@ -73,11 +74,76 @@ BoundaryConditionTDFree<dim>::BoundaryConditionTDFree(Parameters<dim>& parameter
 }
 
 template <int dim>
-void BoundaryConditionTDFree<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const
+void BoundaryConditionTDFree<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, 
+  values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator&) const
 {
   for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
-    result[di] = W_plus[di];
+    result[di] = values[di];
   return;
+}
+
+template <int dim>
+BoundaryConditionTDTest<dim>::BoundaryConditionTDTest(Parameters<dim>& parameters, TitovDemoulinParameters& td_parameters) :
+  BoundaryCondition<EquationsTypeMhd, dim>(parameters)
+{
+}
+
+template <int dim>
+void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, 
+  values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator& cell) const
+{
+  // Density the same.
+  result[0] = values[0];
+
+  // Velocities are zero on the bottom boundary, otherwise the same as inside.
+  if (point[2] > SMALL)
+  {
+    result[1] = values[1];
+    result[2] = values[2];
+    result[3] = values[3];
+  }
+  else
+    result[1] = result[2] = result[3] = 0.;
+
+  // From divergence-free constraint. Here for x-direction:
+  // \frac{\partial B^{'}_x}{\partial x} = -\left(\frac{\partial B_y}{\partial y} + \frac{\partial B_z}{\partial z} \right)
+  // We want a linear reconstruction B^{'} = B + d * \frac{\partial B^{'}_x}{\partial x}
+  // d will be taken as the elementh length in the direction.
+  // Assumption: we have cubes.
+  double d = std::pow(cell->measure(), 1./3.);
+  // In order to have value (and not just the derivative).
+  // \left|B^{'}_x}\right| = \left|B_x}\right|
+
+  double derivative;
+  if (std::abs(normal[0]) < SMALL)
+  {
+    // z-direction
+    if (std::abs(normal[1]) < SMALL)
+    {
+      derivative = -grads[5][0] - grads[6][1];
+      result[5] = values[5];
+      result[6] = values[6];
+      result[7] = 0.5 * d * derivative * normal[2] + values[7];
+    }
+    // y-direction
+    else
+    {
+      derivative = -grads[5][0] - grads[7][2];
+      result[5] = values[5];
+      result[6] = 0.5 * d * derivative * normal[1] + values[6];
+      result[7] = values[7];
+    }
+  }
+  // x-direction
+  else
+  {
+    derivative = -grads[6][1] - grads[7][2];
+    result[5] = 0.5 * d * derivative * normal[0] + values[5];
+    result[6] = values[6];
+    result[7] = values[7];
+  }
+
+  result[4] = Equations<EquationsTypeMhd, dim>::compute_pressure(result, this->parameters);
 }
 
 template <int dim>
@@ -88,13 +154,14 @@ BoundaryConditionTDInitialState<dim>::BoundaryConditionTDInitialState(Parameters
 }
 
 template <int dim>
-void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, const Point<dim> &p, InputVector &result, const InputVector &W_plus, double time) const
+void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, const Point<dim> &p, const Tensor<1, dim> &normal, 
+  values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator&) const
 {
   // For other than z=0 boundaries, we use do-nothing
   if (p[2] > SMALL)
   {
     for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
-      result[di] = W_plus[di];
+      result[di] = values[di];
     return;
   }
 
@@ -111,3 +178,4 @@ void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, cons
 template class BoundaryConditionTDWithVortices<3>;
 template class BoundaryConditionTDFree<3>;
 template class BoundaryConditionTDInitialState<3>;
+template class BoundaryConditionTDTest<3>;

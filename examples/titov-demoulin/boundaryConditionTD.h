@@ -12,11 +12,13 @@ template <int dim>
 class BoundaryConditionTDWithVortices : public BoundaryCondition<EquationsTypeMhd, dim>
 {
 public:
-  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> values_vector;
+  typedef std::array<std::array<double, dim>, Equations<EquationsTypeMhd, dim>::n_components> grad_vector;
 
   BoundaryConditionTDWithVortices(Parameters<dim>&, TitovDemoulinParameters&);
 
-  void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
+  void bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, values_vector &result, 
+    const grad_vector &grads, const values_vector &W_plus, double time, typename DoFHandler<dim>::active_cell_iterator&) const;
 
 private:
   TitovDemoulinParameters& td_parameters;
@@ -33,22 +35,39 @@ template <int dim>
 class BoundaryConditionTDFree : public BoundaryCondition<EquationsTypeMhd, dim>
 {
 public:
-  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> values_vector;
+  typedef std::array<std::array<double, dim>, Equations<EquationsTypeMhd, dim>::n_components> grad_vector;
 
   BoundaryConditionTDFree(Parameters<dim>&, TitovDemoulinParameters&);
 
-  void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
+  void bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, values_vector &result, 
+    const grad_vector &grads, const values_vector &W_plus, double time, typename DoFHandler<dim>::active_cell_iterator&) const;
+};
+
+template <int dim>
+class BoundaryConditionTDTest : public BoundaryCondition<EquationsTypeMhd, dim>
+{
+public:
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> values_vector;
+  typedef std::array<std::array<double, dim>, Equations<EquationsTypeMhd, dim>::n_components> grad_vector;
+
+  BoundaryConditionTDTest(Parameters<dim>&, TitovDemoulinParameters&);
+
+  void bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, values_vector &result, 
+    const grad_vector &grads, const values_vector &W_plus, double time, typename DoFHandler<dim>::active_cell_iterator&) const;
 };
 
 template <int dim>
 class BoundaryConditionTDInitialState : public BoundaryCondition<EquationsTypeMhd, dim>
 {
 public:
-  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> InputVector;
+  typedef std::array<double, Equations<EquationsTypeMhd, dim>::n_components> values_vector;
+  typedef std::array<std::array<double, dim>, Equations<EquationsTypeMhd, dim>::n_components> grad_vector;
 
   BoundaryConditionTDInitialState(Parameters<dim>&, TitovDemoulinParameters&);
 
-  void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
+  void bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, values_vector &result,
+    const grad_vector &grads, const values_vector &W_plus, double time, typename DoFHandler<dim>::active_cell_iterator&) const;
 
 private:
   TitovDemoulinParameters& td_parameters;

@@ -23,32 +23,32 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W)
+inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const values_vector &W)
 {
   return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_magnetic_energy(const InputVector &W)
+inline double Equations<EquationsTypeMhd, dim>::compute_magnetic_energy(const values_vector &W)
 {
   return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const Parameters<dim>& parameters)
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
   return std::max(0., (parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const InputVector &W, const Parameters<dim>& parameters)
+inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
   const double magnetic_energy = compute_magnetic_energy(W);
   return compute_pressure(W, compute_kinetic_energy(W), magnetic_energy, parameters) + magnetic_energy;
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters)
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters)
 {
   return (parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
 }
@@ -73,7 +73,7 @@ std::array<double, dim> Equations<EquationsTypeMhd, dim>::compute_magnetic_field
 }
 
 template <int dim>
-void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters)
+void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const values_vector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters)
 {
   const double mag_energy = compute_magnetic_energy(W);
   const double pressure = compute_pressure(W, parameters);
