@@ -143,7 +143,7 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
     result[7] = values[7];
   }
 
-  result[4] = Equations<EquationsTypeMhd, dim>::compute_pressure(result, this->parameters);
+  result[4] = values[4];
 }
 
 template <int dim>
