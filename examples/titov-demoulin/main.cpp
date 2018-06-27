@@ -41,7 +41,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.quadrature_order = 6;
   parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = -2.e-1;
+  parameters.output_step = 2.e-1;
   parameters.final_time = 20.;
 
   parameters.max_cells = 3500;
