@@ -37,7 +37,10 @@ inline double Equations<EquationsTypeMhd, dim>::compute_magnetic_energy(const va
 template <int dim>
 inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
-  return std::max(0., (parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
+  double p = (parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W));
+  if (p <= 0.)
+    LOGL(0, "Warning - negative pressure");
+  return p;
 }
 
 template <int dim>
@@ -51,6 +54,12 @@ template <int dim>
 inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters)
 {
   return (parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
+}
+
+template <int dim>
+inline double Equations<EquationsTypeMhd, dim>::compute_energy_from_pressure(const values_vector &W, const double& pressure, const Parameters<dim>& parameters)
+{
+  return (pressure / (parameters.gas_gamma - 1.0)) + compute_kinetic_energy(W) + compute_magnetic_energy(W);
 }
 
 template <int dim>
@@ -108,6 +117,53 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const values_vector &
   flux[5][2] = ((W[3] * oneOverRho) * W[5]) - ((W[1] * oneOverRho) * W[7]);
   flux[6][2] = ((W[3] * oneOverRho) * W[6]) - ((W[2] * oneOverRho) * W[7]);
   flux[7][2] = 0.0;
+}
+
+template <int dim>
+void Equations<EquationsTypeMhd, dim>::compute_flux_vector(const Tensor<1, dim> &normal, const values_vector &W, std::array <double, n_components > &flux, const Parameters<dim>& parameters)
+{
+  const double mag_energy = compute_magnetic_energy(W);
+  const double pressure = compute_pressure(W, parameters);
+  const double E = W[4];
+  const double total_pressure = pressure + mag_energy;
+  const double oneOverRho = 1. / W[0];
+  const double UB = (W[1] * W[5] + W[2] * W[6] + W[3] * W[7])* oneOverRho;
+  const int i = get_normal_direction(normal);
+  double sign = normal[i];
+  switch (i)
+  {
+  case 0:
+    flux[0] = W[1];
+    flux[1] = (W[1] * W[1] * oneOverRho) - W[5] * W[5] + total_pressure;
+    flux[2] = (W[1] * W[2] * oneOverRho) - W[5] * W[6];
+    flux[3] = (W[1] * W[3] * oneOverRho) - W[5] * W[7];
+    flux[4] = (E + total_pressure) * (W[1] * oneOverRho) - (W[5] * UB);
+    flux[5] = 0.0;
+    flux[6] = ((W[1] * oneOverRho) * W[6]) - ((W[2] * oneOverRho) * W[5]);
+    flux[7] = ((W[1] * oneOverRho) * W[7]) - ((W[3] * oneOverRho) * W[5]);
+    break;
+  case 1:
+    flux[0] = W[2];
+    flux[1] = (W[2] * W[1] * oneOverRho) - W[6] * W[5];
+    flux[2] = (W[2] * W[2] * oneOverRho) - W[6] * W[6] + total_pressure;
+    flux[3] = (W[2] * W[3] * oneOverRho) - W[6] * W[7];
+    flux[4] = (E + total_pressure) * (W[2] * oneOverRho) - (W[6] * UB);
+    flux[5] = ((W[2] * oneOverRho) * W[5]) - ((W[1] * oneOverRho) * W[6]);
+    flux[6] = 0.0;
+    flux[7] = ((W[2] * oneOverRho) * W[7]) - ((W[3] * oneOverRho) * W[6]);
+    break;
+  case 2:
+    flux[0] = W[3];
+    flux[1] = (W[3] * W[1] * oneOverRho) - W[7] * W[5];
+    flux[2] = (W[3] * W[2] * oneOverRho) - W[7] * W[6];
+    flux[3] = (W[3] * W[3] * oneOverRho) - W[7] * W[7] + total_pressure;
+    flux[4] = (E + total_pressure) * (W[3] * oneOverRho) - (W[7] * UB);
+    flux[5] = ((W[3] * oneOverRho) * W[5]) - ((W[1] * oneOverRho) * W[7]);
+    flux[6] = ((W[3] * oneOverRho) * W[6]) - ((W[2] * oneOverRho) * W[7]);
+    flux[7] = 0.0;
+  }
+    for (unsigned int d = 0; d < n_components; ++d)
+      flux[d] *= sign;
 }
 
 
