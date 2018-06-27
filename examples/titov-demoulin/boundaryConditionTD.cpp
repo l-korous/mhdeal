@@ -84,7 +84,7 @@ void BoundaryConditionTDFree<dim>::bc_vector_value(int boundary_no, const Point<
 
 template <int dim>
 BoundaryConditionTDTest<dim>::BoundaryConditionTDTest(Parameters<dim>& parameters, TitovDemoulinParameters& td_parameters) :
-  BoundaryCondition<EquationsTypeMhd, dim>(parameters)
+  BoundaryCondition<EquationsTypeMhd, dim>(parameters), td_parameters(td_parameters)
 {
 }
 
@@ -143,7 +143,7 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
     result[7] = values[7];
   }
 
-  result[4] = values[4];
+  result[4] = Equations<EquationsTypeMhd, dim>::compute_energy_from_pressure(result, Equations<EquationsTypeMhd, dim>::compute_pressure(values, this->parameters), this->parameters);
 }
 
 template <int dim>
@@ -158,7 +158,7 @@ void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, cons
   values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator&) const
 {
   // For other than z=0 boundaries, we use do-nothing
-  if (p[2] > SMALL)
+  if (boundary_no != 0)
   {
     for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
       result[di] = values[di];

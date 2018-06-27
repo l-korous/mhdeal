@@ -55,6 +55,8 @@ public:
 
   void bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, values_vector &result, 
     const grad_vector &grads, const values_vector &W_plus, double time, typename DoFHandler<dim>::active_cell_iterator&) const;
+private:
+  TitovDemoulinParameters& td_parameters;
 };
 
 template <int dim>

@@ -31,17 +31,17 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
   parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
-  parameters.refinements = { 50, 100, 50 };
-  parameters.limit = true;
-  parameters.use_div_free_space_for_B = true;
+  parameters.refinements = { 20, 40, 20 };
+  parameters.limit = false;
+  parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .01;
+  parameters.cfl_coefficient = .05;
   parameters.start_limiting_at = -.05;
-  parameters.quadrature_order = 6;
-  parameters.polynomial_order_dg = 1;
+  parameters.quadrature_order = 5;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 2.e-1;
+  parameters.output_step = -2.e-1;
   parameters.final_time = 20.;
 
   parameters.max_cells = 3500;
