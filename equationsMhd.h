@@ -10,25 +10,26 @@ class Equations<EquationsTypeMhd, dim>
 public:
   static const unsigned int n_components = 2 * dim + 2;
 
-  typedef std::array<double, n_components> InputVector;
+  typedef std::array<double, n_components> values_vector;
 
-  static double compute_kinetic_energy(const InputVector &W);
+  static double compute_kinetic_energy(const values_vector &W);
 
-  static double compute_magnetic_energy(const InputVector &W);
-
-  // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
-  static double compute_pressure(const InputVector &W, const Parameters<dim>& parameters);
+  static double compute_magnetic_energy(const values_vector &W);
 
   // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
-  static double compute_total_pressure(const InputVector &W, const Parameters<dim>& parameters);
+  static double compute_pressure(const values_vector &W, const Parameters<dim>& parameters);
+
+  // Compute pressure, and use kinetic energy and magnetic energy from the state vector.
+  static double compute_total_pressure(const values_vector &W, const Parameters<dim>& parameters);
 
   // Compute pressure, and use the passed values of kinetic energy and magnetic energy.
-  static double compute_pressure(const InputVector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters);
+  static double compute_pressure(const values_vector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters);
 
   static double compute_magnetic_field_divergence(const std::vector<Tensor<1, dim> > &W);
+  static std::array<double, dim> compute_magnetic_field_curl(const std::vector<Tensor<1, dim> > &W);
 
   // Compute the matrix of MHD fluxes.
-  static void compute_flux_matrix(const InputVector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters);
+  static void compute_flux_matrix(const values_vector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters);
 
   // The rest is for the output.  
   class Postprocessor : public DataPostprocessor<dim>

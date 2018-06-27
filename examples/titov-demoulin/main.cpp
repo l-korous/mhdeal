@@ -31,17 +31,17 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
   parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
-  parameters.refinements = { 80, 160, 80 };
+  parameters.refinements = { 20, 40, 20 };
   parameters.limit = false;
-  parameters.use_div_free_space_for_B = false;
+  parameters.use_div_free_space_for_B = true;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
   parameters.start_limiting_at = -.05;
-  parameters.quadrature_order = 1;
-  parameters.polynomial_order_dg = 0;
+  parameters.quadrature_order = 5;
+  parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = 2.e-1;
+  parameters.output_step = -2.e-1;
   parameters.final_time = 20.;
 
   parameters.max_cells = 3500;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 
     InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTDFree<DIMENSION> boundary_conditions(parameters, td_parameters);
+    BoundaryConditionTDTest<DIMENSION> boundary_conditions(parameters, td_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity

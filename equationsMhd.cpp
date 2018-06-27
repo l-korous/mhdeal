@@ -23,32 +23,32 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const InputVector &W)
+inline double Equations<EquationsTypeMhd, dim>::compute_kinetic_energy(const values_vector &W)
 {
   return 0.5 * (W[1] * W[1] + W[2] * W[2] + W[3] * W[3]) / W[0];
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_magnetic_energy(const InputVector &W)
+inline double Equations<EquationsTypeMhd, dim>::compute_magnetic_energy(const values_vector &W)
 {
   return 0.5 * (W[5] * W[5] + W[6] * W[6] + W[7] * W[7]);
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const Parameters<dim>& parameters)
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
   return std::max(0., (parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W)));
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const InputVector &W, const Parameters<dim>& parameters)
+inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
   const double magnetic_energy = compute_magnetic_energy(W);
   return compute_pressure(W, compute_kinetic_energy(W), magnetic_energy, parameters) + magnetic_energy;
 }
 
 template <int dim>
-inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const InputVector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters)
+inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters)
 {
   return (parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
 }
@@ -65,7 +65,15 @@ double Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(const
 }
 
 template <int dim>
-void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const InputVector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters)
+std::array<double, dim> Equations<EquationsTypeMhd, dim>::compute_magnetic_field_curl(const std::vector<Tensor<1, dim> > &W)
+{
+  std::array<double, dim> curl_ = { W[7][1] - W[6][2], W[5][2] - W[7][0], W[6][0] - W[5][1] };
+
+  return curl_;
+}
+
+template <int dim>
+void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const values_vector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters)
 {
   const double mag_energy = compute_magnetic_energy(W);
   const double pressure = compute_pressure(W, parameters);
@@ -125,6 +133,9 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::evaluate_vector_field(
 
     computed_quantities[q](dim) = equations.compute_pressure(inputs.solution_values[q]);
     computed_quantities[q](dim + 1) = equations.compute_magnetic_field_divergence(inputs.solution_gradients[q]);
+    auto curl_ = equations.compute_magnetic_field_curl(inputs.solution_gradients[q]);
+    for (unsigned int d = 0; d < dim; ++d)
+      computed_quantities[q](dim + 2 + d) = curl_[d];
   }
 }
 #else
@@ -153,6 +164,9 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
 
     computed_quantities[q](dim) = Equations<EquationsTypeMhd, dim>::compute_pressure(uh_q, parameters);
     computed_quantities[q](dim + 1) = Equations<EquationsTypeMhd, dim>::compute_magnetic_field_divergence(duh[q]);
+    auto curl_ = Equations<EquationsTypeMhd, dim>::compute_magnetic_field_curl(duh[q]);
+    for (unsigned int d = 0; d < dim; ++d)
+      computed_quantities[q](dim + 2 + d) = curl_[d];
   }
 }
 #endif
@@ -160,7 +174,7 @@ Equations<EquationsTypeMhd, dim>::Postprocessor::compute_derived_quantities_vect
 template <int dim>
 std::vector<std::string> Equations<EquationsTypeMhd, dim>::Postprocessor::get_names() const
 {
-  return{ "velocity", "velocity", "velocity", "pressure", "mag_field_divergence" };
+  return{ "velocity", "velocity", "velocity", "pressure", "divB", "curlB", "curlB", "curlB" };
 }
 
 template <int dim>
@@ -169,6 +183,9 @@ std::vector<DataComponentInterpretation::DataComponentInterpretation> Equations<
   std::vector<DataComponentInterpretation::DataComponentInterpretation> interpretation(dim, DataComponentInterpretation::component_is_part_of_vector);
   interpretation.push_back(DataComponentInterpretation::component_is_scalar);
   interpretation.push_back(DataComponentInterpretation::component_is_scalar);
+  interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
+  interpretation.push_back(DataComponentInterpretation::component_is_part_of_vector);
 
   return interpretation;
 }

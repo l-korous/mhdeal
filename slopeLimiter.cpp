@@ -35,6 +35,8 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
         u_c_set[i] = false;
       for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
       {
+        if (!this->is_primitive[i] || this->component_ii[i] > 4)
+          continue;
         if (!this->is_primitive[i])
           data->lambda_indices_to_multiply_all_B_components.push_back(this->dof_indices[i]);
         else
@@ -64,23 +66,6 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
             neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
           }
         }
-
-        // If on boundary which is periodic, get also the proper periodic neighbors
-        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
-        {
-          if (cell->at_boundary(face_no) && this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
-          {
-            TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
-            for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
-            {
-              // Only now we know this vertex is at a periodic boundary
-              if (face->vertex_index(face_i) == data->vertexIndex[vertex_i])
-              {
-               // Do stuff
-              }
-            }
-          }
-        }
       }
     }
 
@@ -90,6 +75,8 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       u_c_set[i] = false;
     for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
     {
+      if (!this->is_primitive[i] || this->component_ii[i] > 4)
+        continue;
       if (this->is_primitive[i])
       {
         // Here we rely on the fact, that the constant basis fn is the first one and that all other basis fns have zero mean.
@@ -146,6 +133,8 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
 
         for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
         {
+          if (!this->is_primitive[i] || this->component_ii[i] > 4)
+            continue;
           if (this->is_primitive[i])
           {
             if (std::abs(u_c[this->component_ii[i]]) < SMALL)
@@ -255,23 +244,6 @@ void BarthJespersenSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrapper
           {
             data->neighbor_dof_indices[vertex_i][neighbor_i].resize(this->dofs_per_cell);
             neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
-          }
-        }
-
-        // If on boundary which is periodic, get also the proper periodic neighbors
-        for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
-        {
-          if (cell->at_boundary(face_no) && this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
-          {
-            TriaIterator<TriaAccessor<dim - 1, dim, dim> > face = cell->face(face_no);
-            for (unsigned int face_i = 0; face_i < GeometryInfo<dim>::vertices_per_face; ++face_i)
-            {
-              // Only now we know this vertex is at a periodic boundary
-              if (face->vertex_index(face_i) == data->vertexIndex[vertex_i])
-              {
-                // Do stuff
-              }
-            }
           }
         }
       }

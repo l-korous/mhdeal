@@ -180,8 +180,7 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
     }
     // inside the torus
     else {
-      double rho_0 = 1.0;
-      value_list[pp][0] = rho_0 * exp(-zz * td_parameters.Tc2Tp * invL_G);
+      value_list[pp][0] = td_parameters.rho_0 * exp(-zz * td_parameters.Tc2Tp * invL_G);
 
       B_loc.sadd(1.0, sqrt(1.0 + (2.0 * (td_parameters.N_t * td_parameters.N_t) / (td_parameters.R * td_parameters.R)) * (1.0 - r_min * r_min)) +
         (td_parameters.R / r_maj) - 1.0, theta0);

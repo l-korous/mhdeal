@@ -22,7 +22,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   time_step_number(0),
   mag(dim + 2),
   update_flags(update_values | update_JxW_values | update_gradients),
-  face_update_flags(update_values | update_JxW_values | update_normal_vectors | update_q_points),
+  face_update_flags(update_values | update_JxW_values | update_normal_vectors | update_q_points | update_gradients),
   neighbor_face_update_flags(update_values | update_q_points),
   fe_v_cell(mapping, fe, quadrature, update_flags),
   fe_v_face(mapping, fe, face_quadrature, face_update_flags),
@@ -38,6 +38,7 @@ Problem<equationsType, dim>::Problem(Parameters<dim>& parameters, Equations<equa
   W_prev.resize(n_quadrature_points_cell);
   n_quadrature_points_face = face_quadrature.get_points().size();
   Wplus_old.resize(n_quadrature_points_face);
+  Wgrad_plus_old.resize(n_quadrature_points_face);
   Wminus_old.resize(n_quadrature_points_face);
   normal_fluxes_old.resize(n_quadrature_points_face);
 
@@ -133,7 +134,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 
   // Loop through all cells.
   int ith_cell = 0;
-  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+  for (cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
   {
     // Only assemble what belongs to this process.
     if (!cell->is_locally_owned())
@@ -380,33 +381,56 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
   const bool external_face, const unsigned int boundary_id, Vector<double>& cell_rhs)
 {
   // This loop is preparation - calculate all states (Wplus on the current element side of the currently assembled face, Wminus on the other side).
-  for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
+  if (time_step_number == 0)
   {
-    for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
-      Wplus_old[q][c] = Wminus_old[q][c] = 0.;
-
-    for (unsigned int i = 0; i < dofs_per_cell; ++i)
+    initial_condition.vector_value(fe_v.get_quadrature_points(), Wplus_old);
+    if (!external_face)
+      for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
+        for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
+          Wminus_old[q][c] = Wplus_old[q][c];
+  }
+  else
+  {
+    for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
     {
-      if (fe_v.get_fe().has_support_on_face(i, face_no))
+      for (unsigned int c = 0; c < Equations<equationsType, dim>::n_components; ++c)
       {
-        if (!is_primitive[i])
-        {
-          Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
-          for (int d = 0; d < dim; d++)
-            Wplus_old[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
-        }
-        else
-          Wplus_old[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-        if (!external_face)
+        Wplus_old[q][c] = Wminus_old[q][c] = 0.;
+        for (int d = 0; d < dim; d++)
+          Wgrad_plus_old[q][c][d] = 0.;
+      }
+      for (unsigned int i = 0; i < dofs_per_cell; ++i)
+      {
+        if (fe_v.get_fe().has_support_on_face(i, face_no))
         {
           if (!is_primitive[i])
           {
-            Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
+            Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
+            Tensor<2, dim> fe_v_grad = fe_v_cell[mag].gradient(i, q);
             for (int d = 0; d < dim; d++)
-              Wminus_old[q][5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+            {
+              Wplus_old[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
+              for (int e = 0; e < dim; e++)
+                Wgrad_plus_old[q][5 + d][e] += prev_solution(dof_indices[i]) * fe_v_grad[d][e];
+            }
           }
           else
-            Wminus_old[q][component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+          {
+            Wplus_old[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+            for (int d = 0; d < dim; d++)
+              Wgrad_plus_old[q][component_ii[i]][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
+          }
+          if (!external_face)
+          {
+            if (!is_primitive[i])
+            {
+              Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
+              for (int d = 0; d < dim; d++)
+                Wminus_old[q][5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
+            }
+            else
+              Wminus_old[q][component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
+          }
         }
       }
     }
@@ -415,7 +439,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
   for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
   {
     if (external_face)
-      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), Wminus_old[q], Wplus_old[q], this->time);
+      boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), fe_v.normal_vector(q), Wminus_old[q], Wgrad_plus_old[q], Wplus_old[q], this->time, this->cell);
 
     // Once we have the states on both sides of the face, we need to calculate the numerical flux.
     this->numFlux->numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
@@ -596,7 +620,7 @@ void Problem<equationsType, dim>::output_results(bool use_prev_solution) const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-  }
+}
 #else
   std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : (use_prev_solution ? "prev_solution" : "solution")) + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -674,8 +698,8 @@ void Problem<equationsType, dim>::run()
       current_limited_solution = current_unlimited_solution;
 
     move_time_step_handle_outputs();
-    }
   }
+}
 
 template <EquationsType equationsType, int dim>
 void Problem<equationsType, dim>::perform_reset_after_refinement()
@@ -748,7 +772,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
         prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
       this->perform_reset_after_refinement();
-    }
+  }
     else
     {
       this->reset_after_refinement = false;
@@ -756,7 +780,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
       ++time_step_number;
       time += parameters.current_time_step_length;
     }
-    }
+}
   else
   {
     this->reset_after_refinement = false;
@@ -764,6 +788,6 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     ++time_step_number;
     time += parameters.current_time_step_length;
   }
-  }
+}
 
 template class Problem<EquationsTypeMhd, 3>;

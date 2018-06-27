@@ -119,10 +119,11 @@ public:
   // Slope limiter
   SlopeLimiter<equationsType, dim>* slopeLimiter;
 
-  // TODO Revise this for adaptivity (subface_flags, ...)
   const UpdateFlags update_flags;
   const UpdateFlags face_update_flags;
   const UpdateFlags neighbor_face_update_flags;
+  // Currently assembled flag.
+  typename DoFHandler<dim>::active_cell_iterator cell;
   // DOF indices both on the currently assembled element and the neighbor.
   FEValues<dim> fe_v_cell;
   FEFaceValues<dim> fe_v_face;
@@ -132,6 +133,7 @@ public:
   std::vector<types::global_dof_index> dof_indices;
   std::vector<types::global_dof_index> dof_indices_neighbor;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > Wplus_old, Wminus_old;
+  std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > Wgrad_plus_old;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > normal_fluxes_old;
   std::vector<std::array<double, Equations<equationsType, dim>::n_components> > W_prev;
   std::vector<std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> > fluxes_old;

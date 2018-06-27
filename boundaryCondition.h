@@ -10,14 +10,14 @@ template <EquationsType equationsType, int dim>
 class BoundaryCondition
 {
 public:
-  typedef std::array<double, Equations<equationsType, dim>::n_components> InputVector;
+  typedef std::array<double, Equations<equationsType, dim>::n_components> values_vector;
+  typedef std::array<std::array<double, dim>, Equations<equationsType, dim>::n_components> grad_vector;
 
   BoundaryCondition(Parameters<dim>& parameters);
 
   // Values for this boundary identifier.
-  virtual void bc_vector_value(int boundary_no, const Point<dim> &point, InputVector &result, const InputVector &W_plus, double time) const;
-
-  double compute_energy_from_given_pressure(const InputVector &W, double pressure) const;
+  virtual void bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, values_vector &result,
+    const grad_vector &grads, const values_vector &W_plus, double time, typename DoFHandler<dim>::active_cell_iterator&) const;
 
   // Passed as a constructor parameter
   Parameters<dim>& parameters;
