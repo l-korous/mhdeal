@@ -35,8 +35,6 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
         u_c_set[i] = false;
       for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
       {
-        if (!this->is_primitive[i] || this->component_ii[i] > 4)
-          continue;
         if (!this->is_primitive[i])
           data->lambda_indices_to_multiply_all_B_components.push_back(this->dof_indices[i]);
         else
@@ -75,8 +73,6 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       u_c_set[i] = false;
     for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
     {
-      if (!this->is_primitive[i] || this->component_ii[i] > 4)
-        continue;
       if (this->is_primitive[i])
       {
         // Here we rely on the fact, that the constant basis fn is the first one and that all other basis fns have zero mean.
@@ -133,8 +129,6 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
 
         for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
         {
-          if (!this->is_primitive[i] || this->component_ii[i] > 4)
-            continue;
           if (this->is_primitive[i])
           {
             if (std::abs(u_c[this->component_ii[i]]) < SMALL)
@@ -173,13 +167,16 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       }
     }
 
-    for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
+    for (int k = 0; k < 5; k++)
       for (int i = 0; i < data->lambda_indices_to_multiply[k].size(); i++)
         current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= alpha_e[k];
 
-    double alpha_e_B = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
+    double mag_alpha = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
+    for (int k = 5; k < 8; k++)
+      for (int i = 0; i < data->lambda_indices_to_multiply[k].size(); i++)
+        current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= mag_alpha;
     for (int i = 0; i < data->lambda_indices_to_multiply_all_B_components.size(); i++)
-      current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= alpha_e_B;
+      current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= mag_alpha;
   }
 }
 
