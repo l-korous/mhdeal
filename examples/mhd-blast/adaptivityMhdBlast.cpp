@@ -135,7 +135,7 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   Vector<double> gradient_indicator(triangulation.n_active_cells());
   calculate_jumps(solution, dof_handler, mapping, gradient_indicator);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->parameters.refine_threshold, this->parameters.coarsen_threshold, this->parameters.max_cells + (int)std::floor((time / 0.5) * 10000.));
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->parameters.refine_threshold, this->parameters.coarsen_threshold, this->parameters.max_cells + (int)std::floor((time) * 1000.));
 
   triangulation.prepare_coarsening_and_refinement();
 

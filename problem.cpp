@@ -439,15 +439,10 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
   for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
   {
     if (external_face)
-    {
       boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), fe_v.normal_vector(q), Wminus_old[q], Wgrad_plus_old[q], Wplus_old[q], this->time, this->cell);
-      this->equations.compute_flux_vector(fe_v.normal_vector(q), Wminus_old[q], normal_fluxes_old[q], this->parameters);
-    }
-    else
-    {
-      // Once we have the states on both sides of the face, we need to calculate the numerical flux.
-      this->numFlux->numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
-    }
+    
+    // Once we have the states on both sides of the face, we need to calculate the numerical flux.
+    this->numFlux->numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
 
     // Some debugging outputs.
     if ((parameters.debug & parameters.Assembling) || (parameters.debug & parameters.NumFlux))
