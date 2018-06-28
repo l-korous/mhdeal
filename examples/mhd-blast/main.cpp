@@ -27,20 +27,20 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters)
 {
   parameters.corner_a = Point<DIMENSION>(-0.5, -0.75, 0.);
-  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 1.0 / 400.);
-  parameters.refinements = { 400, 600, 1 };
+  parameters.corner_b = Point<DIMENSION>(0.5, 0.75, 1.0 / 10.);
+  parameters.refinements = { 10, 15, 1 };
   parameters.limit = false;
-  parameters.output_file_prefix = "P0-400-600-BTaylor-CFL0.1";
+  parameters.output_file_prefix = "solution";
   parameters.slope_limiter = parameters.vertexBased;
   parameters.use_div_free_space_for_B = false;
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.75;
-  parameters.cfl_coefficient = .01;
+  parameters.cfl_coefficient = .025;
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 1.e-1;
+  parameters.output_step = 1.e-2;
   parameters.final_time = 1.;
   parameters.debug = parameters.BasicSteps;// | parameters.Adaptivity | parameters.PeriodicBoundaries;
 
@@ -50,11 +50,11 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  parameters.max_cells = 3000;
+  parameters.max_cells = 1500;
   parameters.refine_every_nth_time_step = 50;
-  parameters.perform_n_initial_refinements = 20;
-  parameters.refine_threshold = 0.2;
-  parameters.coarsen_threshold = 0.2;
+  parameters.perform_n_initial_refinements = 25;
+  parameters.refine_threshold = 0.35;
+  parameters.coarsen_threshold = 0.25;
 }
 
 int main(int argc, char *argv[])

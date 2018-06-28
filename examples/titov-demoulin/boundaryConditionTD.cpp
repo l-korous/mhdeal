@@ -96,7 +96,7 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
   result[0] = values[0];
 
   // Velocities are zero on the bottom boundary, otherwise the same as inside.
-  if (boundary_no != 0)
+  if (boundary_no != 4)
   {
     result[1] = values[1];
     result[2] = values[2];
