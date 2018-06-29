@@ -46,10 +46,23 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
             data->lambda_indices_to_multiply[this->component_ii[i]].push_back(this->dof_indices[i]);
         }
       }
+      for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
+        data->vertex_is_at_nonperiodic_boundary[vertex_i] = false;
+
+      for (unsigned int face = 0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+        if (cell->at_boundary(face) && !(this->parameters.is_periodic_boundary(cell->face(face)->boundary_id())))
+          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_face; ++v)
+          {
+            int index_ = GeometryInfo<dim>::face_to_cell_vertices(face, v);
+            data->vertex_is_at_nonperiodic_boundary[index_] = true;
+          }
 
       data->center = cell->center();
       for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
       {
+        if (data->vertex_is_at_nonperiodic_boundary[vertex_i])
+          continue;
+
         data->vertexIndex[vertex_i] = cell->vertex_index(vertex_i);
         data->vertexPoint[vertex_i] = data->center + (1. - NEGLIGIBLE) * (cell->vertex(vertex_i) - data->center);
 
@@ -90,8 +103,12 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
     double alpha_e[Equations<equationsType, dim>::n_components];
     for (int i = 0; i < Equations<equationsType, dim>::n_components; i++)
       alpha_e[i] = 1.;
+
     for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
     {
+      if (data->vertex_is_at_nonperiodic_boundary[vertex_i])
+        continue;
+
       // (!!!) Find out u_i
       Vector<double> u_i(Equations<equationsType, dim>::n_components);
       const Point<dim> p_cell = this->mapping.transform_real_to_unit_cell(cell, data->vertexPoint[vertex_i]);

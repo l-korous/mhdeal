@@ -186,13 +186,13 @@ FE_DG_DivFree<dim, spacedim>::shape_value_component(const typename Triangulation
   case 9:
     switch (component) {
     case 0:
-      return 2. * cell_diameter * p(0);
+      return 2. * p(0);
       break;
     case 1:
-      return -cell_diameter * p(1);
+      return -p(1);
       break;
     case 2:
-      return -cell_diameter * p(2);
+      return -p(2);
       break;
     }
     break;
@@ -281,13 +281,13 @@ FE_DG_DivFree<dim, spacedim>::shape_grad_component(const typename Triangulation<
   case 9:
     switch (component) {
     case 0:
-      grad[0] = 2.;
+      grad[0] = 2. / h;
       break;
     case 1:
-      grad[1] = -1.;
+      grad[1] = -1. / h;
       break;
     case 2:
-      grad[2] = -1.;
+      grad[2] = -1. / h;
       break;
     }
     break;

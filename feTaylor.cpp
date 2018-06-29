@@ -322,11 +322,12 @@ void FE_DG_Taylor<dim, spacedim>::fill_fe_subface_values(const typename Triangul
   std::vector<Tensor<4, dim> > empty_vector_of_4th_order_tensors;
 
   double h = cell->diameter();
+  Point<dim> c = cell->center();
 
   if (fe_internal.update_each & (update_values | update_gradients))
     for (unsigned int i = 0; i < n_q_points; ++i)
     {
-      const Point<dim> p = (Point<dim>)(mapping_data.quadrature_points[i] - cell->center()) / h;
+      const Point<dim> p = (Point<dim>)(mapping_data.quadrature_points[i] - c) / h;
       polynomial_space.compute(p, //mapping_data.quadrature_points[i],
         values, grads, grad_grads,
         empty_vector_of_3rd_order_tensors,
