@@ -148,9 +148,6 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
         {
           if (this->is_primitive[i])
           {
-            if (std::abs(u_c[this->component_ii[i]]) < SMALL)
-              continue;
-
             // Here we rely on the fact, that the constant basis fn is the first one.
             if (!u_i_extrema_set[this->component_ii[i]])
             {
