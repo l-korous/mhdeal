@@ -31,13 +31,13 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
   parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
-  parameters.refinements = { 20, 40, 20 };
+  parameters.refinements = { 10, 20, 10 };
   parameters.limit = true;
   parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
-  parameters.start_limiting_at = 1e-6;
+  parameters.start_limiting_at = -1e-6;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
@@ -47,9 +47,9 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.max_cells = 4000;
   parameters.refine_every_nth_time_step = 25;
   parameters.perform_n_initial_refinements = 25;
-  parameters.refine_threshold = 0.2;
+  parameters.refine_threshold = 0.25;
   parameters.coarsen_threshold = 0.2;
-  parameters.volume_factor = 2;
+  parameters.volume_factor = 3;
   parameters.time_interval_max_cells_multiplicator = 0.;
 
   // plasma beta
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::none), parallel::distributed::Triangulation<DIMENSION>::no_automatic_repartitioning);
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator);
 #else
     Triangulation<DIMENSION> triangulation;
 #endif    

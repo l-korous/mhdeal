@@ -60,9 +60,6 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       data->center = cell->center();
       for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
       {
-        if (data->vertex_is_at_nonperiodic_boundary[vertex_i])
-          continue;
-
         data->vertexIndex[vertex_i] = cell->vertex_index(vertex_i);
         data->vertexPoint[vertex_i] = data->center + (1. - NEGLIGIBLE) * (cell->vertex(vertex_i) - data->center);
 
@@ -77,6 +74,7 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
             neighbor->get_dof_indices(data->neighbor_dof_indices[vertex_i][neighbor_i++]);
           }
         }
+        data->neighbor_count = neighbor_i;
       }
     }
 
@@ -106,7 +104,7 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
 
     for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
     {
-      if (data->vertex_is_at_nonperiodic_boundary[vertex_i])
+      if (data->neighbor_count < 4)
         continue;
 
       // (!!!) Find out u_i
