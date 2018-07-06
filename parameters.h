@@ -98,6 +98,8 @@ public:
   int perform_n_initial_refinements;
   double refine_threshold;
   double coarsen_threshold;
+  int volume_factor;
+  double time_interval_max_cells_multiplicator;
 };
 
 #endif

@@ -31,24 +31,26 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
   parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
-  parameters.refinements = { 40, 80, 40 };
+  parameters.refinements = { 20, 40, 20 };
   parameters.limit = true;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
-  parameters.cfl_coefficient = .05;
-  parameters.start_limiting_at = -.05;
+  parameters.cfl_coefficient = .01;
+  parameters.start_limiting_at = 1e-6;
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
   parameters.output_step = -1.e-1;
   parameters.final_time = 20.;
 
-  parameters.max_cells = 3500;
+  parameters.max_cells = 4000;
   parameters.refine_every_nth_time_step = 25;
   parameters.perform_n_initial_refinements = 25;
-  parameters.refine_threshold = 0.10;
-  parameters.coarsen_threshold = 0.15;
+  parameters.refine_threshold = 0.2;
+  parameters.coarsen_threshold = 0.2;
+  parameters.volume_factor = 2;
+  parameters.time_interval_max_cells_multiplicator = 0.;
 
   // plasma beta
   td_parameters.beta = 0.05;
@@ -115,7 +117,7 @@ int main(int argc, char *argv[])
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity
-    //problem.set_adaptivity(&adaptivity);
+    problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }
