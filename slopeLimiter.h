@@ -41,6 +41,7 @@ protected:
     std::vector<unsigned int> lambda_indices_to_multiply_all_B_components;
     // TODO This may not work for adaptivity (max. number of cells sharing a vertes might be higher than 8)
     std::vector<types::global_dof_index> neighbor_dof_indices[GeometryInfo<dim>::vertices_per_cell][GeometryInfo<dim>::vertices_per_cell];
+    unsigned short neighbor_count;
     std::array<bool, GeometryInfo<dim>::vertices_per_cell> vertex_is_at_nonperiodic_boundary;
   };
 
