@@ -109,7 +109,9 @@ void AdaptivityMhdBlast<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& sol
       average_jumps[i] = jump(i) / area(i);
       sum_of_average_jumps += average_jumps[i];
     }
-    gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps * cell->diameter() * cell->diameter() * cell->diameter() * cell->diameter();
+    for (int i = 0; i < this->parameters.volume_factor; i++)
+      sum_of_average_jumps *= cell->diameter();
+    gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps;
   }
   for (int i = 0; i < gradient_indicator.size(); i++)
     if (gradient_indicator[i] < SMALL)
@@ -135,7 +137,8 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   Vector<double> gradient_indicator(triangulation.n_active_cells());
   calculate_jumps(solution, dof_handler, mapping, gradient_indicator);
 
-  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->parameters.refine_threshold, this->parameters.coarsen_threshold, this->parameters.max_cells + (int)std::floor((time) * 1000.));
+  int max_calls_ = this->parameters.max_cells + (int)std::floor(time * this->parameters.max_cells * this->parameters.time_interval_max_cells_multiplicator / this->parameters.final_time);
+  GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->parameters.refine_threshold, this->parameters.coarsen_threshold, max_calls_);
 
   triangulation.prepare_coarsening_and_refinement();
 
