@@ -13,7 +13,7 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
 {
   FEValuesExtractors::Scalar scalars[dim];
   scalars[0].component = 0;
-  scalars[1].component = 0;
+  scalars[1].component = 4;
   const QGauss<dim - 1> face_quadrature(1);
   UpdateFlags face_update_flags = UpdateFlags(update_values | update_JxW_values);
   FEFaceValues<dim> fe_v_face(mapping, dof_handler.get_fe(), face_quadrature, face_update_flags);
@@ -113,9 +113,6 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
       sum_of_average_jumps *= cell->diameter();
     gradient_indicator(cell->active_cell_index()) = sum_of_average_jumps;
   }
-  for (int i = 0; i < gradient_indicator.size(); i++)
-    if (gradient_indicator[i] < SMALL)
-      gradient_indicator[i] = 0.;
 }
 
 template <int dim>
