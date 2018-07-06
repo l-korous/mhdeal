@@ -33,7 +33,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
   parameters.refinements = { 10, 20, 10 };
   parameters.limit = true;
-  parameters.use_div_free_space_for_B = false;
+  parameters.use_div_free_space_for_B = true;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
@@ -44,12 +44,12 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.output_step = -1.e-1;
   parameters.final_time = 20.;
 
-  parameters.max_cells = 4000;
+  parameters.max_cells = 2500;
   parameters.refine_every_nth_time_step = 25;
   parameters.perform_n_initial_refinements = 25;
-  parameters.refine_threshold = 0.25;
+  parameters.refine_threshold = 0.5;
   parameters.coarsen_threshold = 0.2;
-  parameters.volume_factor = 3;
+  parameters.volume_factor = 4;
   parameters.time_interval_max_cells_multiplicator = 0.;
 
   // plasma beta
