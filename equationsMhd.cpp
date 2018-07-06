@@ -38,8 +38,6 @@ template <int dim>
 inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
   double p = (parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W));
-  if (p <= 0.)
-    LOGL(0, "Warning - negative pressure");
   return std::max(0.,p);
 }
 
