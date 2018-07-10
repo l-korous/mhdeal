@@ -23,6 +23,7 @@ public:
   enum Limiter { vertexBased, barthJespersen};
   Limiter slope_limiter;
   double start_limiting_at;
+  bool limit_edges_and_vertices, limitB;
 
   // Flux enumeration - for potentially adding more fluxes, decision which one to use is then made in Equations<>::numerical_normal_flux.
   enum NumFluxType { hlld, lax_friedrich };

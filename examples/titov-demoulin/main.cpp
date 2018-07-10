@@ -19,11 +19,6 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 #endif
 {
   GridGenerator::subdivided_hyper_rectangle(triangulation, parameters.refinements, parameters.corner_a, parameters.corner_b, true);
-
-  std::vector<dealii::GridTools::PeriodicFacePair< dealii::TriaIterator<dealii::CellAccessor<DIMENSION> > > > matched_pairs;
-  for (std::vector<std::array<int, 3> >::const_iterator it = parameters.periodic_boundaries.begin(); it != parameters.periodic_boundaries.end(); it++)
-    dealii::GridTools::collect_periodic_faces(triangulation, (*it)[0], (*it)[1], (*it)[2], matched_pairs);
-  triangulation.add_periodicity(matched_pairs);
 }
 
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
@@ -31,9 +26,10 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.slope_limiter = parameters.vertexBased;
   parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
   parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
-  parameters.refinements = { 10, 20, 10 };
+  parameters.refinements = { 20, 40, 20 };
   parameters.limit = true;
-  parameters.use_div_free_space_for_B = true;
+  parameters.limitB = false;
+  parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
@@ -41,7 +37,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.quadrature_order = 5;
   parameters.polynomial_order_dg = 1;
   parameters.patches = 0;
-  parameters.output_step = -1.e-1;
+  parameters.output_step = -1.e-2;
   parameters.final_time = 20.;
 
   parameters.max_cells = 2500;
@@ -77,7 +73,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.d = 1.5;
   
   // The coronal/prominence temperature ratio
-  td_parameters.Tc2Tp = 10.;
+  td_parameters.Tc2Tp = 1.;
 
   td_parameters.omega_0 = 0.3;
 
@@ -117,7 +113,7 @@ int main(int argc, char *argv[])
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity
-    problem.set_adaptivity(&adaptivity);
+    // problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }

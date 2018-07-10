@@ -92,6 +92,7 @@ template <int dim>
 void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, 
   values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator& cell) const
 {
+  LOGL(0, "boundary_no: " << boundary_no << ", normal: " << normal);
   // Density the same.
   result[0] = values[0];
 
@@ -111,6 +112,7 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
   // d will be taken as the elementh length in the direction.
   // Assumption: we have cubes.
   double d = std::pow(cell->measure(), 1./3.);
+  LOGL(0, "d: " << d);
   // In order to have value (and not just the derivative).
   // \left|B^{'}_x}\right| = \left|B_x}\right|
 
@@ -121,29 +123,32 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
     if (std::abs(normal[1]) < SMALL)
     {
       derivative = -grads[5][0] - grads[6][1];
-      result[5] = values[5];
-      result[6] = values[6];
-      result[7] = 0.5 * d * derivative * normal[2] + values[7];
+      result[5] = (0.5 * d * grads[5][2] * normal[2]) + values[5];
+      result[6] = (0.5 * d * grads[6][2] * normal[2]) + values[6];
+      result[7] = (0.5 * d * derivative * normal[2]) + values[7];
     }
     // y-direction
     else
     {
       derivative = -grads[5][0] - grads[7][2];
-      result[5] = values[5];
-      result[6] = 0.5 * d * derivative * normal[1] + values[6];
-      result[7] = values[7];
+      result[5] = (0.5 * d * grads[5][1] * normal[1]) + values[5];
+      result[6] = (0.5 * d * derivative * normal[1]) + values[6];
+      result[7] = (0.5 * d * grads[7][1] * normal[1]) + values[7];
     }
   }
   // x-direction
   else
   {
     derivative = -grads[6][1] - grads[7][2];
-    result[5] = 0.5 * d * derivative * normal[0] + values[5];
-    result[6] = values[6];
-    result[7] = values[7];
+    result[5] = (0.5 * d * derivative * normal[0]) + values[5];
+    result[6] = (0.5 * d * grads[6][0] * normal[0]) + values[6];
+    result[7] = (0.5 * d * grads[7][0] * normal[0]) + values[7];
   }
+  LOGL(0, "result[5]: " << result[5] << ", values[5]: " << values[5]);
+  LOGL(0, "result[6]: " << result[6] << ", values[6]: " << values[6]);
+  LOGL(0, "result[7]: " << result[7] << ", values[7]: " << values[7]);
 
-  result[4] = Equations<EquationsTypeMhd, dim>::compute_energy_from_pressure(result, Equations<EquationsTypeMhd, dim>::compute_pressure(values, this->parameters), this->parameters);
+  result[4] = values[4];
 }
 
 template <int dim>
@@ -155,18 +160,16 @@ BoundaryConditionTDInitialState<dim>::BoundaryConditionTDInitialState(Parameters
 
 template <int dim>
 void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, const Point<dim> &p, const Tensor<1, dim> &normal, 
-  values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator&) const
+  values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator& cell) const
 {
-  // For other than z=0 boundaries, we use do-nothing
-  if (boundary_no != 0)
-  {
-    for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
-      result[di] = values[di];
-    return;
-  }
-
   std::vector<Point<dim> > points;
-  points.push_back(p);
+  Point<dim> p1;
+  for (unsigned int di = 0; di < dim; ++di)
+  {
+    double length_in_direction = (this->parameters.corner_b[di] - this->parameters.corner_a[di]) / this->parameters.refinements[di];
+    p1[di] = p[di] + (0.5 * normal[di] * length_in_direction);
+  }
+  points.push_back(p1);
   std::array<double, Equations<EquationsTypeMhd, dim>::n_components> vla;
   std::vector<std::array<double, Equations<EquationsTypeMhd, dim>::n_components> > vl;
   vl.push_back(vla);

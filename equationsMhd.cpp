@@ -38,7 +38,9 @@ template <int dim>
 inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const Parameters<dim>& parameters)
 {
   double p = (parameters.gas_gamma - 1.0) * (W[4] - compute_kinetic_energy(W) - compute_magnetic_energy(W));
-  return std::max(0.,p);
+  if (p < 0)
+    LOGL(0, "Warning: negative pressure");
+  return p;// std::max(0., p);
 }
 
 template <int dim>
@@ -51,7 +53,10 @@ inline double Equations<EquationsTypeMhd, dim>::compute_total_pressure(const val
 template <int dim>
 inline double Equations<EquationsTypeMhd, dim>::compute_pressure(const values_vector &W, const double& Uk, const double& Um, const Parameters<dim>& parameters)
 {
-  return (parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
+  double p = (parameters.gas_gamma - 1.0) * (W[4] - Uk - Um);
+  if (p < 0)
+    LOGL(0, "Warning: negative pressure");
+  return p;// std::max(0., p);
 }
 
 template <int dim>
@@ -82,10 +87,8 @@ std::array<double, dim> Equations<EquationsTypeMhd, dim>::compute_magnetic_field
 template <int dim>
 void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const values_vector &W, std::array <std::array <double, dim>, n_components > &flux, const Parameters<dim>& parameters)
 {
-  const double mag_energy = compute_magnetic_energy(W);
-  const double pressure = compute_pressure(W, parameters);
   const double E = W[4];
-  const double total_pressure = pressure + mag_energy;
+  const double total_pressure = compute_total_pressure(W, parameters);
   const double oneOverRho = 1. / W[0];
   const double UB = (W[1] * W[5] + W[2] * W[6] + W[3] * W[7])* oneOverRho;
 
@@ -120,10 +123,8 @@ void Equations<EquationsTypeMhd, dim>::compute_flux_matrix(const values_vector &
 template <int dim>
 void Equations<EquationsTypeMhd, dim>::compute_flux_vector(const Tensor<1, dim> &normal, const values_vector &W, std::array <double, n_components > &flux, const Parameters<dim>& parameters)
 {
-  const double mag_energy = compute_magnetic_energy(W);
-  const double pressure = compute_pressure(W, parameters);
   const double E = W[4];
-  const double total_pressure = pressure + mag_energy;
+  const double total_pressure = compute_total_pressure(W, parameters);
   const double oneOverRho = 1. / W[0];
   const double UB = (W[1] * W[5] + W[2] * W[6] + W[3] * W[7])* oneOverRho;
   const int i = get_normal_direction(normal);
