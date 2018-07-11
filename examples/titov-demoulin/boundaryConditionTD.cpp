@@ -92,7 +92,6 @@ template <int dim>
 void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, 
   values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator& cell) const
 {
-  LOGL(0, "boundary_no: " << boundary_no << ", normal: " << normal);
   // Density the same.
   result[0] = values[0];
 
@@ -112,7 +111,6 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
   // d will be taken as the elementh length in the direction.
   // Assumption: we have cubes.
   double d = std::pow(cell->measure(), 1./3.);
-  LOGL(0, "d: " << d);
   // In order to have value (and not just the derivative).
   // \left|B^{'}_x}\right| = \left|B_x}\right|
 
@@ -144,9 +142,6 @@ void BoundaryConditionTDTest<dim>::bc_vector_value(int boundary_no, const Point<
     result[6] = (0.5 * d * grads[6][0] * normal[0]) + values[6];
     result[7] = (0.5 * d * grads[7][0] * normal[0]) + values[7];
   }
-  LOGL(0, "result[5]: " << result[5] << ", values[5]: " << values[5]);
-  LOGL(0, "result[6]: " << result[6] << ", values[6]: " << values[6]);
-  LOGL(0, "result[7]: " << result[7] << ", values[7]: " << values[7]);
 
   result[4] = values[4];
 }
@@ -176,6 +171,9 @@ void BoundaryConditionTDInitialState<dim>::bc_vector_value(int boundary_no, cons
   ic.vector_value(points, vl);
   for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
     result[di] = vl[0][di];
+  //result[0] = values[0];
+  result[1] = result[2] = result[3] = 0.;
+  //result[4] = Equations<EquationsTypeMhd, dim>::compute_energy_from_pressure(result, this->td_parameters.beta, this->parameters);
 }
 
 template class BoundaryConditionTDWithVortices<3>;

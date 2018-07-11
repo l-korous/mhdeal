@@ -24,21 +24,21 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-2.5, -5., 0.);
-  parameters.corner_b = Point<DIMENSION>(2.5, 5., 5.);
-  parameters.refinements = { 20, 40, 20 };
-  parameters.limit = true;
+  parameters.corner_a = Point<DIMENSION>(-4., -6., 0.);
+  parameters.corner_b = Point<DIMENSION>(4., 6., 5.);
+  parameters.refinements = { 120, 180, 75 };
+  parameters.limit = false;
   parameters.limitB = false;
-  parameters.use_div_free_space_for_B = false;
+  parameters.use_div_free_space_for_B = true;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
   parameters.start_limiting_at = -1e-6;
   parameters.quadrature_order = 5;
-  parameters.polynomial_order_dg = 1;
+  parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
   parameters.output_step = -1.e-2;
-  parameters.final_time = 20.;
+  parameters.final_time = 1.e-8;
 
   parameters.max_cells = 2500;
   parameters.refine_every_nth_time_step = 25;
@@ -54,23 +54,23 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   // coronal height scale
   td_parameters.L_G = 0.;
 
-  // coronal height scale
+  // Density
   td_parameters.rho_0 = 1.;
 
   // Torus winding number
-  td_parameters.N_t = 5.0;
+  td_parameters.N_t = 5.;
 
   // Torus major radius
   td_parameters.R = 3.0;
 
-  // Torus major radius
-  td_parameters.r = 1.0;
+  // Torus minor radius
+  td_parameters.r = 0.5;
 
   // Magnetic charge separation distance
-  td_parameters.L = 1.5;
+  td_parameters.L = 2.0;
 
   // Geometrical factor
-  td_parameters.d = 1.5;
+  td_parameters.d = 0.5;
   
   // The coronal/prominence temperature ratio
   td_parameters.Tc2Tp = 1.;
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 
     InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTDTest<DIMENSION> boundary_conditions(parameters, td_parameters);
+    BoundaryConditionTDInitialState<DIMENSION> boundary_conditions(parameters, td_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity

@@ -36,7 +36,7 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
   double xx, yy, zz;
   Point<dim> &ca = this->parameters.corner_a;
   Point<dim> &cb = this->parameters.corner_b;
-  const double dd = 1e-8;  // precision of numerical derivatives
+  const double dd = SMALL;  // precision of numerical derivatives
   const double idd = 0.5 / dd;
 
   for (unsigned int pp = 0; pp < points.size(); ++pp)
@@ -130,13 +130,13 @@ void InitialConditionTitovDemoulin<equationsType, dim>::vector_value(const std::
 
     // Radius vectors originating in magnetic charges
     Vector<double> r_plus(3);//(xx - L2R * R, yy, zz + d2R * R);
-    r_plus[0] = xx - L2R * this->td_parameters.R;
+    r_plus[0] = xx - this->td_parameters.L;
     r_plus[1] = yy;
-    r_plus[2] = zz + d2R * this->td_parameters.R;
+    r_plus[2] = zz + this->td_parameters.d;
     Vector<double> r_minus(3);//(xx + L2R * R, yy, zz + d2R * R);
-    r_minus[0] = xx + L2R * this->td_parameters.R;
+    r_minus[0] = xx + this->td_parameters.L;
     r_minus[1] = yy;
-    r_minus[2] = zz + d2R * this->td_parameters.R;
+    r_minus[2] = zz + this->td_parameters.d;
 
     double rp = r_plus.l2_norm();
     double rm = r_minus.l2_norm();
