@@ -177,15 +177,12 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
                 cell->periodic_neighbor_of_periodic_neighbor(face_no) :
                 cell->neighbor_of_neighbor(face_no));
 
-            for (unsigned int subface_no = 0; subface_no < cell->face(face_no)->n_children(); ++subface_no)
+            for (unsigned int subface_no = 0; subface_no < 4; ++subface_no)
             {
               const typename DoFHandler<dim>::active_cell_iterator neighbor_child =
                 (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()) ?
                   cell->periodic_neighbor_child_on_subface(face_no, subface_no) :
                   cell->neighbor_child_on_subface(face_no, subface_no));
-
-              Assert(neighbor_child->face(neighbor2) == cell->face(face_no)->child(subface_no), ExcInternalError());
-              Assert(neighbor_child->has_children() == false, ExcInternalError());
 
               fe_v_subface.reinit(cell, face_no, subface_no);
               fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
