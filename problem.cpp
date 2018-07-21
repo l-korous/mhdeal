@@ -156,7 +156,7 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     assemble_cell_term(cell_matrix, cell_rhs, assemble_matrix);
 
     // Assemble the face integrals, only after the first (projection) step
-    if (time_step_number > 0)
+    //if (time_step_number > 0)
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
@@ -172,10 +172,11 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
           // Not performed if there is no adaptivity involved.
           if (cell->neighbor_or_periodic_neighbor(face_no)->has_children())
           {
-            const unsigned int neighbor2 =
-              (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()) ?
-                cell->periodic_neighbor_of_periodic_neighbor(face_no) :
-                cell->neighbor_of_neighbor(face_no));
+            unsigned int neighbor2;
+            if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
+              neighbor2 = cell->periodic_neighbor_of_periodic_neighbor(face_no);
+            else
+              neighbor2 = cell->neighbor_of_neighbor(face_no);
 
             for (unsigned int subface_no = 0; subface_no < 4; ++subface_no)
             {
@@ -334,7 +335,7 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
     cell_rhs(i) += val;
   }
 
-  if (time_step_number > 0)
+  //if (time_step_number > 0)
   {
     for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
       equations.compute_flux_matrix(W_prev[q], fluxes_old[q], this->parameters);
@@ -444,19 +445,24 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
     // Some debugging outputs.
     if ((parameters.debug & parameters.Assembling) || (parameters.debug & parameters.NumFlux))
     {
-      LOGL(2, "point_i: " << q);
-      LOGL(2, "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2]);
-      LOGL(2, "Wplus: ");
-      for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        LOGL(3, Wplus_old[q][i] << (i < 7 ? ", " : ""));
+      LOG(0, "point_i: " << q);
 
-      LOGL(2, "Wminus: ");
+      LOG(1, "q: " << fe_v.quadrature_point(q) << ", n: " << fe_v.normal_vector(q)[0] << ", " << fe_v.normal_vector(q)[1] << ", " << fe_v.normal_vector(q)[2]);
+      LOG(1, "Wplus: ");
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        LOGL(3, Wminus_old[q][i] << (i < 7 ? ", " : ""));
+        LOG(0, Wplus_old[q][i] << (i < 7 ? ", " : ""));
 
-      LOGL(2, "Num F: ");
+      LOG(1, "Wminus: ");
       for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
-        LOGL(3, normal_fluxes_old[q][i] << (i < 7 ? ", " : ""));
+        LOG(0, Wminus_old[q][i] << (i < 7 ? ", " : ""));
+
+      LOG(1, "Num F: ");
+      for (unsigned int i = 0; i < Equations<equationsType, dim>::n_components; i++)
+      {
+        LOG(0, normal_fluxes_old[q][i] << (i < 7 ? ", " : ""));
+        if ((i + 1) == Equations<equationsType, dim>::n_components)
+          std::cout << std::endl;
+      }
     }
   }
 

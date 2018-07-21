@@ -24,17 +24,17 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-4., -6., 0.);
-  parameters.corner_b = Point<DIMENSION>(4., 6., 5.);
-  parameters.refinements = { 120, 180, 75 };
+  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
+  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
+  parameters.refinements = { 50, 100, 50 };
   parameters.limit = false;
   parameters.limitB = false;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
   parameters.start_limiting_at = -1e-6;
-  parameters.quadrature_order = 5;
+  parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
   parameters.output_step = -1.e-2;
@@ -97,9 +97,9 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator);
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::limit_level_difference_at_vertices));
 #else
-    Triangulation<DIMENSION> triangulation;
+    Triangulation<DIMENSION> triangulation(Triangulation<DIMENSION>::limit_level_difference_at_vertices);
 #endif    
     set_triangulation(triangulation, parameters);
 
