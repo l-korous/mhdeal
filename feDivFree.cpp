@@ -7,7 +7,7 @@ FE_DG_DivFree<dim, spacedim>::FE_DG_DivFree()
   :
   FiniteElement<dim, spacedim>(FiniteElementData<dim>(get_dpo_vector(DEGREE), dim, DEGREE, FiniteElementData<dim>::L2),
     std::vector<bool>(FiniteElementData<dim>(get_dpo_vector(DEGREE), dim, DEGREE).dofs_per_cell, true),
-    std::vector<ComponentMask>({ ComponentMask({1, 0, 0}), ComponentMask({0, 1, 0}), ComponentMask({0, 0, 1}), ComponentMask({ 1, 0, 0 }), ComponentMask({ 1, 0, 0 }), ComponentMask({ 0, 1, 0 }), ComponentMask({ 0, 1, 0 }), ComponentMask({ 0, 0, 1 }), ComponentMask({ 0, 0, 1 }), ComponentMask({1, 1, 1}) }))
+    std::vector<ComponentMask>({ ComponentMask({1, 0, 0}), ComponentMask({0, 1, 0}), ComponentMask({0, 0, 1}), ComponentMask({ 1, 0, 0 }), ComponentMask({ 1, 0, 0 }), ComponentMask({ 0, 1, 0 }), ComponentMask({ 0, 1, 0 }), ComponentMask({ 0, 0, 1 }), ComponentMask({ 0, 0, 1 }), ComponentMask({ 1, 1, 0 }), ComponentMask({ 1, 0, 1 }) }))
   , FiniteElementIsConstantInterface<dim>()
   //std::vector<ComponentMask>(10, ComponentMask({ true, true, true })))
 {
@@ -43,7 +43,7 @@ std::vector<unsigned int>
 FE_DG_DivFree<dim, spacedim>::get_dpo_vector(const unsigned int deg)
 {
   std::vector<unsigned int> dpo(dim + 1, static_cast<unsigned int>(0));
-  dpo[dim] = 10;
+  dpo[dim] = 11;
   return dpo;
 }
 
@@ -186,10 +186,16 @@ FE_DG_DivFree<dim, spacedim>::shape_value_component(const typename Triangulation
   case 9:
     switch (component) {
     case 0:
-      return 2. * p(0);
+      return p(0);
       break;
     case 1:
       return -p(1);
+      break;
+    }
+  case 10:
+    switch (component) {
+    case 0:
+      return p(0);
       break;
     case 2:
       return -p(2);
@@ -281,10 +287,17 @@ FE_DG_DivFree<dim, spacedim>::shape_grad_component(const typename Triangulation<
   case 9:
     switch (component) {
     case 0:
-      grad[0] = 2. / h;
+      grad[0] = 1. / h;
       break;
     case 1:
       grad[1] = -1. / h;
+      break;
+    }
+    break;
+  case 10:
+    switch (component) {
+    case 0:
+      grad[0] = 1. / h;
       break;
     case 2:
       grad[2] = -1. / h;

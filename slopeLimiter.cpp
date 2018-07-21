@@ -104,7 +104,7 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
 
     for (unsigned int vertex_i = 0; vertex_i < GeometryInfo<dim>::vertices_per_cell; ++vertex_i)
     {
-      if (data->neighbor_count < 4 && data->vertex_is_at_nonperiodic_boundary[vertex_i])
+      if (!this->parameters.limit_edges_and_vertices && data->neighbor_count < 4 && data->vertex_is_at_nonperiodic_boundary[vertex_i])
         continue;
 
       // (!!!) Find out u_i
@@ -179,16 +179,20 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
       }
     }
 	
-    //for (int k = 0; k < Equations<equationsType, dim>::n_components; k++)
-    for (int k = 0; k < dim + 2; k++)
+    for (int k = 0; k < 5; k++)
       for (int i = 0; i < data->lambda_indices_to_multiply[k].size(); i++)
         current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= alpha_e[k];
 
-	/*
-    double mag_alpha = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
-    for (int i = 0; i < data->lambda_indices_to_multiply_all_B_components.size(); i++)
-      current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= mag_alpha;
-	*/
+    if (this->parameters.limitB)
+    {
+      for (int k = 5; k < Equations<equationsType, dim>::n_components; k++)
+        for (int i = 0; i < data->lambda_indices_to_multiply[k].size(); i++)
+          current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= alpha_e[k];
+
+      double mag_alpha = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
+      for (int i = 0; i < data->lambda_indices_to_multiply_all_B_components.size(); i++)
+        current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= mag_alpha;
+    }
   }
 }
 

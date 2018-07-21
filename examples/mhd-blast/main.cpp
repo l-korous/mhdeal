@@ -36,7 +36,7 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.periodic_boundaries = { { 0, 1, 0 },{ 2, 3, 1 } };
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.75;
-  parameters.cfl_coefficient = .025;
+  parameters.cfl_coefficient = .1;
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
@@ -50,11 +50,13 @@ void set_parameters(Parameters<DIMENSION>& parameters)
   parameters.output_solution = true;
   */
 
-  parameters.max_cells = 1500;
+  parameters.max_cells = 5000;
   parameters.refine_every_nth_time_step = 50;
   parameters.perform_n_initial_refinements = 25;
-  parameters.refine_threshold = 0.35;
-  parameters.coarsen_threshold = 0.25;
+  parameters.refine_threshold = 0.3;
+  parameters.coarsen_threshold = 0.1;
+  parameters.volume_factor = 3;
+  parameters.time_interval_max_cells_multiplicator = 1.;
 }
 
 int main(int argc, char *argv[])
@@ -87,7 +89,7 @@ int main(int argc, char *argv[])
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity
-    //problem.set_adaptivity(&adaptivity);
+    problem.set_adaptivity(&adaptivity);
     // Run the problem - entire transient problem.
     problem.run();
   }

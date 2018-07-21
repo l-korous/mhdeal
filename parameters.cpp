@@ -26,6 +26,9 @@ Parameters<dim>::Parameters() {
 
   this->volume_factor = 4;
   this->time_interval_max_cells_multiplicator = 2.;
+
+  this->limit_edges_and_vertices = false;
+  this->limitB = true;
 }
 
 template <int dim>

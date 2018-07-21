@@ -88,8 +88,11 @@ public:
   const Log& operator << (const T &t) const
   {
     for (int i = Offset; i > 0; i--)
-      std::cout << "  ";
-    std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+      std::cout << " | ";
+#ifdef HAVE_MPI
+    if(Offset == 0)
+      std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+#endif
     std::cout << t;
     return *this;
   }
@@ -97,8 +100,11 @@ public:
   const Log& operator << (std::ostream& (*p) (std::ostream &)) const
   {
     for (int i = Offset; i > 0; i--)
-      std::cout << "  ";
-    std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+      std::cout << " | ";
+#ifdef HAVE_MPI
+    if (Offset == 0)
+      std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+#endif
     std::cout << p;
     return *this;
   }
@@ -113,7 +119,9 @@ public:
   {
     for (int i = Offset; i > 0; i--)
       std::cout << "  ";
+#ifdef HAVE_MPI
     std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+#endif
     std::cout << t;
     std::cout << std::endl;
     return *this;
@@ -122,7 +130,9 @@ public:
   {
     for (int i = Offset; i > 0; i--)
       std::cout << "  ";
+#ifdef HAVE_MPI
     std::cout << "proc. #" << Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) << " | ";
+#endif
     std::cout << p;
     std::cout << std::endl;
     return *this;
