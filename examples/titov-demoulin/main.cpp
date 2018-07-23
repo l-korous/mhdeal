@@ -37,8 +37,8 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = -1.e-2;
-  parameters.final_time = 1.e-8;
+  parameters.output_step = 5.e-1;
+  parameters.final_time = 10.;
 
   parameters.max_cells = 2500;
   parameters.refine_every_nth_time_step = 25;
@@ -64,13 +64,13 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.R = 3.0;
 
   // Torus minor radius
-  td_parameters.r = 0.5;
+  td_parameters.r = 1.0;
 
   // Magnetic charge separation distance
-  td_parameters.L = 2.0;
+  td_parameters.L = 1.5;
 
   // Geometrical factor
-  td_parameters.d = 0.5;
+  td_parameters.d = 1.5;
   
   // The coronal/prominence temperature ratio
   td_parameters.Tc2Tp = 1.;
