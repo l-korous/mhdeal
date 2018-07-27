@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 #ifdef HAVE_MPI
     parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::limit_level_difference_at_vertices));
 #else
-    Triangulation<DIMENSION> triangulation(Triangulation<DIMENSION>::limit_level_difference_at_vertices);
+    Triangulation<DIMENSION> triangulation(Triangulation<DIMENSION>::allow_anisotropic_smoothing);
 #endif
     set_triangulation(triangulation, parameters);
 

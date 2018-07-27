@@ -140,7 +140,19 @@ bool AdaptivityMhdBlast<dim>::refine_mesh(int time_step, double time, TrilinosWr
   int max_calls_ = this->parameters.max_cells + (int)std::floor(time * this->parameters.max_cells * this->parameters.time_interval_max_cells_multiplicator / this->parameters.final_time);
   GridRefinement::refine_and_coarsen_fixed_fraction(triangulation, gradient_indicator, this->parameters.refine_threshold, this->parameters.coarsen_threshold, max_calls_);
 
+#ifdef HAVE_MPI
+  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    if (cell->refine_flag_set())
+      cell->set_refine_flag(RefinementCase<3>::cut_xy);
+#endif
+
   triangulation.prepare_coarsening_and_refinement();
+
+#ifdef HAVE_MPI
+  for (typename DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active(); cell != dof_handler.end(); ++cell)
+    if (cell->refine_flag_set())
+      cell->set_refine_flag(RefinementCase<3>::cut_xy);
+#endif
 
   return true;
 }

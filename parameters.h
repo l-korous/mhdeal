@@ -89,7 +89,8 @@ public:
     Assembling = 4,
     SlopeLimiting = 8,
     NumFlux = 16,
-    Adaptivity = 32
+    Adaptivity = 32,
+    DetailSteps = 64
   };
   int debug;
 

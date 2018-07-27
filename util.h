@@ -142,9 +142,7 @@ public:
 #define LOGL(x, ...) {std::stringstream ss; ss << __VA_ARGS__; Logline<x> l; l << ss.str();}
 
 // For debug purposes only.
-#ifndef OUTPUT_BASE
 //#define OUTPUT_BASE
-#endif
 
 // Safe limit on max number of basis functions (for all components !!)
 // - e.g. for linear Taylor functions in 3d, it is 4 x component count = 32 in case of MHD (8 components)

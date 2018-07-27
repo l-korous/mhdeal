@@ -148,8 +148,8 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
 
     cell->get_dof_indices(dof_indices);
 
-    if (parameters.debug & parameters.Assembling)
-      std::cout << "NEW CELL: " << ith_cell << std::endl;
+    if (parameters.debug & parameters.DetailSteps)
+      LOGL(2, "Cell: " << ith_cell);
     ith_cell++;
 
     // Assemble the volumetric integrals.
@@ -160,9 +160,13 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
     {
       for (unsigned int face_no = 0; face_no < GeometryInfo<dim>::faces_per_cell; ++face_no)
       {
+        if (parameters.debug & parameters.DetailSteps)
+          LOG(3, "Face: " << face_no);
         // Boundary face - here we pass the boundary id
         if (cell->at_boundary(face_no) && !(this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id())))
         {
+          if (parameters.debug & parameters.DetailSteps)
+            LOGL(1, " - boundary");
           fe_v_face.reinit(cell, face_no);
           assemble_face_term(face_no, fe_v_face, fe_v_face, true, cell->face(face_no)->boundary_id(), cell_rhs);
         }
@@ -172,13 +176,17 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
           // Not performed if there is no adaptivity involved.
           if (cell->neighbor_or_periodic_neighbor(face_no)->has_children())
           {
+            int n_children = cell->face(face_no)->number_of_children();
             unsigned int neighbor2;
             if (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()))
               neighbor2 = cell->periodic_neighbor_of_periodic_neighbor(face_no);
             else
               neighbor2 = cell->neighbor_of_neighbor(face_no);
 
-            for (unsigned int subface_no = 0; subface_no < 4; ++subface_no)
+            if (parameters.debug & parameters.DetailSteps)
+              LOGL(1, " - neighbor more split, " << n_children << " children");
+
+            for (unsigned int subface_no = 0; subface_no < n_children; ++subface_no)
             {
               const typename DoFHandler<dim>::active_cell_iterator neighbor_child =
                 (this->parameters.is_periodic_boundary(cell->face(face_no)->boundary_id()) ?
@@ -196,6 +204,8 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
           // Not performed if there is no adaptivity involved.
           else if (cell->neighbor_or_periodic_neighbor(face_no)->level() != cell->level())
           {
+            if (parameters.debug & parameters.DetailSteps)
+              LOGL(1, " - neighbor less split");
             const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor_or_periodic_neighbor(face_no);
             Assert(neighbor->level() == cell->level() - 1, ExcInternalError());
             neighbor->get_dof_indices(dof_indices_neighbor);
@@ -216,6 +226,8 @@ void Problem<equationsType, dim>::assemble_system(bool assemble_matrix)
           // This is the only face assembly case performed without adaptivity.
           else
           {
+            if (parameters.debug & parameters.DetailSteps)
+              LOGL(1, " - neighbor equally split");
             const typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor_or_periodic_neighbor(face_no);
             neighbor->get_dof_indices(dof_indices_neighbor);
 
@@ -680,6 +692,8 @@ void Problem<equationsType, dim>::run()
     }
 
     // Assemble
+    if(this->parameters.debug | this->parameters.BasicSteps)
+      LOGL(1, "Assembling...")
     system_rhs = 0;
     if (reset_after_refinement)
       system_matrix = 0;
@@ -692,11 +706,17 @@ void Problem<equationsType, dim>::run()
       output_vector(system_rhs, "rhs");
 
     // Solve
+    if (this->parameters.debug | this->parameters.BasicSteps)
+      LOGL(1, "Solving...")
     solve();
 
     // Postprocess if required
     if ((this->time >= this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
-      postprocess();
+    {
+      if (this->parameters.debug | this->parameters.BasicSteps)
+        LOGL(1, "Postprocessing...")
+        postprocess();
+    }
     else
       current_limited_solution = current_unlimited_solution;
 
@@ -736,6 +756,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     // we use the unlimited solution here for two reasons:
     // - it has ghost elements
     // - it is a useful indicator where to refine
+    LOGL(1, "Refining...")
     bool refined = this->adaptivity->refine_mesh(time_step_number, time, current_unlimited_solution, dof_handler, triangulation, mapping);
     if (refined)
     {
