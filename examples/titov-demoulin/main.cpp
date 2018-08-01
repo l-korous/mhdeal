@@ -52,7 +52,17 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.beta = 0.05;
 
   // coronal height scale
-  td_parameters.L_G = 0.;
+  td_parameters.L_G = 20.;
+
+  // Gravity acceleration
+  // g = ( l_0 / v^2_0 ) g
+  if (td_parameters.L_G > NEGLIGIBLE)
+  {
+    double l_0 = 1.2e8 / td_parameters.L_G;
+    double t_0 = 10.;
+    double v_0 = l_0 / t_0;
+    parameters.g = (l_0 / (v_0 * v_0)) * 274.;
+  }
 
   // Density
   td_parameters.rho_0 = 1.;
@@ -71,7 +81,7 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
 
   // Geometrical factor
   td_parameters.d = 1.5;
-  
+
   // The coronal/prominence temperature ratio
   td_parameters.Tc2Tp = 1.;
 
@@ -105,7 +115,7 @@ int main(int argc, char *argv[])
 
     InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTDInitialState<DIMENSION> boundary_conditions(parameters, td_parameters);
+    BoundaryConditionTDTest<DIMENSION> boundary_conditions(parameters, td_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity

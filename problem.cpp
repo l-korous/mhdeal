@@ -336,7 +336,13 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
     for (unsigned int q = 0; q < n_quadrature_points_cell; ++q)
     {
       if (is_primitive[i])
+      {
         val += fe_v_cell.JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
+
+        // Gravity - always downward
+        if (component_ii[i] == dim)
+          val += fe_v_cell.JxW(q) * W_prev[q][0] * fe_v_cell.shape_value(i, q) * this->parameters.g;
+      }
       else
       {
         Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);

@@ -18,6 +18,9 @@ public:
   // Use exactly Div-Free space.
   bool use_div_free_space_for_B;
 
+  // Gravity acceleration - in z-direction
+  double g;
+
   // Limiter
   bool limit;
   enum Limiter { vertexBased, barthJespersen};
