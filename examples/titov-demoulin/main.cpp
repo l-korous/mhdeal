@@ -24,21 +24,21 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
 void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-4., -6., 0.);
-  parameters.corner_b = Point<DIMENSION>(4., 6., 5.);
-  parameters.refinements = { 120, 180, 75 };
+  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
+  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
+  parameters.refinements = { 50, 100, 50 };
   parameters.limit = false;
   parameters.limitB = false;
-  parameters.use_div_free_space_for_B = true;
+  parameters.use_div_free_space_for_B = false;
   parameters.num_flux_type = Parameters<DIMENSION>::hlld;
   parameters.lax_friedrich_stabilization_value = 0.5;
   parameters.cfl_coefficient = .01;
   parameters.start_limiting_at = -1e-6;
-  parameters.quadrature_order = 5;
+  parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = -1.e-2;
-  parameters.final_time = 1.e-8;
+  parameters.output_step = 5.e-1;
+  parameters.final_time = 10.;
 
   parameters.max_cells = 2500;
   parameters.refine_every_nth_time_step = 25;
@@ -52,7 +52,17 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.beta = 0.05;
 
   // coronal height scale
-  td_parameters.L_G = 0.;
+  td_parameters.L_G = 20.;
+
+  // Gravity acceleration
+  // g = ( l_0 / v^2_0 ) g
+  if (td_parameters.L_G > NEGLIGIBLE)
+  {
+    double l_0 = 1.2e8 / td_parameters.L_G;
+    double t_0 = 10.;
+    double v_0 = l_0 / t_0;
+    parameters.g = (l_0 / (v_0 * v_0)) * 274.;
+  }
 
   // Density
   td_parameters.rho_0 = 1.;
@@ -64,14 +74,14 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   td_parameters.R = 3.0;
 
   // Torus minor radius
-  td_parameters.r = 0.5;
+  td_parameters.r = 1.0;
 
   // Magnetic charge separation distance
-  td_parameters.L = 2.0;
+  td_parameters.L = 1.5;
 
   // Geometrical factor
-  td_parameters.d = 0.5;
-  
+  td_parameters.d = 1.5;
+
   // The coronal/prominence temperature ratio
   td_parameters.Tc2Tp = 1.;
 
@@ -97,15 +107,15 @@ int main(int argc, char *argv[])
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
 #ifdef HAVE_MPI
-    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator);
+    parallel::distributed::Triangulation<DIMENSION> triangulation(mpi_communicator, typename dealii::Triangulation<DIMENSION>::MeshSmoothing(Triangulation<DIMENSION>::limit_level_difference_at_vertices));
 #else
-    Triangulation<DIMENSION> triangulation;
+    Triangulation<DIMENSION> triangulation(Triangulation<DIMENSION>::limit_level_difference_at_vertices);
 #endif    
     set_triangulation(triangulation, parameters);
 
     InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTDInitialState<DIMENSION> boundary_conditions(parameters, td_parameters);
+    BoundaryConditionTDTest<DIMENSION> boundary_conditions(parameters, td_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity

@@ -185,11 +185,11 @@ void VertexBasedSlopeLimiter<equationsType, dim>::postprocess(TrilinosWrappers::
 
     if (this->parameters.limitB)
     {
+      double mag_alpha = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
       for (int k = 5; k < Equations<equationsType, dim>::n_components; k++)
         for (int i = 0; i < data->lambda_indices_to_multiply[k].size(); i++)
-          current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= alpha_e[k];
+          current_limited_solution(data->lambda_indices_to_multiply[k][i]) *= mag_alpha;
 
-      double mag_alpha = std::min(std::min(alpha_e[5], alpha_e[6]), alpha_e[7]);
       for (int i = 0; i < data->lambda_indices_to_multiply_all_B_components.size(); i++)
         current_limited_solution(data->lambda_indices_to_multiply_all_B_components[i]) *= mag_alpha;
     }
