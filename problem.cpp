@@ -698,7 +698,7 @@ void Problem<equationsType, dim>::run()
     }
 
     // Assemble
-    if(this->parameters.debug | this->parameters.BasicSteps)
+    if(this->parameters.debug & this->parameters.BasicSteps)
       LOGL(1, "Assembling...")
     system_rhs = 0;
     if (reset_after_refinement)
@@ -712,14 +712,14 @@ void Problem<equationsType, dim>::run()
       output_vector(system_rhs, "rhs");
 
     // Solve
-    if (this->parameters.debug | this->parameters.BasicSteps)
+    if (this->parameters.debug & this->parameters.BasicSteps)
       LOGL(1, "Solving...")
     solve();
 
     // Postprocess if required
     if ((this->time >= this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
     {
-      if (this->parameters.debug | this->parameters.BasicSteps)
+      if (this->parameters.debug & this->parameters.BasicSteps)
         LOGL(1, "Postprocessing...")
         postprocess();
     }
