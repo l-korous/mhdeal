@@ -417,36 +417,33 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
       }
       for (unsigned int i = 0; i < dofs_per_cell; ++i)
       {
-        if (fe_v.get_fe().has_support_on_face(i, face_no))
+        if (!is_primitive[i])
+        {
+          Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
+          Tensor<2, dim> fe_v_grad = fe_v[mag].gradient(i, q);
+          for (int d = 0; d < dim; d++)
+          {
+            Wplus_old[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
+            for (int e = 0; e < dim; e++)
+              Wgrad_plus_old[q][5 + d][e] += prev_solution(dof_indices[i]) * fe_v_grad[d][e];
+          }
+        }
+        else
+        {
+          Wplus_old[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
+          for (int d = 0; d < dim; d++)
+            Wgrad_plus_old[q][component_ii[i]][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
+        }
+        if (!external_face)
         {
           if (!is_primitive[i])
           {
-            Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
-            Tensor<2, dim> fe_v_grad = fe_v_cell[mag].gradient(i, q);
+            Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
             for (int d = 0; d < dim; d++)
-            {
-              Wplus_old[q][5 + d] += prev_solution(dof_indices[i]) * fe_v_value[d];
-              for (int e = 0; e < dim; e++)
-                Wgrad_plus_old[q][5 + d][e] += prev_solution(dof_indices[i]) * fe_v_grad[d][e];
-            }
+              Wminus_old[q][5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
           }
           else
-          {
-            Wplus_old[q][component_ii[i]] += prev_solution(dof_indices[i]) * fe_v.shape_value(i, q);
-            for (int d = 0; d < dim; d++)
-              Wgrad_plus_old[q][component_ii[i]][d] += prev_solution(dof_indices[i]) * fe_v.shape_grad(i, q)[d];
-          }
-          if (!external_face)
-          {
-            if (!is_primitive[i])
-            {
-              Tensor<1, dim> fe_v_value_neighbor = fe_v_neighbor[mag].value(i, q);
-              for (int d = 0; d < dim; d++)
-                Wminus_old[q][5 + d] += prev_solution(dof_indices_neighbor[i]) * fe_v_value_neighbor[d];
-            }
-            else
-              Wminus_old[q][component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
-          }
+            Wminus_old[q][component_ii[i]] += prev_solution(dof_indices_neighbor[i]) * fe_v_neighbor.shape_value(i, q);
         }
       }
     }
@@ -456,7 +453,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
   {
     if (external_face)
       boundary_conditions.bc_vector_value(boundary_id, fe_v.quadrature_point(q), fe_v.normal_vector(q), Wminus_old[q], Wgrad_plus_old[q], Wplus_old[q], this->time, this->cell);
-    
+
     // Once we have the states on both sides of the face, we need to calculate the numerical flux.
     this->numFlux->numerical_normal_flux(fe_v.normal_vector(q), Wplus_old[q], Wminus_old[q], normal_fluxes_old[q], max_signal_speed);
 
@@ -493,7 +490,7 @@ Problem<equationsType, dim>::assemble_face_term(const unsigned int face_no, cons
       {
         if (!is_primitive[i])
         {
-          Tensor<1, dim> fe_v_value = fe_v_cell[mag].value(i, q);
+          Tensor<1, dim> fe_v_value = fe_v[mag].value(i, q);
           val += this->parameters.current_time_step_length * (normal_fluxes_old[q][5] * fe_v_value[0] + normal_fluxes_old[q][6] * fe_v_value[1] + normal_fluxes_old[q][7] * fe_v_value[2]) * fe_v.JxW(q);
         }
         else
@@ -641,7 +638,7 @@ void Problem<equationsType, dim>::output_results(bool use_prev_solution) const
 
     std::ofstream visit_master_output((filename_base + ".visit").c_str());
     data_out.write_pvtu_record(visit_master_output, filenames);
-}
+  }
 #else
   std::string filename = (parameters.output_file_prefix.length() > 0 ? parameters.output_file_prefix : (use_prev_solution ? "prev_solution" : "solution")) + "-" + Utilities::int_to_string(output_file_number, 3) + ".vtk";
   std::ofstream output(filename.c_str());
@@ -698,9 +695,9 @@ void Problem<equationsType, dim>::run()
     }
 
     // Assemble
-    if(this->parameters.debug & this->parameters.BasicSteps)
+    if (this->parameters.debug & this->parameters.BasicSteps)
       LOGL(1, "Assembling...")
-    system_rhs = 0;
+      system_rhs = 0;
     if (reset_after_refinement)
       system_matrix = 0;
     assemble_system(this->reset_after_refinement);
@@ -714,7 +711,7 @@ void Problem<equationsType, dim>::run()
     // Solve
     if (this->parameters.debug & this->parameters.BasicSteps)
       LOGL(1, "Solving...")
-    solve();
+      solve();
 
     // Postprocess if required
     if ((this->time >= this->parameters.start_limiting_at) && parameters.limit && parameters.polynomial_order_dg > 0)
@@ -762,9 +759,9 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     // we use the unlimited solution here for two reasons:
     // - it has ghost elements
     // - it is a useful indicator where to refine
-    if(this->parameters.debug & this->parameters.BasicSteps)
-	    LOGL(1, "Refining...")
-    bool refined = this->adaptivity->refine_mesh(time_step_number, time, current_unlimited_solution, dof_handler, triangulation, mapping);
+    if (this->parameters.debug & this->parameters.BasicSteps)
+      LOGL(1, "Refining...")
+      bool refined = this->adaptivity->refine_mesh(time_step_number, time, current_unlimited_solution, dof_handler, triangulation, mapping);
     if (refined)
     {
       // transfer solution
@@ -803,7 +800,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
         prev_solution.reinit(locally_relevant_dofs, mpi_communicator);
 
       this->perform_reset_after_refinement();
-  }
+    }
     else
     {
       this->reset_after_refinement = false;
@@ -811,7 +808,7 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
       ++time_step_number;
       time += parameters.current_time_step_length;
     }
-}
+  }
   else
   {
     this->reset_after_refinement = false;
