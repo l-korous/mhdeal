@@ -17,10 +17,10 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
   scalars[1].component = 4;
 
   const QGauss<dim - 1> face_quadrature(1);
-  UpdateFlags face_update_flags = UpdateFlags(update_values | update_JxW_values);
+  UpdateFlags face_update_flags = UpdateFlags(update_values | update_JxW_values | update_gradients);
   FEFaceValues<dim> fe_v_face(mapping, dof_handler.get_fe(), face_quadrature, face_update_flags);
   FESubfaceValues<dim> fe_v_subface(mapping, dof_handler.get_fe(), face_quadrature, face_update_flags);
-  FEFaceValues<dim> fe_v_face_neighbor(mapping, dof_handler.get_fe(), face_quadrature, update_values);
+  FEFaceValues<dim> fe_v_face_neighbor(mapping, dof_handler.get_fe(), face_quadrature, update_values | update_gradients);
   int n_quadrature_points_face = face_quadrature.get_points().size();
   int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
   this->dof_indices.resize(dofs_per_cell);
@@ -49,8 +49,8 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
       {
         Assert(cell->neighbor(face_no).state() == IteratorState::valid, ExcInternalError());
         typename DoFHandler<dim>::cell_iterator neighbor = cell->neighbor(face_no);
-        std::vector<double> u(fe_v_face.n_quadrature_points);
-        std::vector<double> u_neighbor(fe_v_face.n_quadrature_points);
+        std::vector<double> u(n_quadrature_points_face);
+        std::vector<double> u_neighbor(n_quadrature_points_face);
         std::vector<std::array<std::array<double, dim>, dim> > u_mag;
         std::vector<std::array<std::array<double, dim>, dim> > u_neighbor_mag;
         u_mag.resize(n_quadrature_points_face);
@@ -66,7 +66,7 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
             fe_v_face_neighbor.reinit(neighbor_child, neighbor2);
             neighbor_child->get_dof_indices(dof_indices_neighbor);
             const std::vector<double> &JxW = fe_v_subface.get_JxW_values();
-            for (unsigned int x = 0; x < fe_v_subface.n_quadrature_points; ++x)
+            for (unsigned int x = 0; x < n_quadrature_points_face; ++x)
               area[face_no / 2] += JxW[x];
             if (this->parameters.polynomial_order_dg == 0)
             {
@@ -75,20 +75,20 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                 fe_v_subface[scalars[scalar_i]].get_function_values(solution, u);
                 fe_v_face_neighbor[scalars[scalar_i]].get_function_values(solution, u_neighbor);
 
-                for (unsigned int x = 0; x < fe_v_subface.n_quadrature_points; ++x)
+                for (unsigned int x = 0; x < n_quadrature_points_face; ++x)
                   jump[face_no / 2] += std::fabs(u[x] - u_neighbor[x]) * JxW[x];
               }
             }
             else
             {
-              for (unsigned int q = 0; q < fe_v_subface.n_quadrature_points; ++q)
+              for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
                 for (int d = 0; d < dim; d++)
                   for (int e = 0; e < dim; e++)
                     u_mag[q][d][e] = u_neighbor_mag[q][d][e] = 0.;
 
               for (unsigned int i = 0; i < dofs_per_cell; ++i)
               {
-                for (unsigned int q = 0; q < fe_v_subface.n_quadrature_points; ++q)
+                for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
                 {
                   // Plus
                   if (!is_primitive[i])
@@ -98,9 +98,9 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                       for (int e = 0; e < dim; e++)
                         u_mag[q][d][e] += solution(this->dof_indices[i]) * fe_v_grad[d][e];
                   }
-                  else
+                  else if(component_ii[i] >= 5)
                     for (int d = 0; d < dim; d++)
-                      u_mag[q][component_ii[i]][d] += solution(this->dof_indices[i]) * fe_v_subface.shape_grad(i, q)[d];
+                      u_mag[q][component_ii[i] - 5][d] += solution(this->dof_indices[i]) * fe_v_subface.shape_grad(i, q)[d];
 
                   // Minus
                   if (!is_primitive[i])
@@ -110,13 +110,13 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                       for (int e = 0; e < dim; e++)
                         u_neighbor_mag[q][d][e] += solution(this->dof_indices_neighbor[i]) * fe_v_grad[d][e];
                   }
-                  else
+                  else if (component_ii[i] >= 5)
                     for (int d = 0; d < dim; d++)
-                      u_neighbor_mag[q][component_ii[i]][d] += solution(this->dof_indices_neighbor[i]) * fe_v_face_neighbor.shape_grad(i, q)[d];
+                      u_neighbor_mag[q][component_ii[i] - 5][d] += solution(this->dof_indices_neighbor[i]) * fe_v_face_neighbor.shape_grad(i, q)[d];
                 }
               }
 
-              for (unsigned int q = 0; q < fe_v_subface.n_quadrature_points; ++q)
+              for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
               {
                 std::array<double, dim> curl_ = { u_mag[q][2][1] - u_mag[q][1][2], u_mag[q][0][2] - u_mag[q][2][0], u_mag[q][1][0] - u_mag[q][0][1] };
                 u[q] = curl_[0] * curl_[0] + curl_[1] * curl_[1] + curl_[2] * curl_[2];
@@ -138,7 +138,7 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
             fe_v_face_neighbor.reinit(neighbor, neighbor2);
             neighbor->get_dof_indices(dof_indices_neighbor);
             const std::vector<double> &JxW = fe_v_face.get_JxW_values();
-            for (unsigned int x = 0; x < fe_v_face.n_quadrature_points; ++x)
+            for (unsigned int x = 0; x < n_quadrature_points_face; ++x)
               area[face_no / 2] += JxW[x];
             if (this->parameters.polynomial_order_dg == 0)
             {
@@ -147,20 +147,20 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                 fe_v_face[scalars[scalar_i]].get_function_values(solution, u);
                 fe_v_face_neighbor[scalars[scalar_i]].get_function_values(solution, u_neighbor);
 
-                for (unsigned int x = 0; x < fe_v_face.n_quadrature_points; ++x)
+                for (unsigned int x = 0; x < n_quadrature_points_face; ++x)
                   jump[face_no / 2] += std::fabs(u[x] - u_neighbor[x]) * JxW[x];
               }
             }
             else
             {
-              for (unsigned int q = 0; q < fe_v_face.n_quadrature_points; ++q)
+              for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
                 for (int d = 0; d < dim; d++)
                   for (int e = 0; e < dim; e++)
                     u_mag[q][d][e] = u_neighbor_mag[q][d][e] = 0.;
 
               for (unsigned int i = 0; i < dofs_per_cell; ++i)
               {
-                for (unsigned int q = 0; q < fe_v_face.n_quadrature_points; ++q)
+                for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
                 {
                   // Plus
                   if (!is_primitive[i])
@@ -170,9 +170,9 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                       for (int e = 0; e < dim; e++)
                         u_mag[q][d][e] += solution(this->dof_indices[i]) * fe_v_grad[d][e];
                   }
-                  else
+                  else if (component_ii[i] >= 5)
                     for (int d = 0; d < dim; d++)
-                      u_mag[q][component_ii[i]][d] += solution(this->dof_indices[i]) * fe_v_face.shape_grad(i, q)[d];
+                      u_mag[q][component_ii[i] - 5][d] += solution(this->dof_indices[i]) * fe_v_face.shape_grad(i, q)[d];
 
                   // Minus
                   if (!is_primitive[i])
@@ -182,13 +182,13 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                       for (int e = 0; e < dim; e++)
                         u_neighbor_mag[q][d][e] += solution(this->dof_indices_neighbor[i]) * fe_v_grad[d][e];
                   }
-                  else
+                  else if (component_ii[i] >= 5)
                     for (int d = 0; d < dim; d++)
-                      u_neighbor_mag[q][component_ii[i]][d] += solution(this->dof_indices_neighbor[i]) * fe_v_face_neighbor.shape_grad(i, q)[d];
+                      u_neighbor_mag[q][component_ii[i] - 5][d] += solution(this->dof_indices_neighbor[i]) * fe_v_face_neighbor.shape_grad(i, q)[d];
                 }
               }
 
-              for (unsigned int q = 0; q < fe_v_face.n_quadrature_points; ++q)
+              for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
               {
                 std::array<double, dim> curl_ = { u_mag[q][2][1] - u_mag[q][1][2], u_mag[q][0][2] - u_mag[q][2][0], u_mag[q][1][0] - u_mag[q][0][1] };
                 u[q] = curl_[0] * curl_[0] + curl_[1] * curl_[1] + curl_[2] * curl_[2];
@@ -214,7 +214,7 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
               neighbor_face_subface.second);
             neighbor->get_dof_indices(dof_indices_neighbor);
             const std::vector<double> &JxW = fe_v_face.get_JxW_values();
-            for (unsigned int x = 0; x < fe_v_face.n_quadrature_points; ++x)
+            for (unsigned int x = 0; x < n_quadrature_points_face; ++x)
               area[face_no / 2] += JxW[x];
             if (this->parameters.polynomial_order_dg == 0)
             {
@@ -223,20 +223,20 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
               fe_v_face[scalars[scalar_i]].get_function_values(solution, u);
               fe_v_subface[scalars[scalar_i]].get_function_values(solution, u_neighbor);
 
-              for (unsigned int x = 0; x < fe_v_face.n_quadrature_points; ++x)
+              for (unsigned int x = 0; x < n_quadrature_points_face; ++x)
                 jump[face_no / 2] += std::fabs(u[x] - u_neighbor[x]) * JxW[x];
             }
             }
             else
             {
-              for (unsigned int q = 0; q < fe_v_face.n_quadrature_points; ++q)
+              for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
                 for (int d = 0; d < dim; d++)
                   for (int e = 0; e < dim; e++)
                     u_mag[q][d][e] = u_neighbor_mag[q][d][e] = 0.;
 
               for (unsigned int i = 0; i < dofs_per_cell; ++i)
               {
-                for (unsigned int q = 0; q < fe_v_face.n_quadrature_points; ++q)
+                for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
                 {
                   // Plus
                   if (!is_primitive[i])
@@ -246,9 +246,9 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                       for (int e = 0; e < dim; e++)
                         u_mag[q][d][e] += solution(this->dof_indices[i]) * fe_v_grad[d][e];
                   }
-                  else
+                  else if (component_ii[i] >= 5)
                     for (int d = 0; d < dim; d++)
-                      u_mag[q][component_ii[i]][d] += solution(this->dof_indices[i]) * fe_v_face.shape_grad(i, q)[d];
+                      u_mag[q][component_ii[i] - 5][d] += solution(this->dof_indices[i]) * fe_v_face.shape_grad(i, q)[d];
 
                   // Minus
                   if (!is_primitive[i])
@@ -258,13 +258,13 @@ void AdaptivityTD<dim>::calculate_jumps(TrilinosWrappers::MPI::Vector& solution,
                       for (int e = 0; e < dim; e++)
                         u_neighbor_mag[q][d][e] += solution(this->dof_indices_neighbor[i]) * fe_v_grad[d][e];
                   }
-                  else
+                  else if (component_ii[i] >= 5)
                     for (int d = 0; d < dim; d++)
-                      u_neighbor_mag[q][component_ii[i]][d] += solution(this->dof_indices_neighbor[i]) * fe_v_subface.shape_grad(i, q)[d];
+                      u_neighbor_mag[q][component_ii[i] - 5][d] += solution(this->dof_indices_neighbor[i]) * fe_v_subface.shape_grad(i, q)[d];
                 }
               }
 
-              for (unsigned int q = 0; q < fe_v_subface.n_quadrature_points; ++q)
+              for (unsigned int q = 0; q < n_quadrature_points_face; ++q)
               {
                 std::array<double, dim> curl_ = { u_mag[q][2][1] - u_mag[q][1][2], u_mag[q][0][2] - u_mag[q][2][0], u_mag[q][1][0] - u_mag[q][0][1] };
                 u[q] = curl_[0] * curl_[0] + curl_[1] * curl_[1] + curl_[2] * curl_[2];
