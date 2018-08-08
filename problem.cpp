@@ -339,7 +339,7 @@ Problem<equationsType, dim>::assemble_cell_term(FullMatrix<double>& cell_matrix,
       {
         val += fe_v_cell.JxW(q) * W_prev[q][component_ii[i]] * fe_v_cell.shape_value(i, q);
 
-        // Gravity - always downward
+        // Gravity
         if (component_ii[i] == dim)
           val += fe_v_cell.JxW(q) * W_prev[q][0] * fe_v_cell.shape_value(i, q) * this->parameters.g;
       }
@@ -762,7 +762,8 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
     // we use the unlimited solution here for two reasons:
     // - it has ghost elements
     // - it is a useful indicator where to refine
-    LOGL(1, "Refining...")
+    if(this->parameters.debug & this->parameters.BasicSteps)
+	    LOGL(1, "Refining...")
     bool refined = this->adaptivity->refine_mesh(time_step_number, time, current_unlimited_solution, dof_handler, triangulation, mapping);
     if (refined)
     {
