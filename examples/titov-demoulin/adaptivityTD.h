@@ -27,6 +27,11 @@ public:
   int perform_n_initial_refinements;
   double refine_threshold;
   double coarsen_threshold;
+  std::array <unsigned short, BASIS_FN_COUNT> component_ii;
+  std::array <bool, BASIS_FN_COUNT> is_primitive;
+  FEValuesExtractors::Vector mag;
+  std::vector<types::global_dof_index> dof_indices;
+  std::vector<types::global_dof_index> dof_indices_neighbor;
 };
 
 #endif
