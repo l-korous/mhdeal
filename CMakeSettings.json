@@ -1,0 +1,111 @@
+{
+  "environments": [
+    {
+      "environment": "IS_includes", // this is used for intelliSense
+      // ${env.USERPROFILE} == c:\Users\<userName>
+      // ${env.LOCALAPPDATA} == c:\Users\<userName>\AppData\Local
+      "INCLUDE": "${env.INCLUDE};${env.USERPROFILE}\\programy\\sklad;${env.LOCALAPPDATA}\\Microsoft\\Linux\\Header Cache\\1.0\\919434520\\usr\\include"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "Oasa-Release",
+      "generator": "Unix Makefiles",
+      "remoteMachineName": "oasa.asu.cas.cz",
+      "configurationType": "Release",
+      "remoteCMakeListsRoot": "/home/kotek/prg/vs/mhdeal_release",
+      "cmakeExecutable": "/home/kotek/prg/CMake/build/install/bin/cmake",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "installRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\install\\${name}",
+      "remoteBuildRoot": "/home/kotek/prg/vs/mhdeal_release/build",
+      "remoteInstallRoot": "/home/kotek/prg/vs/mhdeal_release/install",
+      "remoteCopySources": true,
+      "remoteCopySourcesOutputVerbosity": "Normal",
+      "remoteCopySourcesConcurrentCopies": "10",
+      "remoteCopySourcesMethod": "sftp",
+      "remoteCopyBuildOutput": true,
+      "cmakeCommandArgs": "-DDEAL_II_DIR=/home/kotek/prg/dealii/build/install",
+      "buildCommandArgs": "-j20",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [
+        "linux_x64",
+        "IS_includes"
+      ]
+    },
+    {
+      "name": "Oasa-Debug",
+      "generator": "Unix Makefiles",
+      "remoteMachineName": "oasa.asu.cas.cz",
+      "configurationType": "Debug",
+      "remoteCMakeListsRoot": "/home/kotek/prg/xcmake",
+      "cmakeExecutable": "/home/kotek/prg/CMake/build/install/bin/cmake",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "installRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\install\\${name}",
+      "remoteBuildRoot": "/home/kotek/prg/xcmake/build",
+      "remoteInstallRoot": "/home/kotek/prg/xcmake/build/install",
+      "remoteCopySources": true,
+      "remoteCopySourcesOutputVerbosity": "Normal",
+      "remoteCopySourcesConcurrentCopies": "10",
+      "remoteCopySourcesMethod": "sftp",
+      "remoteCopyBuildOutput": true,
+      "cmakeCommandArgs": "-DDEAL_II_DIR=/home/kotek/prg/dealii/build_debug/install",
+      "buildCommandArgs": "-j20",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [
+        "linux_x64",
+        "IS_includes"
+      ]
+    },
+
+    {
+      "name": "WSL-Debug",
+      "generator": "Unix Makefiles",
+      "remoteMachineName": "localhost",
+      "configurationType": "Debug",
+      "remoteCMakeListsRoot": "/home/jfk/programy/xcmake",
+      "cmakeExecutable": "/usr/local/bin/cmake",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "installRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\install\\${name}",
+      "remoteBuildRoot": "/home/jfk/programy/xcmake/build",
+      "remoteInstallRoot": "/home/jfk/programy/xcmake/build/install",
+      "remoteCopySources": true,
+      "remoteCopySourcesOutputVerbosity": "Normal",
+      "remoteCopySourcesConcurrentCopies": "10",
+      "remoteCopySourcesMethod": "sftp",
+      "remoteCopyBuildOutput": true,
+      "cmakeCommandArgs": "-DDEAL_II_DIR=/home/jfk/programy/dealii/build_debug/install",
+      "buildCommandArgs": "-j2",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [
+        "linux_x64",
+        "IS_includes"
+      ]
+    },
+
+    {
+      "name": "WSL-Release",
+      "generator": "Unix Makefiles",
+      "remoteMachineName": "localhost",
+      "configurationType": "Release",
+      "remoteCMakeListsRoot": "/home/jfk/programy/xcmake/xcmake_r",
+      "cmakeExecutable": "/usr/local/bin/cmake",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\build\\${name}",
+      "installRoot": "${env.USERPROFILE}\\CMakeBuilds\\${workspaceHash}\\install\\${name}",
+      "remoteBuildRoot": "/home/jfk/programy/xcmake/xcmake_r/build",
+      "remoteInstallRoot": "/home/jfk/programy/xcmake/xcmake_r/build/install",
+      "remoteCopySources": true,
+      "remoteCopySourcesOutputVerbosity": "Normal",
+      "remoteCopySourcesConcurrentCopies": "10",
+      "remoteCopySourcesMethod": "sftp",
+      "remoteCopyBuildOutput": true,
+      "cmakeCommandArgs": "-DDEAL_II_DIR=/home/jfk/programy/dealii/build/install",
+      "buildCommandArgs": "-j2",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [
+        "linux_x64",
+        "IS_includes"
+      ]
+    }
+  ]
+}
+

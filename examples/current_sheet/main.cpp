@@ -2,10 +2,10 @@
 #include "problem.h"
 #include "equationsMhd.h"
 #include "parameters.h"
-#include "parametersTD.h"
-#include "initialConditionTD.h"
-#include "boundaryConditionTD.h"
-#include "adaptivityTD.h"
+#include "parametersCS.h"
+#include "initialConditionCS.h"
+#include "boundaryConditionCS.h"
+#include "adaptivityCS.h"
 
 // Dimension of the problem - passed as a template parameter to pretty much every class.
 #define DIMENSION 3
@@ -21,12 +21,12 @@ void set_triangulation(Triangulation<DIMENSION>& triangulation, Parameters<DIMEN
   GridGenerator::subdivided_hyper_rectangle(triangulation, parameters.refinements, parameters.corner_a, parameters.corner_b, true);
 }
 
-void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& td_parameters)
+void set_parameters(Parameters<DIMENSION>& parameters, CSParameters& cs_parameters)
 {
   parameters.slope_limiter = parameters.vertexBased;
-  parameters.corner_a = Point<DIMENSION>(-5., -10., 0.);
-  parameters.corner_b = Point<DIMENSION>(5., 10., 10.);
-  parameters.refinements = { 50, 100, 50 };
+  parameters.corner_a = Point<DIMENSION>(-10., -10., 0.);
+  parameters.corner_b = Point<DIMENSION>(10., 10., 1.);
+  parameters.refinements = { 50, 50, 5 };
   parameters.limit = false;
   parameters.limitB = false;
   parameters.use_div_free_space_for_B = false;
@@ -37,60 +37,60 @@ void set_parameters(Parameters<DIMENSION>& parameters, TitovDemoulinParameters& 
   parameters.quadrature_order = 1;
   parameters.polynomial_order_dg = 0;
   parameters.patches = 0;
-  parameters.output_step = 5.e-1;
-  parameters.final_time = 12.;
-  parameters.output_file_prefix = "vtx_limit";
+  parameters.output_step = 1.e-1;
+  parameters.final_time = 10.;
+  parameters.output_file_prefix = "solution";
 
-  parameters.max_cells = 2500;
+  parameters.max_cells = 1000;
   parameters.refine_every_nth_time_step = 25;
-  parameters.perform_n_initial_refinements = 25;
+  parameters.perform_n_initial_refinements = 15;
   parameters.refine_threshold = 0.5;
   parameters.coarsen_threshold = 0.2;
   parameters.volume_factor = 4;
   parameters.time_interval_max_cells_multiplicator = 0.;
 
   // plasma beta
-  td_parameters.beta = 0.05;
+  cs_parameters.beta = 0.15;
 
   // coronal height scale
-  td_parameters.L_G = 20.;
+  cs_parameters.L_G = 0.;
 
   // Gravity acceleration
   // g = ( l_0 / v^2_0 ) g
-  if (td_parameters.L_G > NEGLIGIBLE)
+  if (cs_parameters.L_G > NEGLIGIBLE)
   {
-    double l_0 = 1.2e8 / td_parameters.L_G;
+    double l_0 = 1.2e8 / cs_parameters.L_G;
     double t_0 = 10.;
     double v_0 = l_0 / t_0;
-    parameters.g = (l_0 / (v_0 * v_0)) * 274.;
+    parameters.g = 0.;
   }
 
   // Density
-  td_parameters.rho_0 = 1.;
+  cs_parameters.rho_0 = 1.;
 
   // Torus winding number
-  td_parameters.N_t = 5.;
+  cs_parameters.N_t = 5.;
 
   // Torus major radius
-  td_parameters.R = 3.0;
+  cs_parameters.R = 3.0;
 
   // Torus minor radius
-  td_parameters.r = 1.0;
+  cs_parameters.r = 1.0;
 
   // Magnetic charge separation distance
-  td_parameters.L = 1.5;
+  cs_parameters.L = 1.5;
 
   // Geometrical factor
-  td_parameters.d = 1.5;
+  cs_parameters.d = 1.5;
 
   // The coronal/prominence temperature ratio
-  td_parameters.Tc2Tp = 1.;
+  cs_parameters.Tc2Tp = 1.;
 
-  td_parameters.omega_0 = 0.3;
+  cs_parameters.omega_0 = 0.3;
 
-  td_parameters.t_drive = 2.0;
+  cs_parameters.t_drive = 2.0;
 
-  td_parameters.t_ramp = 1.0;
+  cs_parameters.t_ramp = 1.0;
 }
 
 int main(int argc, char *argv[])
@@ -102,8 +102,8 @@ int main(int argc, char *argv[])
   {
     // Initialization of parameters. See parameters.h for description of the individual parameters
     Parameters<DIMENSION> parameters;
-    TitovDemoulinParameters td_parameters;
-    set_parameters(parameters, td_parameters);
+    CSParameters cs_parameters;
+    set_parameters(parameters, cs_parameters);
     parameters.delete_old_outputs(mpi_communicator);
 
     // Declaration of triangulation. The triangulation is not initialized here, but rather in the constructor of Parameters class.
@@ -114,13 +114,13 @@ int main(int argc, char *argv[])
 #endif    
     set_triangulation(triangulation, parameters);
 
-    InitialConditionTitovDemoulin<EQUATIONS, DIMENSION> initial_condition(parameters, td_parameters);
+    InitialConditionCS<EQUATIONS, DIMENSION> initial_condition(parameters, cs_parameters);
     // Set up of boundary condition. See boundaryCondition.h for description of methods, set up the specific function in boundaryCondition.cpp
-    BoundaryConditionTDTest<DIMENSION> boundary_conditions(parameters, td_parameters);
+    BoundaryConditionCSTest<DIMENSION> boundary_conditions(parameters, cs_parameters);
     // Set up equations - see equations.h, equationsMhd.h
     Equations<EQUATIONS, DIMENSION> equations;
     // Adaptivity
-    AdaptivityTD<DIMENSION> adaptivity(parameters, mpi_communicator);
+    AdaptivityCS<DIMENSION> adaptivity(parameters, mpi_communicator);
     // Put together the problem.
     Problem<EQUATIONS, DIMENSION> problem(parameters, equations, triangulation, initial_condition, boundary_conditions);
     // Set adaptivity

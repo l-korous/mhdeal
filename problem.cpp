@@ -740,17 +740,21 @@ void Problem<equationsType, dim>::move_time_step_handle_outputs()
   if (parameters.output_solution)
     output_vector(current_limited_solution, "solution");
 
-  if ((parameters.output_step < 0) || (time - last_output_time >= parameters.output_step))
-  {
-    output_results();
-    last_output_time = time;
-  }
+  //if ((parameters.output_step < 0) || (time - last_output_time >= parameters.output_step))
+  //{
+  //  output_results();
+  //  last_output_time = time;
+  //}
+  
+ if (time_step_number<=1) output_results();
+
 
   if (time_step_number > 0)
+
   {
-    calculate_cfl_condition();
-    double global_cfl_time_step = Utilities::MPI::min(this->cfl_time_step, mpi_communicator);
-    parameters.current_time_step_length = global_cfl_time_step;
+	 calculate_cfl_condition();
+	 double global_cfl_time_step = Utilities::MPI::min(this->cfl_time_step, mpi_communicator);
+	 parameters.current_time_step_length = global_cfl_time_step;
   }
 
   if (this->adaptivity)
