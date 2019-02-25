@@ -5,7 +5,7 @@
 #include "parameters.h"
 #include "initialCondition.h"
 #include "boundaryCondition.h"
-#include "equations.h"
+#include "equationsMhd.h"
 #include "initialConditionCS.h"
 #include "parametersCS.h"
 
@@ -83,5 +83,4 @@ private:
   double R2L;
   double q_mag;
 };
-
 #endif

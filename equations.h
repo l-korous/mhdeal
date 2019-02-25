@@ -12,8 +12,9 @@ enum EquationsType {
 template <EquationsType equationsType, int dim>
 class Equations
 {
-  static const unsigned int n_components = 0;
-  typedef std::array<double, n_components> values_vector;
+    public:
+        static const unsigned int n_components = 0;
+        typedef std::array<double, n_components> values_vector;
 };
 
 #endif

@@ -3,16 +3,16 @@
 
 #include "util.h"
 #include "parameters.h"
+#include "equationsMhd.h"
 #include "initialCondition.h"
-#include "equations.h"
 #include "parametersCS.h"
 
 template <EquationsType equationsType, int dim>
 class InitialConditionCS : public InitialCondition<equationsType, dim>
 {
 public:
-  InitialConditionCS(Parameters<dim>&, CSParameters&);
-  void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
+    InitialConditionCS(Parameters<dim>&, CSParameters&);
+    void vector_value(const std::vector<Point<dim> >&, std::vector<std::array<double, Equations<equationsType, dim>::n_components> >&) const;
 
 private:
   CSParameters& cs_parameters;
