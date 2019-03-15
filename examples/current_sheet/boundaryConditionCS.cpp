@@ -61,6 +61,9 @@ template <int dim>
 void BoundaryConditionCSTest<dim>::bc_vector_value(int boundary_no, const Point<dim> &point, const Tensor<1, dim> &normal, 
   values_vector &result, const grad_vector &grads, const values_vector &values, double time, typename DoFHandler<dim>::active_cell_iterator& cell) const
 {
+  for (unsigned int di = 0; di < Equations<EquationsTypeMhd, dim>::n_components; ++di)
+    result[di] = values[di];
+  return;
   // Density the same.
   result[0] = values[0];
 
